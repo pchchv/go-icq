@@ -1,8 +1,10 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"strings"
 )
 
@@ -70,4 +72,28 @@ type uriFormatError struct {
 
 func (e uriFormatError) Error() string {
 	return fmt.Sprintf("invalid listener URI %q: %v. Valid format: SCHEME://HOST:PORT (e.g., LOCAL://0.0.0.0:5190)", e.URI, e.Err)
+}
+
+// parseURI is a helper function to parse and validate a single URI
+func parseURI(uriStr string) (u *url.URL, err error) {
+	uriStr = strings.TrimSpace(uriStr)
+	if uriStr == "" {
+		return
+	}
+
+	u, err = url.Parse(uriStr)
+	if err != nil {
+		return nil, uriFormatError{URI: uriStr, Err: err}
+	}
+
+	switch {
+	case u.Scheme == "":
+		return nil, uriFormatError{URI: uriStr, Err: errors.New("missing scheme")}
+	case u.Hostname() == "":
+		return nil, uriFormatError{URI: uriStr, Err: errors.New("missing host")}
+	case u.Port() == "":
+		return nil, uriFormatError{URI: uriStr, Err: errors.New("missing port")}
+	}
+
+	return u, nil
 }

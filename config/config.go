@@ -67,3 +67,7 @@ type uriFormatError struct {
 	URI string
 	Err error
 }
+
+func (e uriFormatError) Error() string {
+	return fmt.Sprintf("invalid listener URI %q: %v. Valid format: SCHEME://HOST:PORT (e.g., LOCAL://0.0.0.0:5190)", e.URI, e.Err)
+}

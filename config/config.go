@@ -8,6 +8,13 @@ import (
 	"strings"
 )
 
+var (
+	// Simple error for duplicate listener definitions.
+	errDuplicateListener = errors.New("duplicate listener definition")
+	// Simple error for missing BOS listeners.
+	errNoBOSListeners = errors.New("at least one BOS listener is required")
+)
+
 type Listener struct {
 	BOSListenAddress       string
 	BOSAdvertisedHostPlain string
@@ -62,6 +69,110 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+func (c *Config) ParseListenersCfg() ([]Listener, error) {
+	m := make(map[string]*Listener)
+	// parse BOS listeners
+	for _, uriStr := range c.BOSListeners {
+		u, err := parseURI(uriStr)
+		if err != nil {
+			return nil, err
+		} else if u == nil {
+			continue
+		}
+
+		if _, ok := m[u.Scheme]; !ok {
+			m[u.Scheme] = &Listener{}
+		}
+
+		if m[u.Scheme].BOSListenAddress != "" {
+			return nil, errDuplicateListener
+		}
+
+		m[u.Scheme].BOSListenAddress = net.JoinHostPort(u.Hostname(), u.Port())
+	}
+
+	// parse plaintext BOS advertised listeners
+	for _, uriStr := range c.BOSAdvertisedHostsPlain {
+		u, err := parseURI(uriStr)
+		if err != nil {
+			return nil, err
+		} else if u == nil {
+			continue
+		}
+
+		if _, ok := m[u.Scheme]; !ok {
+			m[u.Scheme] = &Listener{}
+		}
+
+		if m[u.Scheme].BOSAdvertisedHostPlain != "" {
+			return nil, errDuplicateListener
+		}
+
+		m[u.Scheme].BOSAdvertisedHostPlain = net.JoinHostPort(u.Hostname(), u.Port())
+	}
+
+	// parse SSL BOS advertised listeners
+	for _, uriStr := range c.BOSAdvertisedHostsSSL {
+		u, err := parseURI(uriStr)
+		if err != nil {
+			return nil, err
+		} else if u == nil {
+			continue
+		}
+
+		if _, ok := m[u.Scheme]; !ok {
+			m[u.Scheme] = &Listener{}
+		}
+
+		if m[u.Scheme].BOSAdvertisedHostSSL != "" {
+			return nil, errDuplicateListener
+		}
+
+		m[u.Scheme].HasSSL = true
+		m[u.Scheme].BOSAdvertisedHostSSL = net.JoinHostPort(u.Hostname(), u.Port())
+	}
+
+	// parse Kerberos listeners
+	for _, uriStr := range c.KerberosListeners {
+		u, err := parseURI(uriStr)
+		if err != nil {
+			return nil, err
+		}
+
+		if u == nil {
+			continue
+		}
+
+		if _, ok := m[u.Scheme]; !ok {
+			m[u.Scheme] = &Listener{}
+		}
+
+		if m[u.Scheme].KerberosListenAddress != "" {
+			return nil, errDuplicateListener
+		}
+
+		m[u.Scheme].KerberosListenAddress = net.JoinHostPort(u.Hostname(), u.Port())
+	}
+
+	ret := make([]Listener, 0, len(m))
+	for k, v := range m {
+		switch {
+		case v.BOSAdvertisedHostPlain == "":
+			return nil, fmt.Errorf("missing BOS advertise address for listener `%s://`", k)
+		case v.BOSListenAddress == "":
+			return nil, fmt.Errorf("missing BOS listen address for listener `%s://`", k)
+		}
+
+		ret = append(ret, *v)
+	}
+
+	if len(ret) == 0 {
+		return nil, errNoBOSListeners
+	}
+
+	return ret, nil
 }
 
 // uriFormatError is a custom error type for errors related to URIs.

@@ -23,6 +23,12 @@ type Listener struct {
 	HasSSL                 bool
 }
 
+type Build struct {
+	Version string `json:"version"`
+	Commit  string `json:"commit"`
+	Date    string `json:"date"`
+}
+
 type Config struct {
 	BOSListeners            []string
 	BOSAdvertisedHostsPlain []string

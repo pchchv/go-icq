@@ -6,6 +6,14 @@ import (
 	"strings"
 )
 
+type Listener struct {
+	BOSListenAddress       string
+	BOSAdvertisedHostPlain string
+	BOSAdvertisedHostSSL   string
+	KerberosListenAddress  string
+	HasSSL                 bool
+}
+
 type Config struct {
 	BOSListeners            []string
 	BOSAdvertisedHostsPlain []string

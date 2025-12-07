@@ -61,3 +61,9 @@ func (c *Config) Validate() error {
 
 	return nil
 }
+
+// uriFormatError is a custom error type for errors related to URIs.
+type uriFormatError struct {
+	URI string
+	Err error
+}

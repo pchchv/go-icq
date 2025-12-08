@@ -12,6 +12,8 @@ import (
 
 var (
 	errInvalidStructTag      = errors.New("invalid struct tag")
+	errOptionalNonPointer    = errors.New("optional fields must be pointers")
+	errNonOptionalPointer    = errors.New("pointer fields must reference structs and have an `optional` struct tag")
 	errMarshalFailureNilSNAC = errors.New("attempting to marshal a nil SNAC")
 )
 
@@ -212,9 +214,45 @@ func marshalSlice(t reflect.Type, v reflect.Value, oscTag oscarTag, w io.Writer,
 	return nil
 }
 
-func marshal(t reflect.Type) error {
+func marshal(t reflect.Type, v reflect.Value, tag reflect.StructTag, w io.Writer, order binary.ByteOrder) error {
 	if t == nil {
 		return errMarshalFailureNilSNAC
 	}
-	return nil
+
+	oscTag, err := parseOSCARTag(tag)
+	if err != nil {
+		return err
+	}
+
+	if oscTag.optional {
+		if t.Kind() != reflect.Ptr {
+			return fmt.Errorf("%w: got %v", errOptionalNonPointer, t.Kind())
+		}
+
+		if v.IsNil() {
+			return nil
+		}
+
+		// dereference pointer
+		return marshalStruct(t.Elem(), v.Elem(), oscTag, w, order)
+	} else if t.Kind() == reflect.Ptr {
+		return errNonOptionalPointer
+	}
+
+	switch t.Kind() {
+	case reflect.Array:
+		return marshalArray(t, v, w, order)
+	case reflect.Slice:
+		return marshalSlice(t, v, oscTag, w, order)
+	case reflect.String:
+		return marshalString(oscTag, v, w, order)
+	case reflect.Struct:
+		return marshalStruct(t, v, oscTag, w, order)
+	case reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return binary.Write(w, order, v.Interface())
+	case reflect.Interface:
+		return marshalInterface(v, w, oscTag, order)
+	default:
+		return fmt.Errorf("unsupported type %v", t.Kind())
+	}
 }

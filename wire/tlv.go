@@ -14,6 +14,16 @@ type TLV struct {
 	Value []byte `oscar:"len_prefix=uint16"`
 }
 
+// NewTLVBE creates a new TLV. Values are marshalled in big-endian order.
+func NewTLVBE(tag uint16, val any) TLV {
+	return newTLV(tag, val, binary.BigEndian)
+}
+
+// NewTLVLE creates a new TLV. Values are marshalled in little-endian order.
+func NewTLVLE(tag uint16, val any) TLV {
+	return newTLV(tag, val, binary.LittleEndian)
+}
+
 func newTLV(tag uint16, val any, order binary.ByteOrder) TLV {
 	t := TLV{
 		Tag: tag,

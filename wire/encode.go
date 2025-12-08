@@ -1,6 +1,7 @@
 package wire
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -109,6 +110,50 @@ func marshalString(oscTag oscarTag, v reflect.Value, w io.Writer, order binary.B
 	}
 
 	return binary.Write(w, order, []byte(str))
+}
+
+func marshalStruct(t reflect.Type, v reflect.Value, oscTag oscarTag, w io.Writer, order binary.ByteOrder) error {
+	// marshal ICQ messages in little endian order
+	if t.Name() == "ICQMessageReplyEnvelope" {
+		order = binary.LittleEndian
+	}
+
+	marshalEachField := func(w io.Writer) error {
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i)
+			value := v.Field(i)
+			if field.Type.Kind() == reflect.Ptr {
+				if i != t.NumField()-1 {
+					return fmt.Errorf("pointer type found at non-final field %s", field.Name)
+				}
+				if field.Type.Elem().Kind() != reflect.Struct {
+					return fmt.Errorf("field %s must point to a struct, got %v instead", field.Name,
+						field.Type.Elem().Kind())
+				}
+			}
+			if err := marshal(field.Type, value, field.Tag, w, order); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if oscTag.hasLenPrefix {
+		buf := &bytes.Buffer{}
+		if err := marshalEachField(buf); err != nil {
+			return err
+		}
+		// write struct length
+		if err := marshalUnsignedInt(oscTag.lenPrefix, buf.Len(), w, order); err != nil {
+			return err
+		}
+		// write struct bytes
+		if buf.Len() > 0 {
+			_, err := w.Write(buf.Bytes())
+			return err
+		}
+		return nil
+	}
+	return marshalEachField(w)
 }
 
 func marshal(t reflect.Type) error {

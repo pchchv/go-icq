@@ -1,8 +1,10 @@
 package wire
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"strings"
 )
@@ -69,4 +71,39 @@ func parseOSCARTag(tag reflect.StructTag) (oscTag oscarTag, err error) {
 	}
 
 	return oscTag, err
+}
+
+func marshalUnsignedInt(intType reflect.Kind, intVal int, w io.Writer, order binary.ByteOrder) error {
+	switch intType {
+	case reflect.Uint8:
+		if err := binary.Write(w, order, uint8(intVal)); err != nil {
+			return err
+		}
+	case reflect.Uint16:
+		if err := binary.Write(w, order, uint16(intVal)); err != nil {
+			return err
+		}
+	default:
+		panic(fmt.Sprintf("unsupported type %s. allowed types: uint8, uint16", intType))
+	}
+	return nil
+}
+
+func marshalString(oscTag oscarTag, v reflect.Value, w io.Writer, order binary.ByteOrder) error {
+	str := v.String()
+	if oscTag.nullTerminated && str != "" {
+		str = str + "\x00"
+	}
+
+	if oscTag.hasLenPrefix {
+		if err := marshalUnsignedInt(oscTag.lenPrefix, len(str), w, order); err != nil {
+			return err
+		}
+	}
+
+	if str == "" {
+		return nil
+	}
+
+	return binary.Write(w, order, []byte(str))
 }

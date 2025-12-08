@@ -179,6 +179,39 @@ func marshalInterface(v reflect.Value, w io.Writer, tag oscarTag, order binary.B
 	return marshalStruct(elem.Type(), elem, tag, w, order)
 }
 
+// TODO: only write to temporary buffer if len_prefix is set
+func marshalSlice(t reflect.Type, v reflect.Value, oscTag oscarTag, w io.Writer, order binary.ByteOrder) error {
+	buf := &bytes.Buffer{}
+	if t.Elem().Kind() == reflect.Struct {
+		for j := 0; j < v.Len(); j++ {
+			if err := marshalStruct(t.Elem(), v.Index(j), oscarTag{}, buf, order); err != nil {
+				return err
+			}
+		}
+	} else {
+		if err := binary.Write(buf, order, v.Interface()); err != nil {
+			return fmt.Errorf("error marshalling %s", t.Elem().Kind())
+		}
+	}
+
+	if oscTag.hasLenPrefix {
+		if err := marshalUnsignedInt(oscTag.lenPrefix, buf.Len(), w, order); err != nil {
+			return err
+		}
+	} else if oscTag.hasCountPrefix {
+		if err := marshalUnsignedInt(oscTag.countPrefix, v.Len(), w, order); err != nil {
+			return err
+		}
+	}
+
+	if buf.Len() > 0 {
+		_, err := w.Write(buf.Bytes())
+		return err
+	}
+
+	return nil
+}
+
 func marshal(t reflect.Type) error {
 	if t == nil {
 		return errMarshalFailureNilSNAC

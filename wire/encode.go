@@ -9,7 +9,10 @@ import (
 	"strings"
 )
 
-var errInvalidStructTag = errors.New("invalid struct tag")
+var (
+	errInvalidStructTag      = errors.New("invalid struct tag")
+	errMarshalFailureNilSNAC = errors.New("attempting to marshal a nil SNAC")
+)
 
 type oscarTag struct {
 	hasCountPrefix bool
@@ -106,4 +109,11 @@ func marshalString(oscTag oscarTag, v reflect.Value, w io.Writer, order binary.B
 	}
 
 	return binary.Write(w, order, []byte(str))
+}
+
+func marshal(t reflect.Type) error {
+	if t == nil {
+		return errMarshalFailureNilSNAC
+	}
+	return nil
 }

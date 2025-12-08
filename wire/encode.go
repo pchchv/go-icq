@@ -11,6 +11,7 @@ import (
 )
 
 var (
+	ErrMarshalFailure        = errors.New("failed to marshal")
 	errInvalidStructTag      = errors.New("invalid struct tag")
 	errOptionalNonPointer    = errors.New("optional fields must be pointers")
 	errNonOptionalPointer    = errors.New("pointer fields must reference structs and have an `optional` struct tag")
@@ -24,6 +25,22 @@ type oscarTag struct {
 	lenPrefix      reflect.Kind
 	optional       bool
 	nullTerminated bool
+}
+
+// MarshalBE marshals OSCAR protocol messages in big-endian format.
+func MarshalBE(v any, w io.Writer) error {
+	if err := marshal(reflect.TypeOf(v), reflect.ValueOf(v), "", w, binary.BigEndian); err != nil {
+		return fmt.Errorf("%w: %w", ErrMarshalFailure, err)
+	}
+	return nil
+}
+
+// MarshalLE marshals ICQ protocol messages in little-endian format.
+func MarshalLE(v any, w io.Writer) error {
+	if err := marshal(reflect.TypeOf(v), reflect.ValueOf(v), "", w, binary.LittleEndian); err != nil {
+		return fmt.Errorf("%w: %w", ErrMarshalFailure, err)
+	}
+	return nil
 }
 
 func parseOSCARTag(tag reflect.StructTag) (oscTag oscarTag, err error) {

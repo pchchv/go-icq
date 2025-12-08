@@ -59,3 +59,9 @@ type TLVList []TLV
 type TLVBlock struct {
 	TLVList `oscar:"count_prefix=uint16"`
 }
+
+// TLVLBlock is a type of TLV array that has the TLV blob byte-length encoded as
+// a 2-byte value at the beginning of the encoded blob.
+type TLVLBlock struct {
+	TLVList `oscar:"len_prefix=uint16"`
+}

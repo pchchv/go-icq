@@ -46,3 +46,10 @@ func newTLV(tag uint16, val any, order binary.ByteOrder) TLV {
 	}
 	return t
 }
+
+// TLVList is a list of TLV elements.
+// It provides methods to append and access TLVs in the array.
+// It provides methods that decode the data blob into the appropriate type at runtime.
+// The caller assumes the TLV data type at runtime based on the protocol specification.
+// These methods are not safe for read-write access by multiple goroutines.
+type TLVList []TLV

@@ -156,6 +156,29 @@ func marshalStruct(t reflect.Type, v reflect.Value, oscTag oscarTag, w io.Writer
 	return marshalEachField(w)
 }
 
+func marshalArray(t reflect.Type, v reflect.Value, w io.Writer, order binary.ByteOrder) error {
+	if t.Elem().Kind() == reflect.Struct {
+		for j := 0; j < v.Len(); j++ {
+			if err := marshalStruct(t.Elem(), v.Index(j), oscarTag{}, w, order); err != nil {
+				return fmt.Errorf("error marshalling %s: %w", t.Elem().Kind(), err)
+			}
+		}
+	} else {
+		if err := binary.Write(w, order, v.Interface()); err != nil {
+			return fmt.Errorf("error marshalling %s: %w", t.Elem().Kind(), err)
+		}
+	}
+	return nil
+}
+
+func marshalInterface(v reflect.Value, w io.Writer, tag oscarTag, order binary.ByteOrder) error {
+	elem := v.Elem()
+	if elem.Kind() != reflect.Struct {
+		return fmt.Errorf("interface underlying type must be a struct, got %v instead", elem.Kind())
+	}
+	return marshalStruct(elem.Type(), elem, tag, w, order)
+}
+
 func marshal(t reflect.Type) error {
 	if t == nil {
 		return errMarshalFailureNilSNAC

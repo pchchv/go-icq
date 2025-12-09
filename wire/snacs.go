@@ -36,3 +36,16 @@ type ICQMetadataWithSubType struct {
 		ReqSubType uint16
 	} `oscar:"optional"`
 }
+
+type ICQ_0x0041_DBQueryOfflineMsgReply struct {
+	ICQMetadata
+	SenderUIN uint32
+	Year      uint16
+	Month     uint8
+	Day       uint8
+	Hour      uint8
+	Minute    uint8
+	MsgType   uint8
+	Flags     uint8
+	Message   string `oscar:"len_prefix=uint16,nullterm"`
+}

@@ -211,6 +211,31 @@ func (s *TLVList) ICQString(tag uint16) (string, bool) {
 	return "", false
 }
 
+// Bytes retrieves the byte payload associated with the
+// specified tag from the TLVList.
+//
+// If the specified tag is found,
+// the function returns the associated byte slice and true.
+// If the tag is not found, the function returns nil and false.
+func (s *TLVList) Bytes(tag uint16) ([]byte, bool) {
+	for _, tlv := range *s {
+		if tag == tlv.Tag {
+			return tlv.Value, true
+		}
+	}
+	return nil, false
+}
+
+// HasTag indicates if a TLV list has a tag.
+func (s *TLVList) HasTag(tag uint16) bool {
+	for _, tlv := range *s {
+		if tag == tlv.Tag {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *TLVList) uint16(tag uint16, order binary.ByteOrder) (uint16, bool) {
 	for _, tlv := range *s {
 		if tag == tlv.Tag {

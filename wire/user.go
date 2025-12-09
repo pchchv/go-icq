@@ -28,3 +28,12 @@ func StrongMD5PasswordHash(pass, authKey string) []byte {
 	io.WriteString(bottom, "AOL Instant Messenger (SM)")
 	return bottom.Sum(nil)
 }
+
+// roastPass toggles obfuscation/deobfuscates of roastedPass.
+func roastPass(roastedPass []byte, roastTable []byte) []byte {
+	clearPass := make([]byte, len(roastedPass))
+	for i := range roastedPass {
+		clearPass[i] = roastedPass[i] ^ roastTable[i%len(roastTable)]
+	}
+	return clearPass
+}

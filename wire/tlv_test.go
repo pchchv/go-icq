@@ -182,3 +182,234 @@ func TestTLVList_ICQString(t *testing.T) {
 		assert.Empty(t, str)
 	})
 }
+
+func TestTLVList_Getters(t *testing.T) {
+	tests := []struct {
+		name   string
+		given  []TLV
+		ttype  any
+		lookup func(TLVList) (any, bool)
+		expect any
+		found  bool
+		panic  bool
+	}{
+		{
+			name: "given a TLV of big-endian uint32, expect found value",
+			given: []TLV{
+				NewTLVBE(0, uint32(12)),
+				NewTLVBE(1, uint32(34)),
+				NewTLVBE(2, uint32(56)),
+			},
+			lookup: func(l TLVList) (any, bool) {
+				return l.Uint32BE(1)
+			},
+			expect: uint32(34),
+			found:  true,
+		},
+		{
+			name: "given a TLV of big-endian uint32, expect not found value",
+			given: []TLV{
+				NewTLVBE(0, uint32(12)),
+				NewTLVBE(1, uint32(34)),
+				NewTLVBE(2, uint32(56)),
+			},
+			lookup: func(l TLVList) (any, bool) {
+				return l.Uint32BE(3)
+			},
+			expect: uint32(0),
+			found:  false,
+		},
+		{
+			name: "given a TLV of big-endian uint16, expect found value",
+			given: []TLV{
+				NewTLVBE(0, uint16(12)),
+				NewTLVBE(1, uint16(34)),
+				NewTLVBE(2, uint16(56)),
+			},
+			lookup: func(l TLVList) (any, bool) {
+				return l.Uint16BE(1)
+			},
+			expect: uint16(34),
+			found:  true,
+		},
+		{
+			name: "given a TLV of big-endian uint16, expect not found value",
+			given: []TLV{
+				NewTLVBE(0, uint16(12)),
+				NewTLVBE(1, uint16(34)),
+				NewTLVBE(2, uint16(56)),
+			},
+			lookup: func(l TLVList) (any, bool) {
+				return l.Uint16BE(3)
+			},
+			expect: uint16(0),
+			found:  false,
+		},
+		{
+			name: "given a TLV of little-endian uint32, expect found value",
+			given: []TLV{
+				NewTLVLE(0, uint32(12)),
+				NewTLVLE(1, uint32(34)),
+				NewTLVLE(2, uint32(56)),
+			},
+			lookup: func(l TLVList) (any, bool) {
+				return l.Uint32LE(1)
+			},
+			expect: uint32(34),
+			found:  true,
+		},
+		{
+			name: "given a TLV of little-endian uint32, expect not found value",
+			given: []TLV{
+				NewTLVLE(0, uint32(12)),
+				NewTLVLE(1, uint32(34)),
+				NewTLVLE(2, uint32(56)),
+			},
+			lookup: func(l TLVList) (any, bool) {
+				return l.Uint32LE(3)
+			},
+			expect: uint32(0),
+			found:  false,
+		},
+		{
+			name: "given a TLV of little-endian uint16, expect found value",
+			given: []TLV{
+				NewTLVLE(0, uint16(12)),
+				NewTLVLE(1, uint16(34)),
+				NewTLVLE(2, uint16(56)),
+			},
+			lookup: func(l TLVList) (any, bool) {
+				return l.Uint16LE(1)
+			},
+			expect: uint16(34),
+			found:  true,
+		},
+		{
+			name: "given a TLV of little-endian uint16, expect not found value",
+			given: []TLV{
+				NewTLVLE(0, uint16(12)),
+				NewTLVLE(1, uint16(34)),
+				NewTLVLE(2, uint16(56)),
+			},
+			lookup: func(l TLVList) (any, bool) {
+				return l.Uint16LE(3)
+			},
+			expect: uint16(0),
+			found:  false,
+		},
+		{
+			name: "given a TLV of uint8, expect found value",
+			given: []TLV{
+				NewTLVLE(0, uint8(12)),
+				NewTLVLE(1, uint8(34)),
+				NewTLVLE(2, uint8(56)),
+			},
+			lookup: func(l TLVList) (any, bool) {
+				return l.Uint8(1)
+			},
+			expect: uint8(34),
+			found:  true,
+		},
+		{
+			name: "given a TLV of uint8, expect not found value",
+			given: []TLV{
+				NewTLVLE(0, uint8(12)),
+				NewTLVLE(1, uint8(34)),
+				NewTLVLE(2, uint8(56)),
+			},
+			lookup: func(l TLVList) (any, bool) {
+				return l.Uint8(3)
+			},
+			expect: uint8(0),
+			found:  false,
+		},
+		{
+			name: "given a TLV of string, expect found value",
+			given: []TLV{
+				NewTLVBE(0, "12"),
+				NewTLVBE(1, "34"),
+				NewTLVBE(2, "56"),
+			},
+			lookup: func(l TLVList) (any, bool) {
+				return l.String(1)
+			},
+			expect: "34",
+			found:  true,
+		},
+		{
+			name: "given a TLV of string, expect not found value",
+			given: []TLV{
+				NewTLVBE(0, "12"),
+				NewTLVBE(1, "34"),
+				NewTLVBE(2, "56"),
+			},
+			lookup: func(l TLVList) (any, bool) {
+				return l.String(3)
+			},
+			expect: "",
+			found:  false,
+		},
+		{
+			name: "given a TLV of slice, expect found value",
+			given: []TLV{
+				NewTLVBE(0, []byte(`12`)),
+				NewTLVBE(1, []byte(`34`)),
+				NewTLVBE(2, []byte(`56`)),
+			},
+			lookup: func(l TLVList) (any, bool) {
+				return l.Bytes(1)
+			},
+			expect: []byte(`34`),
+			found:  true,
+		},
+		{
+			name: "given a TLV of string, expect not found value",
+			given: []TLV{
+				NewTLVBE(0, []byte(`12`)),
+				NewTLVBE(1, []byte(`34`)),
+				NewTLVBE(2, []byte(`56`)),
+			},
+			lookup: func(l TLVList) (any, bool) {
+				return l.Bytes(3)
+			},
+			expect: []byte(nil),
+			found:  false,
+		},
+		{
+			name: "expect a panic when there's a type mismatch between big-endian uint16 and uint32",
+			given: []TLV{
+				NewTLVBE(0, uint16(12)),
+				NewTLVBE(1, uint16(34)),
+				NewTLVBE(2, uint16(56)),
+			},
+			lookup: func(l TLVList) (any, bool) {
+				return l.Uint32BE(1)
+			},
+			panic: true,
+		},
+		{
+			name: "expect a panic when there's a type mismatch between little-endian uint16 and uint32",
+			given: []TLV{
+				NewTLVLE(0, uint16(12)),
+				NewTLVLE(1, uint16(34)),
+				NewTLVLE(2, uint16(56)),
+			},
+			lookup: func(l TLVList) (any, bool) {
+				return l.Uint32LE(1)
+			},
+			panic: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.panic {
+				assert.Panics(t, func() { tt.lookup(tt.given) })
+				return
+			}
+			have, found := tt.lookup(tt.given)
+			assert.Equal(t, tt.expect, have)
+			assert.Equal(t, tt.found, found)
+		})
+	}
+}

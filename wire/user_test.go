@@ -63,3 +63,85 @@ func TestStrongMD5PasswordHash(t *testing.T) {
 		})
 	}
 }
+
+func TestRoastOSCARPassword(t *testing.T) {
+	tests := []struct {
+		name        string
+		roastedPass []byte
+		want        []byte
+	}{
+		{
+			name:        "empty password",
+			roastedPass: []byte{},
+			want:        []byte{},
+		},
+		{
+			name:        "single byte password",
+			roastedPass: []byte{0xF3},
+			want:        []byte{0x00},
+		},
+		{
+			name:        "multiple bytes password",
+			roastedPass: []byte{0xF3, 0x26, 0x81, 0xC4},
+			want:        []byte{0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			name:        "password longer than roast table",
+			roastedPass: []byte{0xF3, 0x26, 0x81, 0xC4, 0x39, 0x86, 0xDB, 0x92, 0x71, 0xA3, 0xB9, 0xE6, 0x53, 0x7A, 0x95, 0x7C, 0xF3, 0x26},
+			want:        []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			name:        "non-zero roasted password",
+			roastedPass: []byte{0xE3, 0x16, 0x91, 0xD4},
+			want:        []byte{0x10, 0x30, 0x10, 0x10},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := RoastOSCARPassword(tt.roastedPass)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestRoastKerberosPassword(t *testing.T) {
+	tests := []struct {
+		name        string
+		roastedPass []byte
+		want        []byte
+	}{
+		{
+			name:        "empty password",
+			roastedPass: []byte{},
+			want:        []byte{},
+		},
+		{
+			name:        "single byte password",
+			roastedPass: []byte{0x76},
+			want:        []byte{0x00},
+		},
+		{
+			name:        "multiple bytes password",
+			roastedPass: []byte{0x76, 0x91, 0xc5, 0xe7},
+			want:        []byte{0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			name:        "password longer than roast table",
+			roastedPass: []byte{0x76, 0x91, 0xc5, 0xe7, 0xd0, 0xd9, 0x95, 0xdd, 0x9e, 0x2F, 0xea, 0xd8, 0x6B, 0x21, 0xc2, 0xbc, 0x76, 0x91},
+			want:        []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			name:        "non-zero roasted password",
+			roastedPass: []byte{0x66, 0x81, 0xd5, 0xf7},
+			want:        []byte{0x10, 0x10, 0x10, 0x10},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := RoastKerberosPassword(tt.roastedPass)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

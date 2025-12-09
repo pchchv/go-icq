@@ -109,3 +109,34 @@ func (s *TLVList) Uint8(tag uint16) (uint8, bool) {
 	}
 	return 0, false
 }
+
+// Uint16BE retrieves a 16-bit unsigned integer value from the
+// TLVList associated with the specified tag,
+// interpreting the bytes in big-endian format.
+//
+// If the specified tag is found,
+// the function returns the associated value as a uint16 and true.
+// If the tag is not found, the function returns 0 and false.
+func (s *TLVList) Uint16BE(tag uint16) (uint16, bool) {
+	return s.uint16(tag, binary.BigEndian)
+}
+
+// Uint16LE retrieves a 16-bit unsigned integer value from the
+// TLVList associated with the specified tag,
+// interpreting the bytes in little-endian format.
+//
+// If the specified tag is found,
+// the function returns the associated value as a uint16 and true.
+// If the tag is not found, the function returns 0 and false.
+func (s *TLVList) Uint16LE(tag uint16) (uint16, bool) {
+	return s.uint16(tag, binary.LittleEndian)
+}
+
+func (s *TLVList) uint16(tag uint16, order binary.ByteOrder) (uint16, bool) {
+	for _, tlv := range *s {
+		if tag == tlv.Tag {
+			return order.Uint16(tlv.Value), true
+		}
+	}
+	return 0, false
+}

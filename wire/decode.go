@@ -9,7 +9,26 @@ import (
 	"reflect"
 )
 
-var errNotNullTerminated = errors.New("nullterm tag is set, but string is not null-terminated")
+var (
+	ErrUnmarshalFailure  = errors.New("failed to unmarshal")
+	errNotNullTerminated = errors.New("nullterm tag is set, but string is not null-terminated")
+)
+
+// UnmarshalBE unmarshalls OSCAR protocol messages in big-endian format.
+func UnmarshalBE(v any, r io.Reader) error {
+	if err := unmarshal(reflect.TypeOf(v).Elem(), reflect.ValueOf(v).Elem(), "", r, binary.BigEndian); err != nil {
+		return fmt.Errorf("%w: %w", ErrUnmarshalFailure, err)
+	}
+	return nil
+}
+
+// UnmarshalLE unmarshalls OSCAR protocol messages in little-endian format.
+func UnmarshalLE(v any, r io.Reader) error {
+	if err := unmarshal(reflect.TypeOf(v).Elem(), reflect.ValueOf(v).Elem(), "", r, binary.LittleEndian); err != nil {
+		return fmt.Errorf("%w: %w", ErrUnmarshalFailure, err)
+	}
+	return nil
+}
 
 func unmarshalUnsignedInt(intType reflect.Kind, r io.Reader, order binary.ByteOrder) (bufLen int, err error) {
 	switch intType {

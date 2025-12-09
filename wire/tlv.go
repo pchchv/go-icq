@@ -6,6 +6,18 @@ import (
 	"fmt"
 )
 
+// TLVBlock is a type of TLV array that has the TLV element count encoded as
+// a 2-byte value at the beginning of the encoded blob.
+type TLVBlock struct {
+	TLVList `oscar:"count_prefix=uint16"`
+}
+
+// TLVLBlock is a type of TLV array that has the TLV blob byte-length encoded as
+// a 2-byte value at the beginning of the encoded blob.
+type TLVLBlock struct {
+	TLVList `oscar:"len_prefix=uint16"`
+}
+
 // TLV represents dynamically typed data in the OSCAR protocol.
 // Each message consists of a tag (or key) and a blob value.
 // TLVs are typically grouped together in arrays.
@@ -53,15 +65,3 @@ func newTLV(tag uint16, val any, order binary.ByteOrder) TLV {
 // The caller assumes the TLV data type at runtime based on the protocol specification.
 // These methods are not safe for read-write access by multiple goroutines.
 type TLVList []TLV
-
-// TLVBlock is a type of TLV array that has the TLV element count encoded as
-// a 2-byte value at the beginning of the encoded blob.
-type TLVBlock struct {
-	TLVList `oscar:"count_prefix=uint16"`
-}
-
-// TLVLBlock is a type of TLV array that has the TLV blob byte-length encoded as
-// a 2-byte value at the beginning of the encoded blob.
-type TLVLBlock struct {
-	TLVList `oscar:"len_prefix=uint16"`
-}

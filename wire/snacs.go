@@ -29,3 +29,10 @@ type ICQMetadata struct {
 	Seq     uint16
 	ReqType uint16
 }
+
+type ICQMetadataWithSubType struct {
+	ICQMetadata
+	Optional *struct {
+		ReqSubType uint16
+	} `oscar:"optional"`
+}

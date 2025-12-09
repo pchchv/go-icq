@@ -94,63 +94,6 @@ func (s *TLVList) Replace(new TLV) {
 	}
 }
 
-// String retrieves the string value associated with the
-// specified tag from the TLVList.
-//
-// If the specified tag is found,
-// the function returns the associated string value and true.
-// If the tag is not found, the function returns an empty string and false.
-func (s *TLVList) String(tag uint16) (string, bool) {
-	for _, tlv := range *s {
-		if tag == tlv.Tag {
-			return string(tlv.Value), true
-		}
-	}
-	return "", false
-}
-
-// ICQString retrieves the ICQ string value associated with the
-// specified tag from the TLVList.
-//
-// An ICQ string is a string that is prefixed with its
-// length and ends with a null terminator.
-//
-// If the specified tag is found,
-// the function returns the extracted string value and true.
-// If the tag is not found or the string is malformed,
-// the function returns an empty string and false.
-func (s *TLVList) ICQString(tag uint16) (string, bool) {
-	// find the TLV entry with the specified tag
-	for _, tlv := range *s {
-		if tag != tlv.Tag {
-			continue
-		}
-
-		// ensure the value is long enough to contain a valid length prefix and value
-		if len(tlv.Value) < 3 {
-			break
-		}
-
-		// extract the length prefix (first 2 bytes) as a uint16
-		expectedLength := binary.LittleEndian.Uint16(tlv.Value[0:2])
-
-		// extract the actual string value, excluding the length prefix
-		value := tlv.Value[2:]
-
-		// check if the length matches the value length
-		// (including the null terminator)
-		if int(expectedLength) != len(value) {
-			break
-		}
-
-		// remove the null terminator
-		return string(value[:len(value)-1]), true
-	}
-
-	// tag not found
-	return "", false
-}
-
 // Uint8 retrieves a byte value from the TLVList associated with the specified tag.
 //
 // If the specified tag is found,
@@ -209,6 +152,63 @@ func (s *TLVList) Uint32BE(tag uint16) (uint32, bool) {
 // If the tag is not found, the function returns 0 and false.
 func (s *TLVList) Uint32LE(tag uint16) (uint32, bool) {
 	return s.uint32(tag, binary.LittleEndian)
+}
+
+// String retrieves the string value associated with the
+// specified tag from the TLVList.
+//
+// If the specified tag is found,
+// the function returns the associated string value and true.
+// If the tag is not found, the function returns an empty string and false.
+func (s *TLVList) String(tag uint16) (string, bool) {
+	for _, tlv := range *s {
+		if tag == tlv.Tag {
+			return string(tlv.Value), true
+		}
+	}
+	return "", false
+}
+
+// ICQString retrieves the ICQ string value associated with the
+// specified tag from the TLVList.
+//
+// An ICQ string is a string that is prefixed with its
+// length and ends with a null terminator.
+//
+// If the specified tag is found,
+// the function returns the extracted string value and true.
+// If the tag is not found or the string is malformed,
+// the function returns an empty string and false.
+func (s *TLVList) ICQString(tag uint16) (string, bool) {
+	// find the TLV entry with the specified tag
+	for _, tlv := range *s {
+		if tag != tlv.Tag {
+			continue
+		}
+
+		// ensure the value is long enough to contain a valid length prefix and value
+		if len(tlv.Value) < 3 {
+			break
+		}
+
+		// extract the length prefix (first 2 bytes) as a uint16
+		expectedLength := binary.LittleEndian.Uint16(tlv.Value[0:2])
+
+		// extract the actual string value, excluding the length prefix
+		value := tlv.Value[2:]
+
+		// check if the length matches the value length
+		// (including the null terminator)
+		if int(expectedLength) != len(value) {
+			break
+		}
+
+		// remove the null terminator
+		return string(value[:len(value)-1]), true
+	}
+
+	// tag not found
+	return "", false
 }
 
 func (s *TLVList) uint16(tag uint16, order binary.ByteOrder) (uint16, bool) {

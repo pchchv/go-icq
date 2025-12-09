@@ -18,6 +18,14 @@ type TLVLBlock struct {
 	TLVList `oscar:"len_prefix=uint16"`
 }
 
+// TLVRestBlock is a type of TLV array that does not have
+// any length information encoded in the blob.
+// This typically means that a given offset in the SNAC payload,
+// the TLV occupies the "rest" of the payload.
+type TLVRestBlock struct {
+	TLVList
+}
+
 // TLV represents dynamically typed data in the OSCAR protocol.
 // Each message consists of a tag (or key) and a blob value.
 // TLVs are typically grouped together in arrays.

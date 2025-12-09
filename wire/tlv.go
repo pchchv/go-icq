@@ -73,3 +73,13 @@ func newTLV(tag uint16, val any, order binary.ByteOrder) TLV {
 // The caller assumes the TLV data type at runtime based on the protocol specification.
 // These methods are not safe for read-write access by multiple goroutines.
 type TLVList []TLV
+
+// Append adds a TLV to the end of the TLV list.
+func (s *TLVList) Append(tlv TLV) {
+	*s = append(*s, tlv)
+}
+
+// AppendList adds a TLV list to the end of the TLV list.
+func (s *TLVList) AppendList(tlvs []TLV) {
+	*s = append(*s, tlvs...)
+}

@@ -120,3 +120,65 @@ func TestTLVList_Replace(t *testing.T) {
 		})
 	}
 }
+
+func TestTLVList_ICQString(t *testing.T) {
+	// create a new TLV list
+	tlv := TLVList{}
+
+	// add a valid ICQ string TLV entry to the list
+	tlv.Append(NewTLVLE(0x01, []byte{0x09, 0x00, 'k', 'n', 'i', 't', 't', 'i', 'n', 'g', '\x00'}))
+
+	t.Run("Valid ICQString", func(t *testing.T) {
+		// test retrieving a valid ICQ string
+		str, ok := tlv.ICQString(0x01)
+		assert.True(t, ok)
+		assert.Equal(t, "knitting", str)
+	})
+
+	t.Run("Non-existent Tag", func(t *testing.T) {
+		// test retrieving an ICQ string for a non-existent tag
+		str, ok := tlv.ICQString(0x02)
+		assert.False(t, ok)
+		assert.Empty(t, str)
+	})
+
+	t.Run("Malformed ICQString", func(t *testing.T) {
+		// add a malformed TLV entry (length prefix too short)
+		tlvMalformed := TLVList{}
+		tlvMalformed.Append(NewTLVLE(0x03, []byte{0x02, 0x00, 'a'})) // Length 2 but only 1 character and no null terminator
+
+		str, ok := tlvMalformed.ICQString(0x03)
+		assert.False(t, ok)
+		assert.Empty(t, str)
+	})
+
+	t.Run("Incorrect Length Prefix", func(t *testing.T) {
+		// add an incorrect length prefix (does not match actual string length)
+		tlvIncorrectLength := TLVList{}
+		tlvIncorrectLength.Append(NewTLVLE(0x04, []byte{0x0A, 0x00, 'k', 'n', 'i', 't', 't', 'i', 'n', 'g', '\x00'})) // Length prefix is 9 but actual length is 7 + 1 (null terminator)
+
+		str, ok := tlvIncorrectLength.ICQString(0x04)
+		assert.False(t, ok)
+		assert.Empty(t, str)
+	})
+
+	t.Run("Short Length Prefix", func(t *testing.T) {
+		// add a TLV with a length prefix, but the data is too short to contain a valid ICQ string
+		tlvShortLength := TLVList{}
+		tlvShortLength.Append(NewTLVLE(0x05, []byte{0x05, 0x00})) // Length prefix is 5 but no data
+
+		str, ok := tlvShortLength.ICQString(0x05)
+		assert.False(t, ok)
+		assert.Empty(t, str)
+	})
+
+	t.Run("Empty String", func(t *testing.T) {
+		// add a TLV with an empty ICQ string (just the length prefix and null terminator)
+		tlvEmptyString := TLVList{}
+		tlvEmptyString.Append(NewTLVLE(0x06, []byte{0x01, 0x00, '\x00'})) // Length prefix is 1 with just null terminator
+
+		str, ok := tlvEmptyString.ICQString(0x06)
+		assert.True(t, ok)
+		assert.Empty(t, str)
+	})
+}

@@ -1,6 +1,7 @@
 package wire
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -54,5 +55,57 @@ func unmarshalString(v reflect.Value, oscTag oscarTag, r io.Reader, order binary
 	}
 
 	v.SetString(string(buf))
+	return nil
+}
+
+func unmarshalStruct(t reflect.Type, v reflect.Value, oscTag oscarTag, r io.Reader, order binary.ByteOrder) error {
+	if oscTag.hasLenPrefix {
+		bufLen, err := unmarshalUnsignedInt(oscTag.lenPrefix, r, order)
+		if err != nil {
+			return err
+		}
+
+		b := make([]byte, bufLen)
+		if bufLen > 0 {
+			if _, err := io.ReadFull(r, b); err != nil {
+				return err
+			}
+		}
+
+		r = bytes.NewBuffer(b)
+	}
+
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		value := v.Field(i)
+		if field.Type.Kind() == reflect.Ptr {
+			if i != v.NumField()-1 {
+				return fmt.Errorf("pointer type found at non-final field %s", field.Name)
+			}
+			if field.Type.Elem().Kind() != reflect.Struct {
+				return fmt.Errorf("%w: field %s must point to a struct, got %v instead",
+					errNonOptionalPointer, field.Name, field.Type.Elem().Kind())
+			}
+		}
+
+		if err := unmarshal(field.Type, value, field.Tag, r, order); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func unmarshalArray(v reflect.Value, r io.Reader, order binary.ByteOrder) error {
+	arrLen := v.Len()
+	arrType := v.Type().Elem()
+	for i := 0; i < arrLen; i++ {
+		elem := reflect.New(arrType).Elem()
+		if err := unmarshal(arrType, elem, "", r, order); err != nil {
+			return err
+		}
+		v.Index(i).Set(elem)
+	}
+
 	return nil
 }

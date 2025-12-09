@@ -47,6 +47,20 @@ func RoastKerberosPassword(roastedPass []byte) []byte {
 	return roastPass(roastedPass, roastTable)
 }
 
+// RoastOSCARJavaPassword roasts a Java OSCAR client password.
+func RoastOSCARJavaPassword(roastedPass []byte) []byte {
+	var roastTable = []byte{
+		0xF3, 0xB3, 0x6C, 0x99, 0x95, 0x3F, 0xAC, 0xB6,
+		0xC5, 0xFA, 0x6B, 0x63, 0x69, 0x6C, 0xC3, 0x9A,
+	}
+	return roastPass(roastedPass, roastTable)
+}
+
+// RoastTOCPassword roasts a TOC client password.
+func RoastTOCPassword(roastedPass []byte) []byte {
+	return roastPass(roastedPass, []byte("Tic/Toc"))
+}
+
 // roastPass toggles obfuscation/deobfuscates of roastedPass.
 func roastPass(roastedPass []byte, roastTable []byte) []byte {
 	clearPass := make([]byte, len(roastedPass))

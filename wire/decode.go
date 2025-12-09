@@ -109,3 +109,57 @@ func unmarshalArray(v reflect.Value, r io.Reader, order binary.ByteOrder) error 
 
 	return nil
 }
+
+func unmarshalSlice(v reflect.Value, oscTag oscarTag, r io.Reader, order binary.ByteOrder) error {
+	slice := reflect.New(v.Type()).Elem()
+	elemType := v.Type().Elem()
+	if oscTag.hasLenPrefix {
+		bufLen, err := unmarshalUnsignedInt(oscTag.lenPrefix, r, order)
+		if err != nil {
+			return err
+		}
+
+		b := make([]byte, bufLen)
+		if bufLen > 0 {
+			if _, err := io.ReadFull(r, b); err != nil {
+				return err
+			}
+		}
+
+		buf := bytes.NewBuffer(b)
+		for buf.Len() > 0 {
+			elem := reflect.New(elemType).Elem()
+			if err := unmarshal(elemType, elem, "", buf, order); err != nil {
+				return err
+			}
+			slice = reflect.Append(slice, elem)
+		}
+	} else if oscTag.hasCountPrefix {
+		count, err := unmarshalUnsignedInt(oscTag.countPrefix, r, order)
+		if err != nil {
+			return err
+		}
+
+		for i := 0; i < count; i++ {
+			elem := reflect.New(elemType).Elem()
+			if err := unmarshal(elemType, elem, "", r, order); err != nil {
+				return err
+			}
+			slice = reflect.Append(slice, elem)
+		}
+	} else {
+		for {
+			elem := reflect.New(elemType).Elem()
+			if err := unmarshal(elemType, elem, "", r, order); err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				return err
+			}
+			slice = reflect.Append(slice, elem)
+		}
+	}
+
+	v.Set(slice)
+	return nil
+}

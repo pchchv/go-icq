@@ -23,3 +23,9 @@ type ICQUserSearchRecord struct {
 	LastName      string `oscar:"len_prefix=uint16,nullterm"`
 	Nickname      string `oscar:"len_prefix=uint16,nullterm"`
 }
+
+type ICQMetadata struct {
+	UIN     uint32
+	Seq     uint16
+	ReqType uint16
+}

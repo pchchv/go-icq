@@ -11,3 +11,15 @@ type ICQMessageReplyEnvelope struct {
 type ICQMessageRequestEnvelope struct {
 	Body []byte `oscar:"len_prefix=uint16"`
 }
+
+type ICQUserSearchRecord struct {
+	UIN           uint32
+	Age           uint16
+	Email         string `oscar:"len_prefix=uint16,nullterm"`
+	Gender        uint8
+	Authorization uint8
+	OnlineStatus  uint16
+	FirstName     string `oscar:"len_prefix=uint16,nullterm"`
+	LastName      string `oscar:"len_prefix=uint16,nullterm"`
+	Nickname      string `oscar:"len_prefix=uint16,nullterm"`
+}

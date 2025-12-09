@@ -413,3 +413,23 @@ func TestTLVList_Getters(t *testing.T) {
 		})
 	}
 }
+
+func TestTLVList_HasTag(t *testing.T) {
+	list := TLVList{
+		{
+			Tag:   0,
+			Value: []byte(`0`),
+		},
+		{
+			Tag:   1,
+			Value: []byte(`1`),
+		},
+		{
+			Tag:   2,
+			Value: []byte(`2`),
+		},
+	}
+
+	assert.True(t, list.HasTag(0))
+	assert.False(t, list.HasTag(3))
+}

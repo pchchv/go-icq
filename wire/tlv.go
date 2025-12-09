@@ -83,3 +83,29 @@ func (s *TLVList) Append(tlv TLV) {
 func (s *TLVList) AppendList(tlvs []TLV) {
 	*s = append(*s, tlvs...)
 }
+
+// Replace updates the values of TLVs in the list with the same tag as new.
+// If no matching tag is found, the list remains unchanged.
+func (s *TLVList) Replace(new TLV) {
+	for i, old := range *s {
+		if old.Tag == new.Tag {
+			(*s)[i].Value = new.Value
+		}
+	}
+}
+
+// Uint8 retrieves a byte value from the TLVList associated with the specified tag.
+//
+// If the specified tag is found,
+// the function returns the associated value as a uint8 and true.
+// If the tag is not found, the function returns 0 and false.
+func (s *TLVList) Uint8(tag uint16) (uint8, bool) {
+	for _, tlv := range *s {
+		if tag == tlv.Tag {
+			if len(tlv.Value) > 0 {
+				return tlv.Value[0], true
+			}
+		}
+	}
+	return 0, false
+}

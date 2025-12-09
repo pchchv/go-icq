@@ -163,3 +163,64 @@ func unmarshalSlice(v reflect.Value, oscTag oscarTag, r io.Reader, order binary.
 	v.Set(slice)
 	return nil
 }
+
+func unmarshal(t reflect.Type, v reflect.Value, tag reflect.StructTag, r io.Reader, order binary.ByteOrder) error {
+	oscTag, err := parseOSCARTag(tag)
+	if err != nil {
+		return fmt.Errorf("error parsing tag: %w", err)
+	}
+
+	if oscTag.optional {
+		v.Set(reflect.New(t.Elem()))
+		err := unmarshalStruct(t.Elem(), v.Elem(), oscTag, r, order)
+		if errors.Is(err, io.EOF) {
+			// no values to read, but that's ok since this struct is optional
+			v.Set(reflect.Zero(t))
+			err = nil
+		}
+		return err
+	} else if v.Kind() == reflect.Ptr {
+		return errNonOptionalPointer
+	}
+
+	switch v.Kind() {
+	case reflect.Array:
+		return unmarshalArray(v, r, order)
+	case reflect.Slice:
+		return unmarshalSlice(v, oscTag, r, order)
+	case reflect.String:
+		return unmarshalString(v, oscTag, r, order)
+	case reflect.Struct:
+		return unmarshalStruct(t, v, oscTag, r, order)
+	case reflect.Uint8:
+		var l uint8
+		if err := binary.Read(r, order, &l); err != nil {
+			return err
+		}
+		v.Set(reflect.ValueOf(l))
+		return nil
+	case reflect.Uint16:
+		var l uint16
+		if err := binary.Read(r, order, &l); err != nil {
+			return err
+		}
+		v.Set(reflect.ValueOf(l))
+		return nil
+	case reflect.Uint32:
+		var l uint32
+		if err := binary.Read(r, order, &l); err != nil {
+			return err
+		}
+		v.Set(reflect.ValueOf(l))
+		return nil
+	case reflect.Uint64:
+		var l uint64
+		if err := binary.Read(r, order, &l); err != nil {
+			return err
+		}
+		v.Set(reflect.ValueOf(l))
+		return nil
+	default:
+		return fmt.Errorf("unsupported type %v", t.Kind())
+	}
+}

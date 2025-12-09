@@ -29,6 +29,24 @@ func StrongMD5PasswordHash(pass, authKey string) []byte {
 	return bottom.Sum(nil)
 }
 
+// RoastOSCARPassword roasts an OSCAR client password.
+func RoastOSCARPassword(roastedPass []byte) []byte {
+	var roastTable = []byte{
+		0xF3, 0x26, 0x81, 0xC4, 0x39, 0x86, 0xDB, 0x92,
+		0x71, 0xA3, 0xB9, 0xE6, 0x53, 0x7A, 0x95, 0x7C,
+	}
+	return roastPass(roastedPass, roastTable)
+}
+
+// RoastKerberosPassword roasts a Kerberos client password.
+func RoastKerberosPassword(roastedPass []byte) []byte {
+	var roastTable = []byte{
+		0x76, 0x91, 0xc5, 0xe7, 0xd0, 0xd9, 0x95, 0xdd,
+		0x9e, 0x2F, 0xea, 0xd8, 0x6B, 0x21, 0xc2, 0xbc,
+	}
+	return roastPass(roastedPass, roastTable)
+}
+
 // roastPass toggles obfuscation/deobfuscates of roastedPass.
 func roastPass(roastedPass []byte, roastTable []byte) []byte {
 	clearPass := make([]byte, len(roastedPass))

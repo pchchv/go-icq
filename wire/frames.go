@@ -168,6 +168,48 @@ func (f *FlapClient) ReceiveFLAP() (FLAPFrame, error) {
 	return flap, err
 }
 
+// SendSNAC sends a SNAC message wrapped in a FLAP frame.
+func (f *FlapClient) SendSNAC(frame SNACFrame, body any) error {
+	snacBuf := &bytes.Buffer{}
+	if err := MarshalBE(frame, snacBuf); err != nil {
+		return err
+	}
+	if err := MarshalBE(body, snacBuf); err != nil {
+		return err
+	}
+
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	flap := FLAPFrame{
+		StartMarker: 42,
+		FrameType:   FLAPFrameData,
+		Sequence:    uint16(f.sequence),
+		Payload:     snacBuf.Bytes(),
+	}
+	if err := MarshalBE(flap, f.w); err != nil {
+		return err
+	}
+
+	f.sequence++
+	return nil
+}
+
+// ReceiveSNAC receives a SNAC message wrapped in a FLAP frame.
+func (f *FlapClient) ReceiveSNAC(frame *SNACFrame, body any) error {
+	flap := FLAPFrame{}
+	if err := UnmarshalBE(&flap, f.r); err != nil {
+		return err
+	}
+
+	buf := bytes.NewBuffer(flap.Payload)
+	if err := UnmarshalBE(frame, buf); err != nil {
+		return err
+	}
+
+	return UnmarshalBE(body, buf)
+}
+
 func (f *FlapClient) String() string {
 	return ""
 }

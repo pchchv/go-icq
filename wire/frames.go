@@ -1,6 +1,7 @@
 package wire
 
 import (
+	"bytes"
 	"io"
 	"sync"
 )
@@ -62,4 +63,52 @@ func NewFlapClient(startSeq uint32, r io.Reader, w io.Writer) *FlapClient {
 		w:        w,
 		mutex:    sync.Mutex{},
 	}
+}
+
+// SendSignonFrame sends a signon FLAP frame containing a list of
+// TLVs to authenticate or initiate a session.
+func (f *FlapClient) SendSignonFrame(tlvs []TLV) error {
+	signonFrame := FLAPSignonFrame{
+		FLAPVersion: 1,
+	}
+
+	if len(tlvs) > 0 {
+		signonFrame.AppendList(tlvs)
+	}
+
+	buf := &bytes.Buffer{}
+	if err := MarshalBE(signonFrame, buf); err != nil {
+		return err
+	}
+
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	flap := FLAPFrame{
+		StartMarker: 42,
+		FrameType:   FLAPFrameSignon,
+		Sequence:    uint16(f.sequence),
+		Payload:     buf.Bytes(),
+	}
+	if err := MarshalBE(flap, f.w); err != nil {
+		return err
+	}
+
+	f.sequence++
+	return nil
+}
+
+// ReceiveSignonFrame receives a signon FLAP response message.
+func (f *FlapClient) ReceiveSignonFrame() (FLAPSignonFrame, error) {
+	flap := FLAPFrame{}
+	if err := UnmarshalBE(&flap, f.r); err != nil {
+		return FLAPSignonFrame{}, err
+	}
+
+	signonFrame := FLAPSignonFrame{}
+	if err := UnmarshalBE(&signonFrame, bytes.NewBuffer(flap.Payload)); err != nil {
+		return FLAPSignonFrame{}, err
+	}
+
+	return signonFrame, nil
 }

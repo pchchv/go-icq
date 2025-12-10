@@ -75,3 +75,30 @@ func TestSNAC_0x01_0x14_OServiceSetPrivacyFlags_MemberFlag(t *testing.T) {
 		})
 	}
 }
+
+func TestBARTInfo_HasClearIconHash(t *testing.T) {
+	tests := []struct {
+		name     string
+		bartInfo BARTInfo
+		want     bool
+	}{
+		{
+			bartInfo: BARTInfo{
+				Hash: GetClearIconHash(),
+			},
+			want: true,
+		},
+		{
+			bartInfo: BARTInfo{
+				Hash: []byte{'s', 'o', 'm', 'e', 'd', 'a', 't', 'a'},
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.bartInfo.HasClearIconHash())
+		})
+	}
+}

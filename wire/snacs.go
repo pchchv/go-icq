@@ -1,5 +1,7 @@
 package wire
 
+import "bytes"
+
 const (
 	BOS         uint16 = 0x0000
 	OService    uint16 = 0x0001
@@ -836,6 +838,12 @@ const (
 type BARTInfo struct {
 	Flags uint8
 	Hash  []byte `oscar:"len_prefix=uint8"`
+}
+
+// HasClearIconHash reports whether the BART ID hash contains the
+// ClearIconHash sentinel value.
+func (h BARTInfo) HasClearIconHash() bool {
+	return bytes.Equal(h.Hash, GetClearIconHash())
 }
 
 // ICQMessageReplyEnvelope is a helper struct that provides syntactic sugar for

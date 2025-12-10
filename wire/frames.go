@@ -30,6 +30,17 @@ type FLAPSignonFrame struct {
 	FLAPVersion uint32
 }
 
+// FLAPFrameDisconnect is the last FLAP frame sent to a client before disconnection.
+// It differs from FLAPFrame in that there is no payload length prefix at the end,
+// which causes pre-multi-conn Windows AIM clients to
+// improperly handle server disconnections,
+// as when the regular FLAPFrame type is used.
+type FLAPFrameDisconnect struct {
+	StartMarker uint8
+	FrameType   uint8
+	Sequence    uint16
+}
+
 // FlapClient sends and receive FLAP frames to and from the server.
 // It ensures that the message sequence numbers are
 // properly incremented after sending each successive message.

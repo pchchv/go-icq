@@ -885,3 +885,7 @@ type ICQ_0x0041_DBQueryOfflineMsgReply struct {
 type SNAC_0x01_0x11_OServiceIdleNotification struct {
 	IdleTime uint32
 }
+
+type SNAC_0x01_0x14_OServiceSetPrivacyFlags struct {
+	PrivacyFlags uint32
+}

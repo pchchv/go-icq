@@ -907,3 +907,9 @@ func (s SNAC_0x01_0x14_OServiceSetPrivacyFlags) IdleFlag() bool {
 func (s SNAC_0x01_0x14_OServiceSetPrivacyFlags) MemberFlag() bool {
 	return s.PrivacyFlags&OServicePrivacyFlagMember == OServicePrivacyFlagMember
 }
+
+// GetClearIconHash returns an opaque value set in
+// BARTID hash that indicates the user wants to clear their buddy icon.
+func GetClearIconHash() []byte {
+	return []byte{0x02, 0x01, 0xd2, 0x04, 0x72}
+}

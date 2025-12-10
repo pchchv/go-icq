@@ -2,6 +2,7 @@ package wire
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"sync"
 )
@@ -146,4 +147,20 @@ func (f *FlapClient) SendKeepAliveFrame() error {
 
 	f.sequence++
 	return nil
+}
+
+// ReceiveFLAP receives a FLAP frame and body.
+// It only returns a body if the FLAP frame is a data frame.
+func (f *FlapClient) ReceiveFLAP() (FLAPFrame, error) {
+	flap := FLAPFrame{}
+	err := UnmarshalBE(&flap, f.r)
+	if err != nil {
+		err = fmt.Errorf("unable to unmarshal FLAP frame: %w", err)
+	}
+
+	return flap, err
+}
+
+func (f *FlapClient) String() string {
+	return ""
 }

@@ -5,9 +5,24 @@ import (
 	"sync"
 )
 
+const (
+	FLAPFrameData      uint8 = 0x02
+	FLAPFrameError     uint8 = 0x03
+	FLAPFrameSignon    uint8 = 0x01
+	FLAPFrameSignoff   uint8 = 0x04
+	FLAPFrameKeepAlive uint8 = 0x05
+)
+
 type SNACError struct {
 	TLVRestBlock
 	Code uint16
+}
+
+type FLAPFrame struct {
+	StartMarker uint8
+	FrameType   uint8
+	Sequence    uint16
+	Payload     []byte `oscar:"len_prefix=uint16"`
 }
 
 // FlapClient sends and receive FLAP frames to and from the server.

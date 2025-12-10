@@ -832,6 +832,12 @@ const (
 	StatsReportAck            uint16 = 0x0004
 )
 
+// BARTInfo represents a BART feedbag item.
+type BARTInfo struct {
+	Flags uint8
+	Hash  []byte `oscar:"len_prefix=uint8"`
+}
+
 // ICQMessageReplyEnvelope is a helper struct that provides syntactic sugar for
 // marshaling an ICQ message into a little-endian byte array.
 type ICQMessageReplyEnvelope struct {

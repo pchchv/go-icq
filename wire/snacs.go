@@ -889,3 +889,15 @@ type SNAC_0x01_0x11_OServiceIdleNotification struct {
 type SNAC_0x01_0x14_OServiceSetPrivacyFlags struct {
 	PrivacyFlags uint32
 }
+
+// IdleFlag returns whether other AIM users can see
+// how long the user has been idle.
+func (s SNAC_0x01_0x14_OServiceSetPrivacyFlags) IdleFlag() bool {
+	return s.PrivacyFlags&OServicePrivacyFlagIdle == OServicePrivacyFlagIdle
+}
+
+// MemberFlag returns whether other AIM users can see
+// how long the user has been a member.
+func (s SNAC_0x01_0x14_OServiceSetPrivacyFlags) MemberFlag() bool {
+	return s.PrivacyFlags&OServicePrivacyFlagMember == OServicePrivacyFlagMember
+}

@@ -43,6 +43,13 @@ type FLAPFrameDisconnect struct {
 	Sequence    uint16
 }
 
+type SNACFrame struct {
+	FoodGroup uint16
+	SubGroup  uint16
+	Flags     uint16
+	RequestID uint32
+}
+
 // FlapClient sends and receive FLAP frames to and from the server.
 // It ensures that the message sequence numbers are
 // properly incremented after sending each successive message.

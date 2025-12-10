@@ -839,6 +839,11 @@ type BARTID struct {
 	BARTInfo
 }
 
+type BartIDsWName struct {
+	IDs        []BARTID `oscar:"len_prefix=uint8"`
+	ScreenName string   `oscar:"len_prefix=uint8"`
+}
+
 // BARTInfo represents a BART feedbag item.
 type BARTInfo struct {
 	Flags uint8

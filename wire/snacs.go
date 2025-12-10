@@ -834,6 +834,11 @@ const (
 	StatsReportAck            uint16 = 0x0004
 )
 
+type BARTID struct {
+	Type uint16
+	BARTInfo
+}
+
 // BARTInfo represents a BART feedbag item.
 type BARTInfo struct {
 	Flags uint8

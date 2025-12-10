@@ -112,3 +112,38 @@ func (f *FlapClient) ReceiveSignonFrame() (FLAPSignonFrame, error) {
 
 	return signonFrame, nil
 }
+
+func (f *FlapClient) SendDataFrame(payload []byte) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	flap := FLAPFrame{
+		StartMarker: 42,
+		FrameType:   FLAPFrameData,
+		Sequence:    uint16(f.sequence),
+		Payload:     payload,
+	}
+	if err := MarshalBE(flap, f.w); err != nil {
+		return err
+	}
+
+	f.sequence++
+	return nil
+}
+
+func (f *FlapClient) SendKeepAliveFrame() error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	flap := FLAPFrame{
+		StartMarker: 42,
+		FrameType:   FLAPFrameKeepAlive,
+		Sequence:    uint16(f.sequence),
+	}
+	if err := MarshalBE(flap, f.w); err != nil {
+		return err
+	}
+
+	f.sequence++
+	return nil
+}

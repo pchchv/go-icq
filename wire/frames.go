@@ -25,6 +25,11 @@ type FLAPFrame struct {
 	Payload     []byte `oscar:"len_prefix=uint16"`
 }
 
+type FLAPSignonFrame struct {
+	TLVRestBlock
+	FLAPVersion uint32
+}
+
 // FlapClient sends and receive FLAP frames to and from the server.
 // It ensures that the message sequence numbers are
 // properly incremented after sending each successive message.

@@ -1,5 +1,10 @@
 package wire
 
+import (
+	"io"
+	"sync"
+)
+
 type SNACError struct {
 	TLVRestBlock
 	Code uint16

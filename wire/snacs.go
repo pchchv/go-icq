@@ -881,3 +881,7 @@ type ICQ_0x0041_DBQueryOfflineMsgReply struct {
 	Flags     uint8
 	Message   string `oscar:"len_prefix=uint16,nullterm"`
 }
+
+type SNAC_0x01_0x11_OServiceIdleNotification struct {
+	IdleTime uint32
+}

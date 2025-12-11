@@ -907,6 +907,11 @@ type ICQEmail struct {
 	Email string `oscar:"len_prefix=uint16,nullterm"`
 }
 
+type ICQInterests struct {
+	Code    uint16
+	Keyword string `oscar:"len_prefix=uint16,nullterm"`
+}
+
 type ICQ_0x0041_DBQueryOfflineMsgReply struct {
 	ICQMetadata
 	SenderUIN uint32

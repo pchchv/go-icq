@@ -1,6 +1,10 @@
 package wire
 
-import "bytes"
+import (
+	"bytes"
+	"errors"
+	"fmt"
+)
 
 const (
 	BOS         uint16 = 0x0000
@@ -936,4 +940,19 @@ func (s SNAC_0x01_0x14_OServiceSetPrivacyFlags) MemberFlag() bool {
 // BARTID hash that indicates the user wants to clear their buddy icon.
 func GetClearIconHash() []byte {
 	return []byte{0x02, 0x01, 0xd2, 0x04, 0x72}
+}
+
+// UnmarshalChatMessageText extracts message text from a chat message.
+// Param b is a slice from TLV wire.ChatTLVMessageInfo.
+func UnmarshalChatMessageText(b []byte) (string, error) {
+	block := TLVRestBlock{}
+	if err := UnmarshalBE(&block, bytes.NewReader(b)); err != nil {
+		return "", fmt.Errorf("UnmarshalBE: %w", err)
+	}
+
+	if b, hasMsg := block.Bytes(ChatTLVMessageInfoText); !hasMsg {
+		return "", errors.New("SNAC(0x0E,0x05) has no chat msg text TLV")
+	} else {
+		return string(b), nil
+	}
 }

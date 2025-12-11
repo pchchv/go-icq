@@ -1049,6 +1049,49 @@ type ICQ_0x07D0_0x03FD_DBQueryMetaReqSetMoreInfo struct {
 	Lang3        uint8
 }
 
+type ICQ_0x07D0_0x03F3_DBQueryMetaReqSetWorkInfo struct {
+	City           string `oscar:"len_prefix=uint16,nullterm"`
+	State          string `oscar:"len_prefix=uint16,nullterm"`
+	Phone          string `oscar:"len_prefix=uint16,nullterm"`
+	Fax            string `oscar:"len_prefix=uint16,nullterm"`
+	Address        string `oscar:"len_prefix=uint16,nullterm"`
+	ZIP            string `oscar:"len_prefix=uint16,nullterm"`
+	CountryCode    uint16
+	Company        string `oscar:"len_prefix=uint16,nullterm"`
+	Department     string `oscar:"len_prefix=uint16,nullterm"`
+	Position       string `oscar:"len_prefix=uint16,nullterm"`
+	OccupationCode uint16
+	WebPage        string `oscar:"len_prefix=uint16,nullterm"`
+}
+
+type ICQ_0x07D0_0x041A_DBQueryMetaReqSetAffiliations struct {
+	PastAffiliations []struct {
+		Code    uint16
+		Keyword string `oscar:"len_prefix=uint16,nullterm"`
+	} `oscar:"count_prefix=uint8"`
+	Affiliations []struct {
+		Code    uint16
+		Keyword string `oscar:"len_prefix=uint16,nullterm"`
+	} `oscar:"count_prefix=uint8"`
+}
+
+type ICQ_0x07D0_0x03EA_DBQueryMetaReqSetBasicInfo struct {
+	Nickname     string `oscar:"len_prefix=uint16,nullterm"`
+	FirstName    string `oscar:"len_prefix=uint16,nullterm"`
+	LastName     string `oscar:"len_prefix=uint16,nullterm"`
+	EmailAddress string `oscar:"len_prefix=uint16,nullterm"`
+	City         string `oscar:"len_prefix=uint16,nullterm"`
+	State        string `oscar:"len_prefix=uint16,nullterm"`
+	Phone        string `oscar:"len_prefix=uint16,nullterm"`
+	Fax          string `oscar:"len_prefix=uint16,nullterm"`
+	HomeAddress  string `oscar:"len_prefix=uint16,nullterm"`
+	CellPhone    string `oscar:"len_prefix=uint16,nullterm"`
+	ZIP          string `oscar:"len_prefix=uint16,nullterm"`
+	CountryCode  uint16
+	GMTOffset    uint8
+	PublishEmail uint8
+}
+
 type SNAC_0x01_0x11_OServiceIdleNotification struct {
 	IdleTime uint32
 }

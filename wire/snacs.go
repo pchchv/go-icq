@@ -903,6 +903,10 @@ type ICQMetadataWithSubType struct {
 	} `oscar:"optional"`
 }
 
+type ICQEmail struct {
+	Email string `oscar:"len_prefix=uint16,nullterm"`
+}
+
 type ICQ_0x0041_DBQueryOfflineMsgReply struct {
 	ICQMetadata
 	SenderUIN uint32

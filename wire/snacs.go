@@ -1010,6 +1010,32 @@ func (s *ICQ_0x07DA_0x01AE_DBQueryMetaReplyLastUserFound) LastResult() {
 	}
 }
 
+// type ICQ_0x07D0_0x0533_DBQueryMetaReqSearchWhitePages struct {
+// 	FirstName           string `oscar:"len_prefix=uint16,nullterm"`
+// 	LastName            string `oscar:"len_prefix=uint16,nullterm"`
+// 	Nickname            string `oscar:"len_prefix=uint16,nullterm"`
+// 	Email               string `oscar:"len_prefix=uint16,nullterm"`
+// 	MinAge              uint16
+// 	MaxAge              uint16
+// 	Gender              uint8
+// 	SpeakingLang        uint8
+// 	City                string `oscar:"len_prefix=uint16,nullterm"`
+// 	State               string `oscar:"len_prefix=uint16,nullterm"`
+// 	CountryCode         uint16
+// 	Company             string `oscar:"len_prefix=uint16,nullterm"`
+// 	Department          string `oscar:"len_prefix=uint16,nullterm"`
+// 	Position            string `oscar:"len_prefix=uint16,nullterm"`
+// 	OccupationCode      uint16
+// 	PastCode            uint16
+// 	PastKeywords        string `oscar:"len_prefix=uint16,nullterm"`
+// 	InterestsCode       uint16
+// 	InterestsKeyword    string `oscar:"len_prefix=uint16,nullterm"`
+// 	AffiliationsCode    uint16
+// 	AffiliationsKeyword string `oscar:"len_prefix=uint16,nullterm"`
+// 	HomePageCode        uint16
+// 	HomePageKeywords    string `oscar:"len_prefix=uint16,nullterm"`
+// 	SearchScope         uint8
+// }
 
 type SNAC_0x01_0x11_OServiceIdleNotification struct {
 	IdleTime uint32

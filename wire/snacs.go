@@ -957,6 +957,38 @@ type ICQ_0x07D0_0x0406_DBQueryMetaReqSetNotes struct {
 	Notes string `oscar:"len_prefix=uint16,nullterm"`
 }
 
+type ICQ_0x0042_DBQueryOfflineMsgReplyLast struct {
+	ICQMetadata
+	DroppedMessages uint8
+}
+
+type ICQ_0x07D0_0x0424_DBQueryMetaReqSetPermissions struct {
+	Authorization uint8 // (1-required, 0-not required)
+	WebAware      uint8 // webaware (0-no, 1-yes)
+	DCPerms       uint8 // dc_perms (0-any, 1-contact, 2-authorization)
+	Unknown       uint8
+}
+
+type ICQ_0x07D0_0x0515_DBQueryMetaReqSearchByDetails struct {
+	FirstName string `oscar:"len_prefix=uint16,nullterm"`
+	LastName  string `oscar:"len_prefix=uint16,nullterm"`
+	NickName  string `oscar:"len_prefix=uint16,nullterm"`
+}
+
+type ICQ_0x07D0_0x040B_DBQueryMetaReqSetEmails struct {
+	Emails []struct {
+		Publish uint8
+		Email   string `oscar:"len_prefix=uint16,nullterm"`
+	} `oscar:"count_prefix=uint8"`
+}
+
+type ICQ_0x07D0_0x0410_DBQueryMetaReqSetInterests struct {
+	Interests []struct {
+		Code    uint16
+		Keyword string `oscar:"len_prefix=uint16,nullterm"`
+	} `oscar:"count_prefix=uint8"`
+}
+
 type SNAC_0x01_0x11_OServiceIdleNotification struct {
 	IdleTime uint32
 }

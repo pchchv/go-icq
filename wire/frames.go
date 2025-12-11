@@ -20,6 +20,18 @@ type SNACError struct {
 	Code uint16
 }
 
+type SNACFrame struct {
+	FoodGroup uint16
+	SubGroup  uint16
+	Flags     uint16
+	RequestID uint32
+}
+
+type SNACMessage struct {
+	Frame SNACFrame
+	Body  any
+}
+
 type FLAPFrame struct {
 	StartMarker uint8
 	FrameType   uint8
@@ -41,13 +53,6 @@ type FLAPFrameDisconnect struct {
 	StartMarker uint8
 	FrameType   uint8
 	Sequence    uint16
-}
-
-type SNACFrame struct {
-	FoodGroup uint16
-	SubGroup  uint16
-	Flags     uint16
-	RequestID uint32
 }
 
 // FlapClient sends and receive FLAP frames to and from the server.

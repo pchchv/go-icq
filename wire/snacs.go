@@ -925,6 +925,38 @@ type ICQ_0x0041_DBQueryOfflineMsgReply struct {
 	Message   string `oscar:"len_prefix=uint16,nullterm"`
 }
 
+type ICQ_0x07D0_0x04BA_DBQueryMetaReqShortInfo struct {
+	UIN uint32
+}
+
+type ICQ_0x07D0_0x0898_DBQueryMetaReqXMLReq struct {
+	XMLRequest string `oscar:"len_prefix=uint16,nullterm"`
+}
+
+type ICQ_0x07D0_0x051F_DBQueryMetaReqSearchByUIN struct {
+	UIN uint32
+}
+
+type ICQ_0x07D0_0x0569_DBQueryMetaReqSearchByUIN2 struct {
+	TLVRestBlock
+}
+
+type ICQ_0x07D0_0x0529_DBQueryMetaReqSearchByEmail struct {
+	Email string `oscar:"len_prefix=uint16,nullterm"`
+}
+
+type ICQ_0x07D0_0x0573_DBQueryMetaReqSearchByEmail3 struct {
+	TLVRestBlock
+}
+
+type ICQ_0x07D0_0x055F_DBQueryMetaReqSearchWhitePages2 struct {
+	TLVRestBlock
+}
+
+type ICQ_0x07D0_0x0406_DBQueryMetaReqSetNotes struct {
+	Notes string `oscar:"len_prefix=uint16,nullterm"`
+}
+
 type SNAC_0x01_0x11_OServiceIdleNotification struct {
 	IdleTime uint32
 }

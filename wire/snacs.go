@@ -989,6 +989,28 @@ type ICQ_0x07D0_0x0410_DBQueryMetaReqSetInterests struct {
 	} `oscar:"count_prefix=uint8"`
 }
 
+type ICQ_0x07DA_0x01AE_DBQueryMetaReplyLastUserFound struct {
+	ICQMetadata
+	ReqSubType uint16
+	Success    uint8
+	Details    ICQUserSearchRecord `oscar:"len_prefix=uint16"`
+	// lastMessageFooter is set only on the last message in the batch
+	LastMessageFooter *struct {
+		FoundUsersLeft uint32
+	} `oscar:"optional"`
+}
+
+// LastResult flags the message as the last message in the search results.
+func (s *ICQ_0x07DA_0x01AE_DBQueryMetaReplyLastUserFound) LastResult() {
+	s.ReqSubType = ICQDBQueryMetaReplyLastUserFound
+	s.LastMessageFooter = &struct {
+		FoundUsersLeft uint32
+	}{
+		FoundUsersLeft: 0,
+	}
+}
+
+
 type SNAC_0x01_0x11_OServiceIdleNotification struct {
 	IdleTime uint32
 }

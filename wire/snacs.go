@@ -1262,6 +1262,17 @@ type ICQ_0x07DA_0x0104_DBQueryMetaReplyShortInfo struct {
 	Gender        uint8
 }
 
+type ODirKeywordListItem struct {
+	// Type is the item type (parent category = 1, keyword = 2).
+	Type uint8
+	// ID is the ID of the keyword or category. If item type is category, then
+	// it's the category ID. If item type is keyword, then it's the parent
+	// category ID. If it's a top-level keyword, value is 0.
+	ID uint8
+	// Name is the keyword or category name.
+	Name string `oscar:"len_prefix=uint16"`
+}
+
 // KerberosTicket represents one service ticket returned inside the
 // SNAC(0x050C, 0x0003) "Kerberos Login Success" response.
 //

@@ -1177,6 +1177,42 @@ type ICQ_0x07DA_0x00FA_DBQueryMetaReplyAffiliations struct {
 	ICQ_0x07D0_0x041A_DBQueryMetaReqSetAffiliations
 }
 
+type ICQ_0x07DA_0x00C8_DBQueryMetaReplyBasicInfo struct {
+	ICQMetadata
+	ReqSubType   uint16
+	Success      uint8
+	Nickname     string `oscar:"len_prefix=uint16,nullterm"`
+	FirstName    string `oscar:"len_prefix=uint16,nullterm"`
+	LastName     string `oscar:"len_prefix=uint16,nullterm"`
+	Email        string `oscar:"len_prefix=uint16,nullterm"`
+	City         string `oscar:"len_prefix=uint16,nullterm"`
+	State        string `oscar:"len_prefix=uint16,nullterm"`
+	Phone        string `oscar:"len_prefix=uint16,nullterm"`
+	Fax          string `oscar:"len_prefix=uint16,nullterm"`
+	Address      string `oscar:"len_prefix=uint16,nullterm"`
+	CellPhone    string `oscar:"len_prefix=uint16,nullterm"`
+	ZIP          string `oscar:"len_prefix=uint16,nullterm"`
+	CountryCode  uint16
+	GMTOffset    uint8
+	AuthFlag     uint8
+	WebAware     uint8
+	DCPerms      uint8
+	PublishEmail uint8
+}
+
+type ICQ_0x07DA_0x0104_DBQueryMetaReplyShortInfo struct {
+	ICQMetadata
+	ReqSubType    uint16
+	Success       uint8
+	Nickname      string `oscar:"len_prefix=uint16,nullterm"`
+	FirstName     string `oscar:"len_prefix=uint16,nullterm"`
+	LastName      string `oscar:"len_prefix=uint16,nullterm"`
+	Email         string `oscar:"len_prefix=uint16,nullterm"`
+	Authorization uint8
+	Unknown       uint8
+	Gender        uint8
+}
+
 type SNAC_0x01_0x11_OServiceIdleNotification struct {
 	IdleTime uint32
 }

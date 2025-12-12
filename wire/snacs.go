@@ -1092,6 +1092,76 @@ type ICQ_0x07D0_0x03EA_DBQueryMetaReqSetBasicInfo struct {
 	PublishEmail uint8
 }
 
+type ICQ_0x07DA_0x010E_DBQueryMetaReplyHomePageCat struct {
+	ICQMetadata
+	ReqSubType uint16
+	Success    uint8
+	Enabled    uint8
+	CatCode    uint16
+	Keywords   string `oscar:"len_prefix=uint16,nullterm"`
+	Unknown    uint8
+}
+
+type ICQ_0x07DA_0x08A2_DBQueryMetaReplyXMLData struct {
+	ICQMetadata
+	ReqSubType uint16
+	Success    uint8
+	XML        string `oscar:"len_prefix=uint16,nullterm"`
+}
+
+type ICQ_0x07DA_0x00DC_DBQueryMetaReplyMoreInfo struct {
+	ICQMetadata
+	ReqSubType uint16
+	Success    uint8
+	ICQ_0x07D0_0x03FD_DBQueryMetaReqSetMoreInfo
+	Unknown     uint16
+	City        string `oscar:"len_prefix=uint16,nullterm"`
+	State       string `oscar:"len_prefix=uint16,nullterm"`
+	CountryCode uint16
+	TimeZone    uint8
+}
+
+type ICQ_0x07DA_0x00EB_DBQueryMetaReplyExtEmailInfo struct {
+	ICQMetadata
+	ReqSubType uint16
+	Success    uint8
+	Emails     []struct {
+		Flag  uint8  // (0-publish, 1-don't)
+		Email string `oscar:"len_prefix=uint16,nullterm"`
+	} `oscar:"count_prefix=uint8"`
+}
+
+type ICQ_0x07DA_0x00D2_DBQueryMetaReplyWorkInfo struct {
+	ICQMetadata
+	ReqSubType uint16
+	Success    uint8
+	ICQ_0x07D0_0x03F3_DBQueryMetaReqSetWorkInfo
+}
+
+type ICQ_0x07DA_0x00F0_DBQueryMetaReplyInterests struct {
+	ICQMetadata
+	ReqSubType uint16
+	Success    uint8
+	Interests  []struct {
+		Code    uint16
+		Keyword string `oscar:"len_prefix=uint16,nullterm"`
+	} `oscar:"count_prefix=uint8"`
+}
+
+type ICQ_0x07DA_0x00E6_DBQueryMetaReplyNotes struct {
+	ICQMetadata
+	ReqSubType uint16
+	Success    uint8
+	ICQ_0x07D0_0x0406_DBQueryMetaReqSetNotes
+}
+
+type ICQ_0x07DA_0x00FA_DBQueryMetaReplyAffiliations struct {
+	ICQMetadata
+	ReqSubType uint16
+	Success    uint8
+	ICQ_0x07D0_0x041A_DBQueryMetaReqSetAffiliations
+}
+
 type SNAC_0x01_0x11_OServiceIdleNotification struct {
 	IdleTime uint32
 }

@@ -1303,6 +1303,43 @@ type SNAC_0x02_0x10_LocateSetKeywordReply struct {
 	Unknown uint16
 }
 
+type SNAC_0x02_0x15_LocateUserInfoQuery2 struct {
+	Type2      uint32
+	ScreenName string `oscar:"len_prefix=uint8"`
+}
+
+type SNAC_0x03_0x02_BuddyRightsQuery struct {
+	TLVRestBlock
+}
+
+type SNAC_0x03_0x03_BuddyRightsReply struct {
+	TLVRestBlock
+}
+
+type SNAC_0x03_0x04_BuddyAddBuddies struct {
+	Buddies []struct {
+		ScreenName string `oscar:"len_prefix=uint8"`
+	}
+}
+
+type SNAC_0x03_0x05_BuddyDelBuddies struct {
+	Buddies []struct {
+		ScreenName string `oscar:"len_prefix=uint8"`
+	}
+}
+
+type SNAC_0x03_0x0F_BuddyAddTempBuddies struct {
+	Buddies []struct {
+		ScreenName string `oscar:"len_prefix=uint8"`
+	}
+}
+
+type SNAC_0x03_0x10_BuddyDelTempBuddies struct {
+	Buddies []struct {
+		ScreenName string `oscar:"len_prefix=uint8"`
+	}
+}
+
 type SNAC_0x01_0x14_OServiceSetPrivacyFlags struct {
 	PrivacyFlags uint32
 }

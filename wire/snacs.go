@@ -1213,6 +1213,10 @@ type ICQ_0x07DA_0x0104_DBQueryMetaReplyShortInfo struct {
 	Gender        uint8
 }
 
+type SNAC_0x04_0x0A_ICBMOfflineRetrieve struct{}
+
+type SNAC_0x04_0x17_ICBMOfflineRetrieveReply struct{}
+
 type SNAC_0x01_0x11_OServiceIdleNotification struct {
 	IdleTime uint32
 }
@@ -1338,6 +1342,62 @@ type SNAC_0x03_0x10_BuddyDelTempBuddies struct {
 	Buddies []struct {
 		ScreenName string `oscar:"len_prefix=uint8"`
 	}
+}
+
+type SNAC_0x04_0x02_ICBMAddParameters struct {
+	Channel              uint16
+	ICBMFlags            uint32
+	MaxIncomingICBMLen   uint16
+	MaxSourceEvil        uint16
+	MaxDestinationEvil   uint16
+	MinInterICBMInterval uint32
+}
+
+type SNAC_0x04_0x05_ICBMParameterReply struct {
+	MaxSlots             uint16
+	ICBMFlags            uint32
+	MaxIncomingICBMLen   uint16
+	MaxSourceEvil        uint16
+	MaxDestinationEvil   uint16
+	MinInterICBMInterval uint32
+}
+
+type SNAC_0x04_0x06_ICBMChannelMsgToHost struct {
+	Cookie     uint64
+	ChannelID  uint16
+	ScreenName string `oscar:"len_prefix=uint8"`
+	TLVRestBlock
+}
+
+type SNAC_0x04_0x08_ICBMEvilRequest struct {
+	SendAs     uint16
+	ScreenName string `oscar:"len_prefix=uint8"`
+}
+
+type SNAC_0x04_0x09_ICBMEvilReply struct {
+	EvilDeltaApplied uint16
+	UpdatedEvilValue uint16
+}
+
+type SNAC_0x04_0x0B_ICBMClientErr struct {
+	Cookie     uint64
+	ChannelID  uint16
+	ScreenName string `oscar:"len_prefix=uint8"`
+	Code       uint16
+	ErrInfo    []byte
+}
+
+type SNAC_0x04_0x0C_ICBMHostAck struct {
+	Cookie     uint64
+	ChannelID  uint16
+	ScreenName string `oscar:"len_prefix=uint8"`
+}
+
+type SNAC_0x04_0x14_ICBMClientEvent struct {
+	Cookie     uint64
+	ChannelID  uint16
+	ScreenName string `oscar:"len_prefix=uint8"`
+	Event      uint16
 }
 
 type SNAC_0x01_0x14_OServiceSetPrivacyFlags struct {

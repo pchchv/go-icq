@@ -1213,6 +1213,8 @@ type ICQ_0x07DA_0x0104_DBQueryMetaReplyShortInfo struct {
 	Gender        uint8
 }
 
+type SNAC_0x0F_0x04_KeywordListQuery struct{}
+
 type SNAC_0x04_0x0A_ICBMOfflineRetrieve struct{}
 
 type SNAC_0x07_0x06_AdminConfirmRequest struct{}
@@ -1443,6 +1445,140 @@ type SNAC_0x09_0x08_PermitDenyDelDenyListEntries struct {
 	Users []struct {
 		ScreenName string `oscar:"len_prefix=uint8"`
 	}
+}
+
+type SNAC_0x13_0x02_FeedbagRightsQuery struct {
+	TLVRestBlock
+}
+
+type SNAC_0x13_0x03_FeedbagRightsReply struct {
+	TLVRestBlock
+}
+
+type SNAC_0x13_0x05_FeedbagQueryIfModified struct {
+	LastUpdate uint32
+	Count      uint8
+}
+
+type SNAC_0x13_0x0E_FeedbagStatus struct {
+	Results []uint16
+}
+
+type SNAC_0x13_0x11_FeedbagStartCluster struct {
+	TLVRestBlock
+}
+
+type SNAC_0x13_0x18_FeedbagRequestAuthorizationToHost struct {
+	ScreenName string `oscar:"len_prefix=uint8"`
+	Reason     string `oscar:"len_prefix=uint16"`
+	Unknown    uint16
+}
+
+type SNAC_0x13_0x1A_FeedbagRespondAuthorizeToHost struct {
+	ScreenName string `oscar:"len_prefix=uint8"`
+	Accepted   uint8
+	Reason     string `oscar:"len_prefix=uint16"`
+}
+
+type SNAC_0x13_0x1B_FeedbagRespondAuthorizeToClient struct {
+	ScreenName string `oscar:"len_prefix=uint8"`
+	Accepted   uint8
+	Reason     string `oscar:"len_prefix=uint16"`
+}
+
+type SNAC_0x15_0x02_BQuery struct {
+	TLVRestBlock
+}
+
+type SNAC_0x15_0x02_DBReply struct {
+	TLVRestBlock
+}
+
+type SNAC_0x17_0x02_BUCPLoginRequest struct {
+	TLVRestBlock
+}
+
+type SNAC_0x17_0x03_BUCPLoginResponse struct {
+	TLVRestBlock
+}
+
+type SNAC_0x17_0x06_BUCPChallengeRequest struct {
+	TLVRestBlock
+}
+
+type SNAC_0x17_0x07_BUCPChallengeResponse struct {
+	AuthKey string `oscar:"len_prefix=uint16"`
+}
+
+type SNAC_0x0A_0x02_UserLookupFindByEmail struct {
+	Email []byte
+}
+
+type SNAC_0x0A_0x03_UserLookupFindReply struct {
+	TLVRestBlock
+}
+
+type SNAC_0x0B_0x02_StatsSetMinReportInterval struct {
+	MinReportInterval uint16
+}
+
+type SNAC_0x0B_0x03_StatsReportEvents struct {
+	TLVRestBlock
+}
+
+type SNAC_0x0B_0x04_StatsReportAck struct {
+}
+
+type SNAC_0x0D_0x03_ChatNavRequestExchangeInfo struct {
+	Exchange uint16
+}
+
+type SNAC_0x0D_0x04_ChatNavRequestRoomInfo struct {
+	Exchange       uint16
+	Cookie         string `oscar:"len_prefix=uint8"`
+	InstanceNumber uint16
+	DetailLevel    uint8
+}
+
+type SNAC_0x0D_0x09_ChatNavNavInfo struct {
+	TLVRestBlock
+}
+
+type SNAC_0x0D_0x09_TLVExchangeInfo struct {
+	Identifier uint16
+	TLVBlock
+}
+
+type SNAC_0x0E_0x02_ChatRoomInfoUpdate struct {
+	Exchange       uint16
+	Cookie         string `oscar:"len_prefix=uint8"`
+	InstanceNumber uint16
+	DetailLevel    uint8
+	TLVBlock
+}
+
+type SNAC_0x0E_0x05_ChatChannelMsgToHost struct {
+	Cookie  uint64
+	Channel uint16
+	TLVRestBlock
+}
+
+type SNAC_0x0E_0x06_ChatChannelMsgToClient struct {
+	Cookie  uint64
+	Channel uint16
+	TLVRestBlock
+}
+
+type SNAC_0x0F_0x02_InfoQuery struct {
+	TLVRestBlock
+}
+
+type SNAC_0x0F_0x03_InfoReply struct {
+	Status  uint16
+	Unknown uint16
+	Results struct {
+		List []TLVBlock `oscar:"count_prefix=uint16"`
+	} `oscar:"count_prefix=uint16"`
 }
 
 type SNAC_0x01_0x14_OServiceSetPrivacyFlags struct {

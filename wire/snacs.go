@@ -1917,6 +1917,75 @@ type SNAC_0x10_0x07_BARTDownload2Reply struct {
 	Data       []byte `oscar:"len_prefix=uint16"`
 }
 
+type SNAC_0x0E_0x03_ChatUsersJoined struct {
+	Users []TLVUserInfo
+}
+
+type SNAC_0x0E_0x04_ChatUsersLeft struct {
+	Users []TLVUserInfo
+}
+
+type SNAC_0x0F_0x04_KeywordListReply struct {
+	Status    uint16
+	Interests []ODirKeywordListItem `oscar:"count_prefix=uint16"`
+}
+
+type SNAC_0x13_0x06_FeedbagReply struct {
+	Version    uint8
+	Items      []FeedbagItem `oscar:"count_prefix=uint16"`
+	LastUpdate uint32
+}
+
+type SNAC_0x13_0x08_FeedbagInsertItem struct {
+	Items []FeedbagItem
+}
+
+type SNAC_0x13_0x09_FeedbagUpdateItem struct {
+	Items []FeedbagItem
+}
+
+type SNAC_0x13_0x0A_FeedbagDeleteItem struct {
+	Items []FeedbagItem
+}
+
+type SNAC_0x04_0x07_ICBMChannelMsgToClient struct {
+	Cookie    uint64
+	ChannelID uint16
+	TLVUserInfo
+	TLVRestBlock
+}
+
+type SNAC_0x02_0x06_LocateUserInfoReply struct {
+	TLVUserInfo
+	LocateInfo TLVRestBlock
+}
+
+type SNAC_0x01_0x0A_OServiceRateParamsChange struct {
+	Code uint16
+	Rate RateParamsSNAC
+}
+
+type SNAC_0x01_0x0F_OServiceUserInfoUpdate struct {
+	UserInfo []TLVUserInfo
+}
+
+type SNAC_0x03_0x0B_BuddyArrived struct {
+	TLVUserInfo
+}
+
+type SNAC_0x03_0x0C_BuddyDeparted struct {
+	TLVUserInfo
+}
+
+type SNAC_0x01_0x10_OServiceEvilNotification struct {
+	NewEvil uint16
+	// Snitcher specifies the user who sent the warning. Nil pointer indicates
+	// an anonymous warning.
+	Snitcher *struct {
+		TLVUserInfo
+	} `oscar:"optional"`
+}
+
 type SNAC_0x01_0x14_OServiceSetPrivacyFlags struct {
 	PrivacyFlags uint32
 }

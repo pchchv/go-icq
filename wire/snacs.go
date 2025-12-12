@@ -1424,6 +1424,41 @@ type SNAC_0x050C_0x0004_KerberosLoginErrResponse struct {
 	Metadata TLVBlock
 }
 
+//	SNAC_0x01_0x07_OServiceRateParamsReply contains rate limits for rate classes and groups.
+//
+// Rate Classes:
+//   - ID: Unique identifier for the rate class.
+//   - WindowSize: The number of previously sent commands included in calculating
+//     the current "rate average."
+//   - ClearLevel: The threshold the average must reach to clear a rate limit.
+//   - AlertLevel: The threshold for triggering an alert that tells the client
+//     that it's getting close to the limit.
+//   - LimitLevel: SNACs will be dropped if the rate falls below this value.
+//   - DisconnectLevel: Server will disconnect if the rate falls below this value.
+//   - CurrentLevel: The current value for the class. Higher values are preferable.
+//     Represents the current "rate average," resembling a moving average of the
+//     times between each of the last WindowSize commands.
+//   - MaxLevel: The maximum rate value. If the current value surpasses this,
+//     it should be reset. The upper limit for a rate average.
+//   - LastTime: Time elapsed since the last message was received by the server.
+//   - CurrentStatus: Indicates whether the server is dropping SNACs for this rate class.
+//
+// Rate Groups:
+//   - ID: Unique identifier for the rate group.
+//   - Pairs: List of SNAC types associated with the rate group,
+//     including FoodGroup (e.g., wire.ICBM) and
+//     SubGroup (e.g., wire.ICBMChannelMsgToHost).
+type SNAC_0x01_0x07_OServiceRateParamsReply struct {
+	RateClasses []RateParamsSNAC `oscar:"count_prefix=uint16"`
+	RateGroups  []struct {
+		ID    uint16
+		Pairs []struct {
+			FoodGroup uint16
+			SubGroup  uint16
+		} `oscar:"count_prefix=uint16"`
+	}
+}
+
 // Used when client wants to get its account information
 // - AdminTLVScreenNameFormatted
 // - AdminTLVEmailAddress

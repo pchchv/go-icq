@@ -1417,6 +1417,34 @@ type SNAC_0x07_0x07_AdminConfirmReply struct {
 	TLV
 }
 
+type SNAC_0x09_0x03_PermitDenyRightsReply struct {
+	TLVRestBlock
+}
+
+type SNAC_0x09_0x05_PermitDenyAddPermListEntries struct {
+	Users []struct {
+		ScreenName string `oscar:"len_prefix=uint8"`
+	}
+}
+
+type SNAC_0x09_0x06_PermitDenyDelPermListEntries struct {
+	Users []struct {
+		ScreenName string `oscar:"len_prefix=uint8"`
+	}
+}
+
+type SNAC_0x09_0x07_PermitDenyAddDenyListEntries struct {
+	Users []struct {
+		ScreenName string `oscar:"len_prefix=uint8"`
+	}
+}
+
+type SNAC_0x09_0x08_PermitDenyDelDenyListEntries struct {
+	Users []struct {
+		ScreenName string `oscar:"len_prefix=uint8"`
+	}
+}
+
 type SNAC_0x01_0x14_OServiceSetPrivacyFlags struct {
 	PrivacyFlags uint32
 }

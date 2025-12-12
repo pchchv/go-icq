@@ -1215,6 +1215,8 @@ type ICQ_0x07DA_0x0104_DBQueryMetaReplyShortInfo struct {
 
 type SNAC_0x04_0x0A_ICBMOfflineRetrieve struct{}
 
+type SNAC_0x07_0x06_AdminConfirmRequest struct{}
+
 type SNAC_0x04_0x17_ICBMOfflineRetrieveReply struct{}
 
 type SNAC_0x01_0x11_OServiceIdleNotification struct {
@@ -1398,6 +1400,21 @@ type SNAC_0x04_0x14_ICBMClientEvent struct {
 	ChannelID  uint16
 	ScreenName string `oscar:"len_prefix=uint8"`
 	Event      uint16
+}
+
+type SNAC_0x07_0x03_AdminInfoReply struct {
+	Permissions uint16
+	TLVBlock
+}
+
+type SNAC_0x07_0x05_AdminChangeReply struct {
+	Permissions uint16
+	TLVBlock
+}
+
+type SNAC_0x07_0x07_AdminConfirmReply struct {
+	Status uint16
+	TLV
 }
 
 type SNAC_0x01_0x14_OServiceSetPrivacyFlags struct {

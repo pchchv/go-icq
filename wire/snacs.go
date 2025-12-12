@@ -1273,6 +1273,99 @@ type SNAC_0x07_0x06_AdminConfirmRequest struct{}
 
 type SNAC_0x04_0x17_ICBMOfflineRetrieveReply struct{}
 
+// SNAC_0x050C_0x0002_KerberosLoginRequest represents a Kerberos-like login request
+// sent by the AIM client as part of the OSCAR authentication handshake using SNAC(0x050C, 0x0002).
+type SNAC_0x050C_0x0002_KerberosLoginRequest struct {
+	// RequestID is a client-generated identifier that matches the one echoed in the server response.
+	RequestID uint32
+	// ClientIP is the client's IPv4 address in network byte order.
+	ClientIP uint32
+	// ClientCOOLVersionMajor is the major version of the AIM client "COOL" protocol.
+	ClientCOOLVersionMajor uint32
+	// ClientCOOLVersionMinor is the minor version of the AIM client "COOL" protocol.
+	ClientCOOLVersionMinor uint32
+	// PaddingOrZero is always observed as 0x00000000 and may be reserved/padding.
+	PaddingOrZero uint32
+	// KerberosPayload contains TLV-encoded data, typically including the AP-REQ (TLV 0x0005).
+	KerberosPayload TLVBlock
+	// LocaleFlags1 appears to contain locale or encoding hints, possibly bitflags.
+	LocaleFlags1 uint32
+	// LocaleFlags2 is another locale- or feature-related field, typically zero.
+	LocaleFlags2 uint32
+	// CountryCode is the user's ISO 3166-1 alpha-2 country code (e.g., "US").
+	CountryCode string `oscar:"len_prefix=uint16"`
+	// LanguageCode is the user's ISO 639-1 language code (e.g., "en").
+	LanguageCode string `oscar:"len_prefix=uint16"`
+	// ServiceContextBlock is a TLV block containing client realm and service info.
+	ServiceContextBlock TLVBlock
+	// VersionOrFlags is likely a protocol feature version or flag mask (exact meaning unknown).
+	VersionOrFlags uint32
+	// AuthType is a 1-byte value (usually 0x00 or 0x01), possibly denoting password type or encoding.
+	AuthType byte
+	// ClientPrincipal is the Kerberos principal name (username).
+	ClientPrincipal string `oscar:"len_prefix=uint16"`
+	// ServicePrincipal is the Kerberos service string (e.g., "im/boss").
+	ServicePrincipal string `oscar:"len_prefix=uint16"`
+	// Reserved1 is typically zero; possibly a padding or reserved field.
+	Reserved1 uint32
+	// RealmCount is typically 0x0002; may indicate how many realms or tickets are requested.
+	RealmCount uint16
+	// TicketRequestMetadata is a TLV block describing requested tickets (e.g., realm, lifetime, enctype).
+	TicketRequestMetadata TLVBlock
+}
+
+// SNAC_0x050C_0x0003_KerberosLoginSuccessResponse represents
+// the server's response to a successful Kerberos-like login request in AIM's OSCAR protocol.
+// It includes the client identity and issued tickets.
+type SNAC_0x050C_0x0003_KerberosLoginSuccessResponse struct {
+	// RequestID matches the KerberosRequestID from the original client request (for correlation).
+	RequestID uint32
+	// Epoch is a server-issued timestamp indicating when the client was authenticated.
+	// This is often used as the start time for ticket validity.
+	Epoch uint32
+	// Reserved is a 4-byte field, usually zero. Possibly reserved for future use or alignment.
+	Reserved uint32
+	// ClientPrincipal is the Kerberos principal name of the authenticated client.
+	ClientPrincipal string `oscar:"len_prefix=uint16"`
+	// ClientRealm is the Kerberos realm in which the client was authenticated (e.g., "AOL").
+	ClientRealm string `oscar:"len_prefix=uint16"`
+	// Tickets contains one or more issued Kerberos tickets, including service tickets and/or a TGT.
+	// These are encoded in ASN.1 DER and include session keys, expiration, and encrypted blobs.
+	Tickets []KerberosTicket `oscar:"count_prefix=uint16"`
+	// Extensions is a TLVBlock containing optional metadata. May include:
+	// - Client capabilities
+	// - Locales or language tags
+	// - Echoed usernames
+	// - Additional authentication hints
+	Extensions TLVBlock
+}
+
+// SNAC_0x050C_0x0004_KerberosLoginErrResponse represents a login failure response
+// sent by the AIM server in reply to a Kerberos-style login attempt (SNAC 0x050C/0x0002).
+//
+// This SNAC is typically sent when authentication fails due to an invalid password,
+// unknown screen name, or protocol-level issues.
+// It includes a human-readable message and an error code, along with optional TLV metadata.
+type SNAC_0x050C_0x0004_KerberosLoginErrResponse struct {
+	// KerbRequestID matches the KerberosRequestID from the original login request,
+	// allowing the client to correlate the response to the appropriate attempt.
+	KerbRequestID uint32
+	// ScreenName is the screen name the client attempted to authenticate as.
+	// This is echoed back by the server for clarity/debugging.
+	ScreenName string `oscar:"len_prefix=uint16"`
+	// ErrCode is a 2-byte error code indicating the reason for login failure.
+	// The only supported value is 0x0401, which indicates an invalid username
+	// or password.
+	ErrCode uint16
+	// Message is a UTF-8 string providing a user-facing explanation of the error
+	// (e.g., "Invalid screen name or password").
+	Message string `oscar:"len_prefix=uint16"`
+	// Unknown1 is an unknown flag.
+	Unknown1 uint32
+	// Metadata is a TLVBlock that may contain additional metadata about the failure.
+	Metadata TLVBlock
+}
+
 type SNAC_0x01_0x11_OServiceIdleNotification struct {
 	IdleTime uint32
 }

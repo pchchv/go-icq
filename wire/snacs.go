@@ -855,6 +855,11 @@ type TLVUserInfo struct {
 	WarningLevel uint16
 }
 
+func (t TLVUserInfo) IsAway() bool {
+	flags, _ := t.Uint16BE(OServiceUserInfoUserFlags)
+	return flags&OServiceUserFlagUnavailable == OServiceUserFlagUnavailable
+}
+
 type BARTID struct {
 	Type uint16
 	BARTInfo

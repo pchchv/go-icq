@@ -862,6 +862,10 @@ const (
 	// FeedbagPDModePermitOnList only allows communication with users on buddy
 	// list and blocks all others from communicating.
 	FeedbagPDModePermitOnList FeedbagPDMode = 0x05
+
+	MultiConnFlagsOldClient    MultiConnFlag = 0x0 // client doesn't support multi-conn
+	MultiConnFlagsRecentClient MultiConnFlag = 0x1 // client supports multi-conn
+	MultiConnFlagsSingleClient MultiConnFlag = 0x3 // client supports multi-conn but only wants 1 concurrent session
 )
 
 type TLVUserInfo struct {
@@ -874,6 +878,8 @@ func (t TLVUserInfo) IsAway() bool {
 	flags, _ := t.Uint16BE(OServiceUserInfoUserFlags)
 	return flags&OServiceUserFlagUnavailable == OServiceUserFlagUnavailable
 }
+
+type MultiConnFlag uint8
 
 // FeedbagPDMode represents a buddy list permit/deny mode setting that
 // determines who can interact with a user.

@@ -1366,6 +1366,22 @@ type SNAC_0x050C_0x0004_KerberosLoginErrResponse struct {
 	Metadata TLVBlock
 }
 
+// Used when client wants to get its account information
+// - AdminTLVScreenNameFormatted
+// - AdminTLVEmailAddress
+// - AdminTLVRegistrationStatus
+type SNAC_0x07_0x02_AdminInfoQuery struct {
+	TLVRestBlock
+}
+
+// AdminTLVScreenNameFormatted - change screenname formatting
+// AdminTLVEmailAddress - change account email
+// AdminTLVRegistrationStatus - change registration status
+// AdminTLVNewPassword, AdminTLVOldPassword - change password
+type SNAC_0x07_0x04_AdminInfoChangeRequest struct {
+	TLVRestBlock
+}
+
 type SNAC_0x01_0x11_OServiceIdleNotification struct {
 	IdleTime uint32
 }

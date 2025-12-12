@@ -866,6 +866,88 @@ const (
 	MultiConnFlagsOldClient    MultiConnFlag = 0x0 // client doesn't support multi-conn
 	MultiConnFlagsRecentClient MultiConnFlag = 0x1 // client supports multi-conn
 	MultiConnFlagsSingleClient MultiConnFlag = 0x3 // client supports multi-conn but only wants 1 concurrent session
+
+	LoginTLVTagsScreenName              uint16 = 0x01
+	LoginTLVTagsRoastedPassword         uint16 = 0x02
+	LoginTLVTagsClientIdentity          uint16 = 0x03
+	LoginTLVTagsReconnectHere           uint16 = 0x05
+	LoginTLVTagsAuthorizationCookie     uint16 = 0x06
+	LoginTLVTagsErrorSubcode            uint16 = 0x08
+	LoginTLVTagsPasswordHash            uint16 = 0x25
+	LoginTLVTagsMultiConnFlags          uint16 = 0x4A
+	LoginTLVTagsRoastedKerberosPassword uint16 = 0x1335
+	LoginTLVTagsRoastedTOCPassword      uint16 = 0x1337
+	LoginTLVTagsPlaintextPassword       uint16 = 0x1338
+	LoginErrInvalidUsernameOrPassword   uint16 = 0x0001
+	LoginErrInvalidPassword             uint16 = 0x0005 // invalid password
+	LoginErrInvalidAccount              uint16 = 0x0007
+	LoginErrDeletedAccount              uint16 = 0x0008
+	LoginErrExpiredAccount              uint16 = 0x0009
+	LoginErrSuspendedAccount            uint16 = 0x0011 // suspended account
+	LoginErrTooHeavilyWarned            uint16 = 0x0019
+	LoginErrRateLimitExceeded           uint16 = 0x001D
+	LoginErrInvalidSecureID             uint16 = 0x0020
+	LoginErrSuspendedAccountAge         uint16 = 0x0022 // suspended due to age (age < 13 years)
+	LoginErrICQUserErr                  uint16 = 0x0008 // ICQ user doesn't exist
+
+	ErrorCodeInvalidSnac          uint16 = 0x01
+	ErrorCodeRateToHost           uint16 = 0x02
+	ErrorCodeRateToClient         uint16 = 0x03
+	ErrorCodeNotLoggedOn          uint16 = 0x04
+	ErrorCodeServiceUnavailable   uint16 = 0x05
+	ErrorCodeServiceNotDefined    uint16 = 0x06
+	ErrorCodeObsoleteSnac         uint16 = 0x07
+	ErrorCodeNotSupportedByHost   uint16 = 0x08
+	ErrorCodeNotSupportedByClient uint16 = 0x09
+	ErrorCodeRefusedByClient      uint16 = 0x0A
+	ErrorCodeReplyTooBig          uint16 = 0x0B
+	ErrorCodeResponsesLost        uint16 = 0x0C
+	ErrorCodeRequestDenied        uint16 = 0x0D
+	ErrorCodeBustedSnacPayload    uint16 = 0x0E
+	ErrorCodeInsufficientRights   uint16 = 0x0F
+	ErrorCodeInLocalPermitDeny    uint16 = 0x10
+	ErrorCodeTooEvilSender        uint16 = 0x11
+	ErrorCodeTooEvilReceiver      uint16 = 0x12
+	ErrorCodeUserTempUnavail      uint16 = 0x13
+	ErrorCodeNoMatch              uint16 = 0x14
+	ErrorCodeListOverflow         uint16 = 0x15
+	ErrorCodeRequestAmbigous      uint16 = 0x16
+	ErrorCodeQueueFull            uint16 = 0x17
+	ErrorCodeNotWhileOnAol        uint16 = 0x18
+	ErrorCodeQueryFail            uint16 = 0x19
+	ErrorCodeTimeout              uint16 = 0x1A
+	ErrorCodeErrorText            uint16 = 0x1B
+	ErrorCodeGeneralFailure       uint16 = 0x1C
+	ErrorCodeProgress             uint16 = 0x1D
+	ErrorCodeInFreeArea           uint16 = 0x1E
+	ErrorCodeRestrictedByPc       uint16 = 0x1F
+	ErrorCodeRemoteRestrictedByPc uint16 = 0x20
+	ErrorTLVFailURL               uint16 = 0x0004 // URL with more detail
+	ErrorTLVErrorSubcode          uint16 = 0x0008 // Foodgroup-specific error code
+	ErrorTLVErrorText             uint16 = 0x001B // String error message text
+	ErrorTLVErrorInfoCLSID        uint16 = 0x0029 // UUID specifying format of ERROR_INFO_DATA data
+	ErrorTLVErrorInfoData         uint16 = 0x002A // Extra information describing error
+
+	BUCPErr                      uint16 = 0x0001
+	BUCPLoginRequest             uint16 = 0x0002
+	BUCPLoginResponse            uint16 = 0x0003
+	BUCPRegisterRequest          uint16 = 0x0004
+	BUCPChallengeRequest         uint16 = 0x0006
+	BUCPChallengeResponse        uint16 = 0x0007
+	BUCPAsasnRequest             uint16 = 0x0008
+	BUCPSecuridRequest           uint16 = 0x000A
+	BUCPRegistrationImageRequest uint16 = 0x000C
+
+	UserLookupErr         uint16 = 0x0001
+	UserLookupFindByEmail uint16 = 0x0002
+	UserLookupFindReply   uint16 = 0x0003
+
+	UserLookupErrNoUserFound uint16 = 0x0014
+
+	UserLookupTLVEmailAddress uint16 = 0x0001
+
+	PopupErr     uint16 = 0x0001
+	PopupDisplay uint16 = 0x0002
 )
 
 type TLVUserInfo struct {

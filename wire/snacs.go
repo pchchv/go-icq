@@ -1217,6 +1217,34 @@ type SNAC_0x01_0x11_OServiceIdleNotification struct {
 	IdleTime uint32
 }
 
+type SNAC_0x01_0x02_OServiceClientOnline struct {
+	GroupVersions []struct {
+		FoodGroup   uint16
+		Version     uint16
+		ToolID      uint16
+		ToolVersion uint16
+	}
+}
+
+type SNAC_0x01_0x03_OServiceHostOnline struct {
+	FoodGroups []uint16
+}
+
+type SNAC_0x01_0x04_OServiceServiceRequest struct {
+	FoodGroup uint16
+	TLVRestBlock
+}
+
+type SNAC_0x01_0x04_TLVRoomInfo struct {
+	Exchange       uint16
+	Cookie         string `oscar:"len_prefix=uint8"`
+	InstanceNumber uint16
+}
+
+type SNAC_0x01_0x05_OServiceServiceResponse struct {
+	TLVRestBlock
+}
+
 type SNAC_0x01_0x14_OServiceSetPrivacyFlags struct {
 	PrivacyFlags uint32
 }

@@ -1213,6 +1213,58 @@ type ICQ_0x07DA_0x0104_DBQueryMetaReplyShortInfo struct {
 	Gender        uint8
 }
 
+// KerberosTicket represents one service ticket returned inside the
+// SNAC(0x050C, 0x0003) "Kerberos Login Success" response.
+//
+// TicketBlob follows the general layout of an RFC 4120 Ticket,
+// but is delivered in AIM’s TLV wrapper rather than a full KRB-TGS-REP.
+type KerberosTicket struct {
+	// PVNO is the Kerberos protocol-version number carried
+	// in the ticket header.  In Kerberos V5 this is always 0x0005.
+	PVNO uint16
+	// EncTicket is the raw ASN.1 DER-encoded Ticket structure
+	// (encrypted to the service key).  Length is given by the preceding
+	// uint16 in the OSCAR stream.
+	EncTicket []byte `oscar:"len_prefix=uint16"`
+	// TicketRealm is the realm to which the service principal belongs
+	// (e.g. "AOL").
+	TicketRealm string `oscar:"len_prefix=uint16"`
+	// ServicePrincipal is the complete service-principal name for which
+	// the ticket is valid (e.g. "im/boss").
+	ServicePrincipal string `oscar:"len_prefix=uint16"`
+	// ClientRealm is the Kerberos realm of the authenticated user.
+	ClientRealm string `oscar:"len_prefix=uint16"`
+	// ClientPrincipal is the principal name inside that realm.
+	ClientPrincipal string `oscar:"len_prefix=uint16"`
+	// KVNO (Key Version Number) tells the service which
+	// long-term key to use when decrypting EncTicket.
+	KVNO uint8
+	// SessionKey is the clear-text session key that the KDC also placed,
+	// encrypted, inside EncTicket.  Provided here for the client’s
+	// convenience so it doesn’t have to decrypt the ticket itself.
+	SessionKey []byte `oscar:"len_prefix=uint16"`
+	// Unknown1 is typically zero. Possibly reserved or unused.
+	Unknown1 uint32
+	// Unknown2 is a possible bitfield.
+	Unknown2 uint32
+	// AuthTime is the time when the initial authentication occurred (UNIX epoch).
+	AuthTime uint32
+	// StartTime is when the ticket becomes valid (UNIX epoch).
+	StartTime uint32
+	// EndTime is when the ticket expires (UNIX epoch).
+	EndTime uint32
+	// RenewTill is likely the latest time the ticket can be renewed (UNIX epoch).
+	RenewTill uint32
+	// Unknown5 is a possible bitfield.
+	Unknown4 uint32
+	// Unknown5 is a possible bitfield.
+	Unknown5 uint32
+	// Unknown6 is a possible bitfield.
+	Unknown6 uint32
+	// ConnectionMetadata holds metadata used for the next connection (IP address, cookie, etc).
+	ConnectionMetadata TLVBlock
+}
+
 type SNAC_0x0F_0x04_KeywordListQuery struct{}
 
 type SNAC_0x04_0x0A_ICBMOfflineRetrieve struct{}

@@ -879,6 +879,14 @@ func (t TLVUserInfo) IsAway() bool {
 // determines who can interact with a user.
 type FeedbagPDMode uint8
 
+type FeedbagItem struct {
+	TLVLBlock
+	ClassID uint16
+	GroupID uint16
+	ItemID  uint16
+	Name    string `oscar:"len_prefix=uint16"`
+}
+
 type BARTID struct {
 	Type uint16
 	BARTInfo

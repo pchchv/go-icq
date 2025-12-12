@@ -1319,6 +1319,19 @@ func (s SNAC_0x01_0x14_OServiceSetPrivacyFlags) MemberFlag() bool {
 	return s.PrivacyFlags&OServicePrivacyFlagMember == OServicePrivacyFlagMember
 }
 
+type SNAC_0x02_0x05_LocateUserInfoQuery struct {
+	Type       uint16
+	ScreenName string `oscar:"len_prefix=uint8"`
+}
+
+func (s SNAC_0x02_0x05_LocateUserInfoQuery) RequestProfile() bool {
+	return s.Type&uint16(LocateTypeSig) == uint16(LocateTypeSig)
+}
+
+func (s SNAC_0x02_0x05_LocateUserInfoQuery) RequestAwayMessage() bool {
+	return s.Type&uint16(LocateTypeUnavailable) == uint16(LocateTypeUnavailable)
+}
+
 // GetClearIconHash returns an opaque value set in
 // BARTID hash that indicates the user wants to clear their buddy icon.
 func GetClearIconHash() []byte {

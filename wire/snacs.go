@@ -2029,6 +2029,43 @@ func (s SNAC_0x09_0x04_PermitDenySetGroupPermitMask) IsFlagSet(flag uint16) bool
 	return flag&uint16(s.PermMask) == flag
 }
 
+// ICBMCh1Fragment represents an ICBM channel 1 (instant message)
+// message component.
+type ICBMCh1Fragment struct {
+	ID      uint8
+	Version uint8
+	Payload []byte `oscar:"len_prefix=uint16"`
+}
+
+type ICBMCh2Fragment struct {
+	Type       uint16
+	Cookie     [8]byte
+	Capability [16]byte
+	TLVRestBlock
+}
+
+type ICBMRoomInfo struct {
+	Exchange uint16
+	Cookie   string `oscar:"len_prefix=uint8"`
+	Instance uint16
+}
+
+// ICBMCh1Message represents the text component of an ICBM channel 1
+// (instant message) message.
+type ICBMCh1Message struct {
+	Charset  uint16
+	Language uint16
+	Text     []byte
+}
+
+// ICBMCh4Message represents an ICBM channel 4 (ICQ) message component.
+type ICBMCh4Message struct {
+	UIN         uint32
+	MessageType uint8
+	Flags       uint8
+	Message     string `oscar:"len_prefix=uint16,nullterm"`
+}
+
 // GetClearIconHash returns an opaque value set in
 // BARTID hash that indicates the user wants to clear their buddy icon.
 func GetClearIconHash() []byte {

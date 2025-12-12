@@ -1474,6 +1474,14 @@ func (s SNAC_0x02_0x05_LocateUserInfoQuery) RequestAwayMessage() bool {
 	return s.Type&uint16(LocateTypeUnavailable) == uint16(LocateTypeUnavailable)
 }
 
+type SNAC_0x09_0x04_PermitDenySetGroupPermitMask struct {
+	PermMask uint32
+}
+
+func (s SNAC_0x09_0x04_PermitDenySetGroupPermitMask) IsFlagSet(flag uint16) bool {
+	return flag&uint16(s.PermMask) == flag
+}
+
 // GetClearIconHash returns an opaque value set in
 // BARTID hash that indicates the user wants to clear their buddy icon.
 func GetClearIconHash() []byte {

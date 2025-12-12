@@ -912,6 +912,21 @@ type ICQInterests struct {
 	Keyword string `oscar:"len_prefix=uint16,nullterm"`
 }
 
+// ICQDCInfo represents ICQ direct connect settings.
+type ICQDCInfo struct {
+	IP                      uint32
+	Port                    uint32
+	DCType                  uint8
+	ProtoVersion            uint16
+	AuthCookie              uint32
+	WebPort                 uint32
+	ClientFutures           uint32
+	LastUpdateTime          uint32
+	LastExtInfoUpdateTime   uint32
+	LastExtStatusUpdateTime uint32
+	Unknown                 uint16
+}
+
 type ICQ_0x0041_DBQueryOfflineMsgReply struct {
 	ICQMetadata
 	SenderUIN uint32

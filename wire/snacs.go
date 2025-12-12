@@ -836,6 +836,17 @@ const (
 	StatsSetMinReportInterval uint16 = 0x0002
 	StatsReportEvents         uint16 = 0x0003
 	StatsReportAck            uint16 = 0x0004
+
+	KerberosLoginRequest             uint16 = 0x0002
+	KerberosLoginSuccessResponse     uint16 = 0x0003
+	KerberosKerberosLoginErrResponse uint16 = 0x0004
+	KerberosTLVTicketRequest         uint16 = 0x0002
+	KerberosTLVBOSServerInfo         uint16 = 0x0003
+	KerberosTLVHostname              uint16 = 0x0005
+	KerberosTLVCookie                uint16 = 0x0006
+	KerberosTLVConnSettings          uint16 = 0x008E
+	KerberosConnUseSSL               uint16 = 0x0002
+	KerberosErrAuthFailure           uint16 = 0x0401
 )
 
 type BARTID struct {
@@ -1263,6 +1274,24 @@ type KerberosTicket struct {
 	Unknown6 uint32
 	// ConnectionMetadata holds metadata used for the next connection (IP address, cookie, etc).
 	ConnectionMetadata TLVBlock
+}
+
+// KerberosLoginRequestTicket appears inside TLV 0x0002 of the
+// Ticket-Request Metadata block that the AIM client bundles into
+// its "Kerberos Login Request" (SNAC 0x050C/0x0002).
+type KerberosLoginRequestTicket struct {
+	// Marker might indicate the payload type.
+	Marker uint32
+	// Version might indicate the internal structure version.
+	Version uint16
+	// Flags contains unknown flags.
+	Flags uint32
+	// Unknown is an unknown field.
+	Unknown uint16
+	// Password holds the user’s password.
+	Password []byte `oscar:"len_prefix=uint16"`
+	// PasswordMetadata may hold additional metadata about the password.
+	PasswordMetadata TLVBlock
 }
 
 type SNAC_0x0F_0x04_KeywordListQuery struct{}

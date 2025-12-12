@@ -2196,3 +2196,25 @@ func UnmarshalChatMessageText(b []byte) (string, error) {
 		return string(b), nil
 	}
 }
+
+// UnmarshalICBMMessageText extracts message text from an ICBM fragment list.
+// Param b is a slice from TLV wire.ICBMTLVAOLIMData.
+func UnmarshalICBMMessageText(b []byte) (string, error) {
+	var frags []ICBMCh1Fragment
+	if err := UnmarshalBE(&frags, bytes.NewBuffer(b)); err != nil {
+		return "", fmt.Errorf("unable to unmarshal ICBM fragment: %w", err)
+	}
+
+	for _, frag := range frags {
+		if frag.ID == 1 { // 1 = message text
+			msg := ICBMCh1Message{}
+			err := UnmarshalBE(&msg, bytes.NewBuffer(frag.Payload))
+			if err != nil {
+				err = fmt.Errorf("unable to unmarshal ICBM message: %w", err)
+			}
+			return string(msg.Text), err
+		}
+	}
+
+	return "", errors.New("unable to find message fragment")
+}

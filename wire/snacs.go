@@ -606,6 +606,37 @@ const (
 	BARTReplyCodesBanned      uint8 = 0x06
 	BARTReplyCodesNotfound    uint8 = 0x07
 
+	BARTTypesBuddyIconSmall      uint16 = 0x00
+	BARTTypesBuddyIcon           uint16 = 0x01
+	BARTTypesStatusStr           uint16 = 0x02
+	BARTTypesArriveSound         uint16 = 0x03
+	BARTTypesRichName            uint16 = 0x04
+	BARTTypesSuperIcon           uint16 = 0x05
+	BARTTypesRadioStation        uint16 = 0x06
+	BARTTypesSuperIconTrigger    uint16 = 0x07
+	BARTTypesStatusTextLink      uint16 = 0x09
+	BARTTypesLocation            uint16 = 0x0B
+	BARTTypesBuddyIconBig        uint16 = 0x0C
+	BARTTypesStatusTextTimestamp uint16 = 0x0D
+	BARTTypesCurrentAvtrack      uint16 = 0x0F
+	BARTTypesDepartSound         uint16 = 0x60
+	BARTTypesImBackground        uint16 = 0x80
+	BARTTypesImChrome            uint16 = 0x81
+	BARTTypesImSkin              uint16 = 0x82
+	BARTTypesImSound             uint16 = 0x83
+	BARTTypesBadge               uint16 = 0x84
+	BARTTypesBadgeUrl            uint16 = 0x85
+	BARTTypesImInitialSound      uint16 = 0x86
+	BARTTypesFlashWallpaper      uint16 = 0x88
+	BARTTypesImmersiveWallpaper  uint16 = 0x89
+	BARTTypesBuddylistBackground uint16 = 0x100
+	BARTTypesBuddylistImage      uint16 = 0x101
+	BARTTypesBuddylistSkin       uint16 = 0x102
+	BARTTypesSmileySet           uint16 = 0x400
+	BARTTypesEncrCertChain       uint16 = 0x402
+	BARTTypesSignCertChain       uint16 = 0x403
+	BARTTypesGatewayCert         uint16 = 0x404
+
 	PermitDenyErr                      uint16 = 0x0001
 	PermitDenyRightsQuery              uint16 = 0x0002
 	PermitDenyRightsReply              uint16 = 0x0003

@@ -849,6 +849,12 @@ const (
 	KerberosErrAuthFailure           uint16 = 0x0401
 )
 
+type TLVUserInfo struct {
+	TLVBlock
+	ScreenName   string `oscar:"len_prefix=uint8"`
+	WarningLevel uint16
+}
+
 type BARTID struct {
 	Type uint16
 	BARTInfo

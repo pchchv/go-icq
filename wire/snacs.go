@@ -1294,6 +1294,20 @@ type KerberosLoginRequestTicket struct {
 	PasswordMetadata TLVBlock
 }
 
+// KerberosBOSServerInfo provides the client with connection parameters for
+// contacting the BOS (Basic OSCAR Service) server.
+//
+// This TLV is typically returned by the server inside a
+// successful Kerberos login response
+// (SNAC 0x050C/0x0003).
+type KerberosBOSServerInfo struct {
+	// Unknown may signify a version or feature flag block.
+	Unknown uint16
+	// ConnectionInfo is a TLV block defining the next server to contact (BOS).
+	// Includes IP address, port, session cookie, and other required fields for login.
+	ConnectionInfo TLVBlock
+}
+
 type SNAC_0x0F_0x04_KeywordListQuery struct{}
 
 type SNAC_0x04_0x0A_ICBMOfflineRetrieve struct{}

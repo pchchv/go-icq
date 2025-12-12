@@ -1245,6 +1245,64 @@ type SNAC_0x01_0x05_OServiceServiceResponse struct {
 	TLVRestBlock
 }
 
+type SNAC_0x01_0x08_OServiceRateParamsSubAdd struct {
+	ClassIDs []uint16
+}
+
+type SNAC_0x01_0x17_OServiceClientVersions struct {
+	Versions []uint16
+}
+
+type SNAC_0x01_0x18_OServiceHostVersions struct {
+	Versions []uint16
+}
+
+type SNAC_0x01_0x1E_OServiceSetUserInfoFields struct {
+	TLVRestBlock
+}
+
+type SNAC_0x01_0x21_OServiceBARTReply struct {
+	BARTID
+}
+
+type SNAC_0x01_0x23_OServiceBART2Reply struct {
+	ReplyID []BartQueryReplyID
+}
+
+type SNAC_0x02_0x03_LocateRightsReply struct {
+	TLVRestBlock
+}
+
+type SNAC_0x02_0x04_LocateSetInfo struct {
+	TLVRestBlock
+}
+
+type SNAC_0x02_0x09_LocateSetDirInfo struct {
+	TLVRestBlock
+}
+
+type SNAC_0x02_0x0A_LocateSetDirReply struct {
+	Result uint16
+}
+
+type SNAC_0x02_0x0B_LocateGetDirInfo struct {
+	ScreenName string `oscar:"len_prefix=uint8"`
+}
+
+type SNAC_0x02_0x0C_LocateGetDirReply struct {
+	Status uint16
+	TLVBlock
+}
+
+type SNAC_0x02_0x0F_LocateSetKeywordInfo struct {
+	TLVRestBlock
+}
+
+type SNAC_0x02_0x10_LocateSetKeywordReply struct {
+	// Unknown is a field whose purpose is not known
+	Unknown uint16
+}
+
 type SNAC_0x01_0x14_OServiceSetPrivacyFlags struct {
 	PrivacyFlags uint32
 }

@@ -1308,6 +1308,21 @@ type KerberosBOSServerInfo struct {
 	ConnectionInfo TLVBlock
 }
 
+type RateParamsSNAC struct {
+	ID              uint16
+	WindowSize      uint32
+	ClearLevel      uint32
+	AlertLevel      uint32
+	LimitLevel      uint32
+	DisconnectLevel uint32
+	CurrentLevel    uint32
+	MaxLevel        uint32
+	V2Params        *struct {
+		LastTime      uint32
+		DroppingSNACs uint8
+	} `oscar:"optional"`
+}
+
 type SNAC_0x0F_0x04_KeywordListQuery struct{}
 
 type SNAC_0x04_0x0A_ICBMOfflineRetrieve struct{}

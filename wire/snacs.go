@@ -2066,6 +2066,34 @@ type ICBMCh4Message struct {
 	Message     string `oscar:"len_prefix=uint16,nullterm"`
 }
 
+// ICBMFragmentList creates an ICBM fragment list for an
+// instant message payload.
+func ICBMFragmentList(text string) ([]ICBMCh1Fragment, error) {
+	msg := ICBMCh1Message{
+		Charset:  ICBMMessageEncodingASCII,
+		Language: 0, // not clear what this means, but it works
+		Text:     []byte(text),
+	}
+	msgBuf := bytes.Buffer{}
+
+	if err := MarshalBE(msg, &msgBuf); err != nil {
+		return nil, fmt.Errorf("unable to marshal ICBM message: %w", err)
+	}
+
+	return []ICBMCh1Fragment{
+		{
+			ID:      5, // 5 = capabilities
+			Version: 1,
+			Payload: []byte{1, 1, 2}, // 1 = text
+		},
+		{
+			ID:      1, // 1 = message text
+			Version: 1,
+			Payload: msgBuf.Bytes(),
+		},
+	}, nil
+}
+
 // GetClearIconHash returns an opaque value set in
 // BARTID hash that indicates the user wants to clear their buddy icon.
 func GetClearIconHash() []byte {

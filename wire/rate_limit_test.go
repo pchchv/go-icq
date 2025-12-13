@@ -2,6 +2,7 @@ package wire
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -104,4 +105,189 @@ func TestSNACRateLimits_All_YieldStopsEarly(t *testing.T) {
 
 	// Should only yield one entry
 	assert.Equal(t, 1, count)
+}
+
+func TestCheckRateLimit(t *testing.T) {
+	baseTime := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	testCases := []struct {
+		name        string
+		lastTime    time.Time
+		currentTime time.Time
+		rateClass   RateClass
+		currentAvg  int32
+		limitedNow  bool
+		wantStatus  RateLimitStatus
+		wantNewAvg  int32
+	}{
+		{
+			name:        "Already limited, but newAvg >= ClearLevel => Clear",
+			lastTime:    baseTime,
+			currentTime: baseTime.Add(50 * time.Millisecond),
+			rateClass: RateClass{
+				WindowSize:      4,
+				MaxLevel:        1000,
+				ClearLevel:      10,
+				DisconnectLevel: 2,
+				LimitLevel:      5,
+				AlertLevel:      8,
+			},
+			currentAvg: 9,    // currentAvg close to ClearLevel
+			limitedNow: true, // already limited
+			// newAvg = (9*(4-1) + 50) / 4 = (27 + 50) / 4 = 77 / 4 = 19
+			// 19 >= ClearLevel(10) => RateLimitStatusClear
+			wantStatus: RateLimitStatusClear,
+			wantNewAvg: 19,
+		},
+		{
+			name:        "Already limited, but newAvg < ClearLevel => Remain Limited",
+			lastTime:    baseTime,
+			currentTime: baseTime.Add(30 * time.Millisecond),
+			rateClass: RateClass{
+				WindowSize:      4,
+				MaxLevel:        1000,
+				ClearLevel:      50,
+				DisconnectLevel: 10,
+				LimitLevel:      20,
+				AlertLevel:      30,
+			},
+			currentAvg: 10,
+			limitedNow: true,
+			// newAvg = (10*(4-1) + 30) / 4 = (30 + 30) / 4 = 60 / 4 = 15
+			// 15 < ClearLevel(50) => remain limited
+			wantStatus: RateLimitStatusLimited,
+			wantNewAvg: 15,
+		},
+		{
+			name:        "Not Limited Now, New average < DisconnectLevel => Disconnect",
+			lastTime:    baseTime,
+			currentTime: baseTime.Add(10 * time.Millisecond),
+			rateClass: RateClass{
+				WindowSize:      4,
+				MaxLevel:        1000,
+				ClearLevel:      100,
+				DisconnectLevel: 5,
+				LimitLevel:      20,
+				AlertLevel:      40,
+			},
+			currentAvg: 1,
+			limitedNow: false,
+			// newAvg = (1*(4-1) + 10) / 4 = (3 + 10) / 4 = 13 / 4 = 3
+			// 3 < DisconnectLevel(5) => RateLimitStatusDisconnect
+			wantStatus: RateLimitStatusDisconnect,
+			wantNewAvg: 3,
+		},
+		{
+			name:        "Limited Now, New average < DisconnectLevel => Disconnect",
+			lastTime:    baseTime,
+			currentTime: baseTime.Add(10 * time.Millisecond),
+			rateClass: RateClass{
+				WindowSize:      4,
+				MaxLevel:        1000,
+				ClearLevel:      100,
+				DisconnectLevel: 5,
+				LimitLevel:      20,
+				AlertLevel:      40,
+			},
+			currentAvg: 1,
+			limitedNow: true,
+			// newAvg = (1*(4-1) + 10) / 4 = (3 + 10) / 4 = 13 / 4 = 3
+			// 3 < DisconnectLevel(5) => RateLimitStatusDisconnect
+			wantStatus: RateLimitStatusDisconnect,
+			wantNewAvg: 3,
+		},
+		{
+			name:        "New average < LimitLevel => Limited",
+			lastTime:    baseTime,
+			currentTime: baseTime.Add(20 * time.Millisecond),
+			rateClass: RateClass{
+				WindowSize:      4,
+				MaxLevel:        1000,
+				ClearLevel:      100,
+				DisconnectLevel: 5,
+				LimitLevel:      40,
+				AlertLevel:      60,
+			},
+			currentAvg: 10,
+			limitedNow: false,
+			// newAvg = (10*(4-1) + 20) / 4 = (30 + 20) / 4 = 50 / 4 = 12
+			// 12 < LimitLevel(40) => RateLimitStatusLimited
+			wantStatus: RateLimitStatusLimited,
+			wantNewAvg: 12,
+		},
+		{
+			name:        "New average < AlertLevel => Alert",
+			lastTime:    baseTime,
+			currentTime: baseTime.Add(30 * time.Millisecond),
+			rateClass: RateClass{
+				WindowSize:      4,
+				MaxLevel:        1000,
+				ClearLevel:      100,
+				DisconnectLevel: 5,
+				LimitLevel:      20,
+				AlertLevel:      40,
+			},
+			currentAvg: 20,
+			limitedNow: false,
+			// newAvg = (20*(4-1) + 30) / 4 = (60 + 30) / 4 = 90 / 4 = 22
+			// 22 >= 20 => not "Limited"; 22 < 40 => "Alert"
+			wantStatus: RateLimitStatusAlert,
+			wantNewAvg: 22,
+		},
+		{
+			name:        "New average >= AlertLevel => Clear",
+			lastTime:    baseTime,
+			currentTime: baseTime.Add(50 * time.Millisecond),
+			rateClass: RateClass{
+				WindowSize:      4,
+				MaxLevel:        1000,
+				ClearLevel:      100,
+				DisconnectLevel: 5,
+				LimitLevel:      20,
+				AlertLevel:      40,
+			},
+			// Choose 39 so the resulting newAvg is 41, which is >= AlertLevel.
+			currentAvg: 39,
+			limitedNow: false,
+			// newAvg = (39*(4-1) + 50) / 4 = (117 + 50) / 4 = 167 / 4 = 41
+			// 41 >= AlertLevel(40) => RateLimitStatusClear
+			wantStatus: RateLimitStatusClear,
+			wantNewAvg: 41,
+		},
+		{
+			name:        "Clamp newAvg to MaxLevel if exceeded",
+			lastTime:    baseTime,
+			currentTime: baseTime.Add(9999 * time.Millisecond),
+			rateClass: RateClass{
+				WindowSize:      4,
+				MaxLevel:        100,
+				ClearLevel:      80,
+				DisconnectLevel: 20,
+				LimitLevel:      40,
+				AlertLevel:      60,
+			},
+			currentAvg: 95,
+			limitedNow: false,
+			// Without clamping, newAvg would be huge:
+			// newAvg = (95*(4-1) + 9999) / 4 = (285 + 9999)/4 = 10284/4 = 2571
+			// Clamped to 100 => 100 >= AlertLevel(60) => RateLimitStatusClear
+			wantStatus: RateLimitStatusClear,
+			wantNewAvg: 100,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotStatus, gotNewAvg := CheckRateLimit(
+				tc.lastTime,
+				tc.currentTime,
+				tc.rateClass,
+				tc.currentAvg,
+				tc.limitedNow,
+			)
+
+			assert.Equal(t, tc.wantStatus, gotStatus)
+			assert.Equal(t, tc.wantNewAvg, gotNewAvg)
+		})
+	}
 }

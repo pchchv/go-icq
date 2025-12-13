@@ -28,4 +28,8 @@ func main() {
 	wire.UnmarshalBE(&snac, rd)
 
 	printByteSlice(rd.Bytes())
+
+	snacBody := wire.SNAC_0x01_0x0F_OServiceUserInfoUpdate{}
+	wire.UnmarshalBE(&snacBody, rd)
+	fmt.Println(snacBody)
 }

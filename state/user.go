@@ -62,6 +62,39 @@ type ICQInterests struct {
 	Keyword4 string
 }
 
+// ICQBasicInfo holds basic information about an ICQ user,
+// including their name, contact details, and location.
+type ICQBasicInfo struct {
+	// Address is the user's residential address.
+	Address string
+	// CellPhone is the user's mobile phone number.
+	CellPhone string
+	// City is the city where the user resides.
+	City string
+	// CountryCode is the code representing the user's country of residence.
+	CountryCode uint16
+	// EmailAddress is the user's primary email address.
+	EmailAddress string
+	// Fax is the user's fax number.
+	Fax string
+	// FirstName is the user's first name.
+	FirstName string
+	// GMTOffset is the user's time zone offset from GMT.
+	GMTOffset uint8
+	// LastName is the user's last name.
+	LastName string
+	// Nickname is the user's nickname or preferred name.
+	Nickname string
+	// Phone is the user's landline phone number.
+	Phone string
+	// PublishEmail indicates whether the user's email address is public.
+	PublishEmail bool
+	// State is the state or region where the user resides.
+	State string
+	// ZIPCode is the user's postal code.
+	ZIPCode string
+}
+
 // IdentScreenName struct stores the normalized version of a user's screen name.
 // This format is used for uniformity in storage and comparison by removing spaces
 // and converting all characters to lowercase.

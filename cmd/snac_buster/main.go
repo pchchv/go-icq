@@ -1,6 +1,11 @@
 package main
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+
+	"github.com/pchchv/go-icq/wire"
+)
 
 func printByteSlice(data []byte) {
 	fmt.Print("[]byte{")
@@ -13,4 +18,8 @@ func printByteSlice(data []byte) {
 	fmt.Println("}")
 }
 
-func main() {}
+func main() {
+	b := []byte{}
+	flap := wire.FLAPFrame{}
+	wire.UnmarshalBE(&flap, bytes.NewReader(b))
+}

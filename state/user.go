@@ -95,6 +95,36 @@ type ICQBasicInfo struct {
 	ZIPCode string
 }
 
+// ICQWorkInfo contains information about the user's professional life,
+// including their workplace and job title.
+type ICQWorkInfo struct {
+	// Address is the address of the user's workplace.
+	Address string
+	// City is the city where the user's workplace is located.
+	City string
+	// Company is the name of the user's employer or company.
+	Company string
+	// CountryCode is the code representing the country where the user's
+	// workplace is located.
+	CountryCode uint16
+	// Department is the name of the department within the user's company.
+	Department string
+	// Fax is the fax number for the user's workplace.
+	Fax string
+	// OccupationCode is the code representing the user's occupation.
+	OccupationCode uint16
+	// Phone is the phone number for the user's workplace.
+	Phone string
+	// Position is the user's job title or position within the company.
+	Position string
+	// State is the state or region where the user's workplace is located.
+	State string
+	// WebPage is the URL of the user's company's website.
+	WebPage string
+	// ZIPCode is the postal code for the user's workplace.
+	ZIPCode string
+}
+
 // IdentScreenName struct stores the normalized version of a user's screen name.
 // This format is used for uniformity in storage and comparison by removing spaces
 // and converting all characters to lowercase.

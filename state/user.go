@@ -34,3 +34,7 @@ func (i IdentScreenName) UIN() uint32 {
 	v, _ := strconv.Atoi(i.screenName)
 	return uint32(v)
 }
+
+// DisplayScreenName type represents the screen name in the user-defined format.
+// This includes the original casing and spacing as defined by the user.
+type DisplayScreenName string

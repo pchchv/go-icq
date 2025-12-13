@@ -1,6 +1,23 @@
 package wire
 
-import "iter"
+import (
+	"iter"
+	"time"
+)
+
+const (
+	// RateLimitStatusLimited indicates the session is currently rate-limited
+	// and should not send further messages in this class.
+	RateLimitStatusLimited RateLimitStatus = 1
+	// RateLimitStatusAlert indicates the session is approaching the
+	// rate limit threshold and may soon be limited if activity continues.
+	RateLimitStatusAlert RateLimitStatus = 2
+	// RateLimitStatusClear indicates the session is under the limit and in good standing.
+	RateLimitStatusClear RateLimitStatus = 3
+	// RateLimitStatusDisconnect indicates the session has exceeded a
+	// critical threshold and should be forcibly disconnected.
+	RateLimitStatusDisconnect RateLimitStatus = 4
+)
 
 // RateLimitClassID identifies a rate limit class.
 type RateLimitClassID uint16
@@ -433,5 +450,70 @@ func (rg SNACRateLimits) RateClassLookup(foodGroup uint16, subGroup uint16) (Rat
 		return 0, false
 	} else {
 		return class, true
+	}
+}
+
+// CheckRateLimit calculates a rate limit status and a new moving average based on
+// the time elapsed between the last event and the current event,
+// a specified rate class,
+// and whether the system is currently limited.
+//
+// Parameters:
+//
+//	lastTime:    The timestamp of the previous event.
+//	currentTime: The current timestamp.
+//	rateClass:   Configuration for rate limiting thresholds and window size.
+//	currentAvg:  The current moving average of the elapsed time between events.
+//	limitedNow:  Indicates if the system is currently under a rate limit.
+//
+// Returns:
+//
+//	status: The new RateLimitStatus, which can be one of:
+//	        - RateLimitStatusDisconnect (when the moving average is smallest)
+//	        - RateLimitStatusLimited
+//	        - RateLimitStatusAlert
+//	        - RateLimitStatusClear (when the moving average is largest)
+//	newAvg:  The updated moving average of the elapsed time.
+//
+// The function updates currentAvg by combining the current interval
+// (the difference between currentTime and lastTime, in milliseconds)
+// with the previous average.
+// If the system was already limited (limitedNow == true),
+// the function checks whether currentAvg has risen above the ClearLevel threshold to
+// move the status back to RateLimitStatusClear.
+// If not, it keeps the status at RateLimitStatusLimited.
+//
+// If the system was not already limited,
+// the updated currentAvg is compared against DisconnectLevel, LimitLevel, and
+// AlertLevel thresholds of the provided RateClass to determine the appropriate rate limit status.
+func CheckRateLimit(
+	lastTime time.Time,
+	currentTime time.Time,
+	rateClass RateClass,
+	currentAvg int32,
+	limitedNow bool,
+) (RateLimitStatus, int32) {
+	// calculate the time elapsed in milliseconds since the last event
+	elapsedMs := int32(currentTime.Sub(lastTime).Milliseconds())
+	// update the moving average
+	newAvg := (currentAvg*(rateClass.WindowSize-1) + elapsedMs) / rateClass.WindowSize
+	// clamp the moving average to the maximum allowable level
+	if newAvg > rateClass.MaxLevel {
+		newAvg = rateClass.MaxLevel
+	}
+
+	switch {
+	case newAvg < rateClass.DisconnectLevel:
+		return RateLimitStatusDisconnect, newAvg
+	case limitedNow && newAvg >= rateClass.ClearLevel:
+		return RateLimitStatusClear, newAvg
+	case limitedNow:
+		return RateLimitStatusLimited, newAvg
+	case newAvg < rateClass.LimitLevel:
+		return RateLimitStatusLimited, newAvg
+	case newAvg < rateClass.AlertLevel:
+		return RateLimitStatusAlert, newAvg
+	default:
+		return RateLimitStatusClear, newAvg
 	}
 }

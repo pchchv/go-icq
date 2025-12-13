@@ -22,4 +22,10 @@ func main() {
 	b := []byte{}
 	flap := wire.FLAPFrame{}
 	wire.UnmarshalBE(&flap, bytes.NewReader(b))
+
+	rd := bytes.NewBuffer(flap.Payload)
+	snac := wire.SNACFrame{}
+	wire.UnmarshalBE(&snac, rd)
+
+	printByteSlice(rd.Bytes())
 }

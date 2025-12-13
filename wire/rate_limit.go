@@ -96,3 +96,16 @@ func DefaultRateLimitClasses() RateLimitClasses {
 		},
 	}
 }
+
+// Get returns the RateClass associated with the given class ID.
+//
+// The class ID must be between 1 and 5 inclusive.
+// Calling Get with an invalid ID will panic.
+func (r RateLimitClasses) Get(ID RateLimitClassID) RateClass {
+	return r.classes[ID-1]
+}
+
+// All returns all defined RateClass entries in order of their class IDs.
+func (r RateLimitClasses) All() [5]RateClass {
+	return r.classes
+}

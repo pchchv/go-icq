@@ -1,6 +1,9 @@
 package state
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 // IdentScreenName struct stores the normalized version of a user's screen name.
 // This format is used for uniformity in storage and comparison by removing spaces
@@ -19,4 +22,15 @@ func NewIdentScreenName(screenName string) IdentScreenName {
 	str := strings.ReplaceAll(screenName, " ", "")
 	str = strings.ToLower(str)
 	return IdentScreenName{screenName: str}
+}
+
+// String returns the string representation of the IdentScreenName.
+func (i IdentScreenName) String() string {
+	return i.screenName
+}
+
+// UIN returns a numeric UIN representation of the IdentScreenName.
+func (i IdentScreenName) UIN() uint32 {
+	v, _ := strconv.Atoi(i.screenName)
+	return uint32(v)
 }

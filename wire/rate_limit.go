@@ -5,6 +5,9 @@ import "iter"
 // RateLimitClassID identifies a rate limit class.
 type RateLimitClassID uint16
 
+// RateLimitStatus represents a session's current rate limiting state.
+type RateLimitStatus uint8
+
 // RateClass defines the configuration for computing rate-limiting behavior
 // using an exponential moving average over time.
 //

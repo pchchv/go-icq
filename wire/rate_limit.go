@@ -1,5 +1,7 @@
 package wire
 
+import "iter"
+
 // RateLimitClassID identifies a rate limit class.
 type RateLimitClassID uint16
 
@@ -382,5 +384,51 @@ func DefaultSNACRateLimits() SNACRateLimits {
 				AlertUserOnline:                1,
 			},
 		},
+	}
+}
+
+// All returns an iterator over all SNAC message types and
+// their associated rate limit classes.
+func (rg SNACRateLimits) All() iter.Seq[struct {
+	FoodGroup      uint16
+	SubGroup       uint16
+	RateLimitClass RateLimitClassID
+}] {
+	return func(yield func(struct {
+		FoodGroup      uint16
+		SubGroup       uint16
+		RateLimitClass RateLimitClassID
+	}) bool) {
+		for foodGroup, subGroups := range rg.lookup {
+			for subGroup, classID := range subGroups {
+				match := struct {
+					FoodGroup      uint16
+					SubGroup       uint16
+					RateLimitClass RateLimitClassID
+				}{
+					FoodGroup:      foodGroup,
+					SubGroup:       subGroup,
+					RateLimitClass: classID,
+				}
+				if !yield(match) {
+					return
+				}
+			}
+		}
+	}
+}
+
+// RateClassLookup returns the RateLimitClassID associated with the
+// given SNAC food group and subgroup.
+//
+// If a match is found, it returns the associated rate class ID and true.
+// If not found, it returns false.
+func (rg SNACRateLimits) RateClassLookup(foodGroup uint16, subGroup uint16) (RateLimitClassID, bool) {
+	if group, ok := rg.lookup[foodGroup]; !ok {
+		return 0, false
+	} else if class, ok := group[subGroup]; !ok {
+		return 0, false
+	} else {
+		return class, true
 	}
 }

@@ -41,6 +41,27 @@ type ICQAffiliations struct {
 	CurrentKeyword3 string
 }
 
+// ICQInterests holds information about the user's interests,
+// categorized by interest code and associated keyword.
+type ICQInterests struct {
+	// Code1 is the code representing the user's first interest.
+	Code1 uint16
+	// Keyword1 is the keyword associated with the user's first interest.
+	Keyword1 string
+	// Code2 is the code representing the user's second interest.
+	Code2 uint16
+	// Keyword2 is the keyword associated with the user's second interest.
+	Keyword2 string
+	// Code3 is the code representing the user's third interest.
+	Code3 uint16
+	// Keyword3 is the keyword associated with the user's third interest.
+	Keyword3 string
+	// Code4 is the code representing the user's fourth interest.
+	Code4 uint16
+	// Keyword4 is the keyword associated with the user's fourth interest.
+	Keyword4 string
+}
+
 // IdentScreenName struct stores the normalized version of a user's screen name.
 // This format is used for uniformity in storage and comparison by removing spaces
 // and converting all characters to lowercase.

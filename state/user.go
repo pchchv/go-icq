@@ -13,6 +13,34 @@ var (
 	ErrAIMHandleInvalidFormat = errors.New("screen name must start with a letter, cannot end with a space, and must contain only letters, numbers, and spaces")
 )
 
+// ICQAffiliations contains information about the user's affiliations, both past and present.
+type ICQAffiliations struct {
+	// PastCode1 is the code representing the user's first past affiliation.
+	PastCode1 uint16
+	// PastKeyword1 is the keyword associated with the user's first past affiliation.
+	PastKeyword1 string
+	// PastCode2 is the code representing the user's second past affiliation.
+	PastCode2 uint16
+	// PastKeyword2 is the keyword associated with the user's second past affiliation.
+	PastKeyword2 string
+	// PastCode3 is the code representing the user's third past affiliation.
+	PastCode3 uint16
+	// PastKeyword3 is the keyword associated with the user's third past affiliation.
+	PastKeyword3 string
+	// CurrentCode1 is the code representing the user's current first affiliation.
+	CurrentCode1 uint16
+	// CurrentKeyword1 is the keyword associated with the user's current first affiliation.
+	CurrentKeyword1 string
+	// CurrentCode2 is the code representing the user's current second affiliation.
+	CurrentCode2 uint16
+	// CurrentKeyword2 is the keyword associated with the user's current second affiliation.
+	CurrentKeyword2 string
+	// CurrentCode3 is the code representing the user's current third affiliation.
+	CurrentCode3 uint16
+	// CurrentKeyword3 is the keyword associated with the user's current third affiliation.
+	CurrentKeyword3 string
+}
+
 // IdentScreenName struct stores the normalized version of a user's screen name.
 // This format is used for uniformity in storage and comparison by removing spaces
 // and converting all characters to lowercase.

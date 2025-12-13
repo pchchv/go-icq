@@ -19,3 +19,80 @@ type RateClass struct {
 	DisconnectLevel int32            // If average is below this, the session should be disconnected.
 	MaxLevel        int32            // Maximum allowed value for the moving average.
 }
+
+// RateLimitClasses stores a fixed set of rate limit class definitions.
+//
+// Each RateClass defines thresholds and behavior for
+// computing moving-average-based rate limits.
+// This struct provides access to individual classes by ID or to the full set.
+type RateLimitClasses struct {
+	classes [5]RateClass // Indexed by class ID - 1
+}
+
+// NewRateLimitClasses creates a new RateLimitClasses instance from a
+// fixed array of 5 RateClass definitions.
+//
+// Each RateClass must have a unique ID from 1 to 5,
+// and the array is expected to be ordered such that
+// classes[ID-1] corresponds to RateClass.ID == ID.
+// No validation is performed on the input.
+func NewRateLimitClasses(classes [5]RateClass) RateLimitClasses {
+	return RateLimitClasses{
+		classes: classes,
+	}
+}
+
+// DefaultRateLimitClasses returns the default SNAC rate limit classes used at
+// one point by the original AIM service,
+// as memorialized by the iserverd project.
+func DefaultRateLimitClasses() RateLimitClasses {
+	return RateLimitClasses{
+		classes: [5]RateClass{
+			{
+				ID:              1,
+				WindowSize:      80,
+				ClearLevel:      2500,
+				AlertLevel:      2000,
+				LimitLevel:      1500,
+				DisconnectLevel: 800,
+				MaxLevel:        6000,
+			},
+			{
+				ID:              2,
+				WindowSize:      80,
+				ClearLevel:      3000,
+				AlertLevel:      2000,
+				LimitLevel:      1500,
+				DisconnectLevel: 1000,
+				MaxLevel:        6000,
+			},
+			{
+				ID:              3,
+				WindowSize:      20,
+				ClearLevel:      5100,
+				AlertLevel:      5000,
+				LimitLevel:      4000,
+				DisconnectLevel: 3000,
+				MaxLevel:        6000,
+			},
+			{
+				ID:              4,
+				WindowSize:      20,
+				ClearLevel:      5500,
+				AlertLevel:      5300,
+				LimitLevel:      4200,
+				DisconnectLevel: 3000,
+				MaxLevel:        8000,
+			},
+			{
+				ID:              5,
+				WindowSize:      10,
+				ClearLevel:      5500,
+				AlertLevel:      5300,
+				LimitLevel:      4200,
+				DisconnectLevel: 3000,
+				MaxLevel:        8000,
+			},
+		},
+	}
+}

@@ -38,3 +38,16 @@ func (i IdentScreenName) UIN() uint32 {
 // DisplayScreenName type represents the screen name in the user-defined format.
 // This includes the original casing and spacing as defined by the user.
 type DisplayScreenName string
+
+// IdentScreenName converts the DisplayScreenName to
+// an IdentScreenName by applying the
+// normalization process defined in NewIdentScreenName.
+func (s DisplayScreenName) IdentScreenName() IdentScreenName {
+	return NewIdentScreenName(string(s))
+}
+
+// String returns the original display string of the screen name,
+// preserving the user-defined casing and spaces.
+func (s DisplayScreenName) String() string {
+	return string(s)
+}

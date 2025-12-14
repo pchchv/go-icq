@@ -3,7 +3,9 @@ package state
 import (
 	"testing"
 
+	"github.com/pchchv/go-icq/wire"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDisplayScreenName_ValidateAIMHandle(t *testing.T) {
@@ -57,6 +59,87 @@ func TestDisplayScreenName_ValidateICQHandle(t *testing.T) {
 				assert.ErrorIs(t, err, tt.wantErr, "ValidateUIN() error = %v, wantErr %v", err, tt.wantErr)
 			} else {
 				assert.NoError(t, err, "ValidateUIN() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestUser_HashPassword(t *testing.T) {
+	tests := []struct {
+		name              string
+		user              User
+		password          string
+		expectedWeakMD5   []byte
+		expectedStrongMD5 []byte
+		wantError         bool
+	}{
+		{
+			name:              "Valid AIM password",
+			user:              User{AuthKey: "someAuthKey", IsICQ: false},
+			password:          "validPassword",
+			expectedWeakMD5:   wire.WeakMD5PasswordHash("validPassword", "someAuthKey"),
+			expectedStrongMD5: wire.StrongMD5PasswordHash("validPassword", "someAuthKey"),
+			wantError:         false,
+		},
+		{
+			name:              "Empty AIM password",
+			user:              User{AuthKey: "someAuthKey", IsICQ: false},
+			password:          "",
+			expectedWeakMD5:   nil,
+			expectedStrongMD5: nil,
+			wantError:         true,
+		},
+		{
+			name:              "AIM password too short",
+			user:              User{AuthKey: "someAuthKey", IsICQ: false},
+			password:          "abc",
+			expectedWeakMD5:   nil,
+			expectedStrongMD5: nil,
+			wantError:         true,
+		},
+		{
+			name:              "AIM password too long",
+			user:              User{AuthKey: "someAuthKey", IsICQ: false},
+			password:          "thispasswordistoolong",
+			expectedWeakMD5:   nil,
+			expectedStrongMD5: nil,
+			wantError:         true,
+		},
+		{
+			name:              "Valid ICQ password",
+			user:              User{AuthKey: "someAuthKey", IsICQ: true},
+			password:          "validICQ",
+			expectedWeakMD5:   wire.WeakMD5PasswordHash("validICQ", "someAuthKey"),
+			expectedStrongMD5: wire.StrongMD5PasswordHash("validICQ", "someAuthKey"),
+			wantError:         false,
+		},
+		{
+			name:              "Empty ICQ password",
+			user:              User{AuthKey: "someAuthKey", IsICQ: true},
+			password:          "",
+			expectedWeakMD5:   nil,
+			expectedStrongMD5: nil,
+			wantError:         true,
+		},
+		{
+			name:              "ICQ password too long",
+			user:              User{AuthKey: "someAuthKey", IsICQ: true},
+			password:          "icqpass89",
+			expectedWeakMD5:   nil,
+			expectedStrongMD5: nil,
+			wantError:         true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.user.HashPassword(tt.password)
+			if tt.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedWeakMD5, tt.user.WeakMD5Pass)
+				assert.Equal(t, tt.expectedStrongMD5, tt.user.StrongMD5Pass)
 			}
 		})
 	}

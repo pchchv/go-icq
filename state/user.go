@@ -153,6 +153,13 @@ type ICQPermissions struct {
 	AuthRequired bool
 }
 
+// ICQUserNotes contains personal notes or additional information added by the user.
+type ICQUserNotes struct {
+	// Notes are the personal notes or additional information the user has
+	// entered in their profile.
+	Notes string
+}
+
 // IdentScreenName struct stores the normalized version of a user's screen name.
 // This format is used for uniformity in storage and comparison by removing spaces
 // and converting all characters to lowercase.

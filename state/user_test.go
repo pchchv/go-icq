@@ -356,3 +356,65 @@ func TestUser_ValidateRoastedJavaPass(t *testing.T) {
 		})
 	}
 }
+
+func TestUser_ValidatePlaintextPass(t *testing.T) {
+	tests := []struct {
+		name          string
+		user          User
+		plaintextPass []byte
+		expected      bool
+	}{
+		{
+			name: "Valid plaintext password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: wire.WeakMD5PasswordHash("testPassword", "testAuthKey"),
+			},
+			plaintextPass: []byte("testPassword"),
+			expected:      true,
+		},
+		{
+			name: "Invalid plaintext password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: wire.WeakMD5PasswordHash("testPassword", "testAuthKey"),
+			},
+			plaintextPass: []byte("wrongPassword"),
+			expected:      false,
+		},
+		{
+			name: "Empty plaintext password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: wire.WeakMD5PasswordHash("testPassword", "testAuthKey"),
+			},
+			plaintextPass: []byte(""),
+			expected:      false,
+		},
+		{
+			name: "Empty stored password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: []byte{},
+			},
+			plaintextPass: []byte("testPassword"),
+			expected:      false,
+		},
+		{
+			name: "Password with special characters",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: wire.WeakMD5PasswordHash("test@123!", "testAuthKey"),
+			},
+			plaintextPass: []byte("test@123!"),
+			expected:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.user.ValidatePlaintextPass(tt.plaintextPass)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

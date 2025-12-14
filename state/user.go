@@ -415,6 +415,25 @@ func (u *User) ValidatePlaintextPass(plaintextPass []byte) bool {
 	return bytes.Equal(u.WeakMD5Pass, md5Hash)
 }
 
+// Age returns the user's age relative to their birthday and timeNow.
+func (u *User) Age(timeNow func() time.Time) uint16 {
+	now := timeNow().UTC()
+	switch {
+	case u.ICQMoreInfo.BirthYear > 0 && u.ICQMoreInfo.BirthDay == 0 && u.ICQMoreInfo.BirthMonth == 0:
+		bday := time.Date(int(u.ICQMoreInfo.BirthYear), time.January, 1, 0, 0, 0, 0, time.UTC)
+		return uint16(now.Year() - bday.Year())
+	case u.ICQMoreInfo.BirthYear > 0 && u.ICQMoreInfo.BirthDay > 0 && u.ICQMoreInfo.BirthMonth > 0:
+		bday := time.Date(int(u.ICQMoreInfo.BirthYear), time.Month(u.ICQMoreInfo.BirthMonth), int(u.ICQMoreInfo.BirthDay), 0, 0, 0, 0, time.UTC)
+		years := now.Year() - bday.Year()
+		if now.YearDay() < bday.YearDay() {
+			years--
+		}
+		return uint16(years)
+	default: // invalid date
+		return 0
+	}
+}
+
 // validateAIMPassword returns an error if the AIM password is invalid.
 // A valid password is 4-16 characters long.
 // The min and max password length values reflect

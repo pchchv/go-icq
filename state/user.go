@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/google/uuid"
 	"github.com/pchchv/go-icq/wire"
 )
 
@@ -354,6 +355,25 @@ type User struct {
 	LastWarnLevel uint16
 	// OfflineMsgCount is the count of offline messages for the user.
 	OfflineMsgCount int
+}
+
+// NewStubUser creates a new user with canned credentials.
+// The default password is "welcome1".
+// This is typically used for development purposes.
+func NewStubUser(screenName DisplayScreenName) (User, error) {
+	uid, err := uuid.NewRandom()
+	if err != nil {
+		return User{}, err
+	}
+
+	u := User{
+		IdentScreenName:   NewIdentScreenName(string(screenName)),
+		DisplayScreenName: screenName,
+		AuthKey:           uid.String(),
+		IsICQ:             screenName.IsUIN(),
+	}
+	err = u.HashPassword("welcome1")
+	return u, err
 }
 
 // HashPassword computes MD5 hashes of the user's password.

@@ -409,6 +409,12 @@ func (u *User) ValidateRoastedJavaPass(roastedPass []byte) bool {
 	return bytes.Equal(u.WeakMD5Pass, md5Hash)
 }
 
+// ValidatePlaintextPass validates plaintext passwords used in Kerberos auth.
+func (u *User) ValidatePlaintextPass(plaintextPass []byte) bool {
+	md5Hash := wire.WeakMD5PasswordHash(string(plaintextPass), u.AuthKey)
+	return bytes.Equal(u.WeakMD5Pass, md5Hash)
+}
+
 // validateAIMPassword returns an error if the AIM password is invalid.
 // A valid password is 4-16 characters long.
 // The min and max password length values reflect

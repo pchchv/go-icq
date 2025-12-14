@@ -20,6 +20,13 @@ var (
 	ErrAIMHandleInvalidFormat = errors.New("screen name must start with a letter, cannot end with a space, and must contain only letters, numbers, and spaces")
 )
 
+type OfflineMessage struct {
+	Sent      time.Time
+	Sender    IdentScreenName
+	Recipient IdentScreenName
+	Message   wire.SNAC_0x04_0x06_ICBMChannelMsgToHost
+}
+
 // AIMNameAndAddr holds name and address AIM directory information.
 type AIMNameAndAddr struct {
 	// FirstName is the user's first name.

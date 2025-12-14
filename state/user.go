@@ -13,6 +13,30 @@ var (
 	ErrAIMHandleInvalidFormat = errors.New("screen name must start with a letter, cannot end with a space, and must contain only letters, numbers, and spaces")
 )
 
+// AIMNameAndAddr holds name and address AIM directory information.
+type AIMNameAndAddr struct {
+	// FirstName is the user's first name.
+	FirstName string
+	// LastName is the user's last name.
+	LastName string
+	// MiddleName is the user's middle name.
+	MiddleName string
+	// MaidenName is the user's maiden name.
+	MaidenName string
+	// Country is the user's country of residence.
+	Country string
+	// State is the user's state or region of residence.
+	State string
+	// City is the user's city of residence.
+	City string
+	// NickName is the user's chosen nickname.
+	NickName string
+	// ZIPCode is the user's postal or ZIP code.
+	ZIPCode string
+	// Address is the user's street address.
+	Address string
+}
+
 // ICQAffiliations contains information about the user's affiliations, both past and present.
 type ICQAffiliations struct {
 	// PastCode1 is the code representing the user's first past affiliation.

@@ -1,12 +1,15 @@
 package state
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/pchchv/go-icq/wire"
 )
 
 var (
@@ -351,6 +354,31 @@ type User struct {
 	LastWarnLevel uint16
 	// OfflineMsgCount is the count of offline messages for the user.
 	OfflineMsgCount int
+}
+
+// HashPassword computes MD5 hashes of the user's password.
+// It computes both weak and strong variants and stores them in the struct.
+func (u *User) HashPassword(passwd string) error {
+	if u.IsICQ {
+		if err := validateICQPassword(passwd); err != nil {
+			return err
+		}
+	} else {
+		if err := validateAIMPassword(passwd); err != nil {
+			return err
+		}
+	}
+
+	u.WeakMD5Pass = wire.WeakMD5PasswordHash(passwd, u.AuthKey)
+	u.StrongMD5Pass = wire.StrongMD5PasswordHash(passwd, u.AuthKey)
+	return nil
+}
+
+// ValidateHash validates MD5-hashed passwords for BUCP auth.
+// It handles hashes used in early AIM 4.x versions ("weak" hashes) and
+// later AIM 4.x-5.x versions ("strong" hashes).
+func (u *User) ValidateHash(md5Hash []byte) bool {
+	return bytes.Equal(u.StrongMD5Pass, md5Hash) || bytes.Equal(u.WeakMD5Pass, md5Hash)
 }
 
 // validateAIMPassword returns an error if the AIM password is invalid.

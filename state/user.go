@@ -381,6 +381,20 @@ func (u *User) ValidateHash(md5Hash []byte) bool {
 	return bytes.Equal(u.StrongMD5Pass, md5Hash) || bytes.Equal(u.WeakMD5Pass, md5Hash)
 }
 
+// ValidateRoastedPass validates roasted passwords for FLAP auth.
+func (u *User) ValidateRoastedPass(roastedPass []byte) bool {
+	clearPass := wire.RoastOSCARPassword(roastedPass)
+	md5Hash := wire.WeakMD5PasswordHash(string(clearPass), u.AuthKey)
+	return bytes.Equal(u.WeakMD5Pass, md5Hash)
+}
+
+// ValidateRoastedTOCPass validates roasted passwords for TOC auth.
+func (u *User) ValidateRoastedTOCPass(roastedPass []byte) bool {
+	clearPass := wire.RoastTOCPassword(roastedPass)
+	md5Hash := wire.WeakMD5PasswordHash(string(clearPass), u.AuthKey)
+	return bytes.Equal(u.WeakMD5Pass, md5Hash)
+}
+
 // validateAIMPassword returns an error if the AIM password is invalid.
 // A valid password is 4-16 characters long.
 // The min and max password length values reflect

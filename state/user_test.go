@@ -250,3 +250,109 @@ func TestUser_ValidateRoastedTOCPass(t *testing.T) {
 		})
 	}
 }
+
+func TestUser_ValidateRoastedKerberosPass(t *testing.T) {
+	tests := []struct {
+		name        string
+		user        User
+		roastedPass []byte
+		expected    bool
+	}{
+		{
+			name: "Valid roasted Kerberos password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: wire.WeakMD5PasswordHash("testPassword", "testAuthKey"),
+			},
+			roastedPass: wire.RoastKerberosPassword([]byte("testPassword")),
+			expected:    true,
+		},
+		{
+			name: "Invalid roasted Kerberos password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: wire.WeakMD5PasswordHash("testPassword", "testAuthKey"),
+			},
+			roastedPass: wire.RoastKerberosPassword([]byte("wrongPassword")),
+			expected:    false,
+		},
+		{
+			name: "Empty roasted Kerberos password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: wire.WeakMD5PasswordHash("testPassword", "testAuthKey"),
+			},
+			roastedPass: wire.RoastKerberosPassword([]byte("")),
+			expected:    false,
+		},
+		{
+			name: "Empty stored password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: []byte{},
+			},
+			roastedPass: wire.RoastKerberosPassword([]byte("testPassword")),
+			expected:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.user.ValidateRoastedKerberosPass(tt.roastedPass)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestUser_ValidateRoastedJavaPass(t *testing.T) {
+	tests := []struct {
+		name        string
+		user        User
+		roastedPass []byte
+		expected    bool
+	}{
+		{
+			name: "Valid roasted Java password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: wire.WeakMD5PasswordHash("testPassword", "testAuthKey"),
+			},
+			roastedPass: wire.RoastOSCARJavaPassword([]byte("testPassword")),
+			expected:    true,
+		},
+		{
+			name: "Invalid roasted Java password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: wire.WeakMD5PasswordHash("testPassword", "testAuthKey"),
+			},
+			roastedPass: wire.RoastOSCARJavaPassword([]byte("wrongPassword")),
+			expected:    false,
+		},
+		{
+			name: "Empty roasted Java password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: wire.WeakMD5PasswordHash("testPassword", "testAuthKey"),
+			},
+			roastedPass: wire.RoastOSCARJavaPassword([]byte("")),
+			expected:    false,
+		},
+		{
+			name: "Empty stored password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: []byte{},
+			},
+			roastedPass: wire.RoastOSCARJavaPassword([]byte("testPassword")),
+			expected:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.user.ValidateRoastedJavaPass(tt.roastedPass)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

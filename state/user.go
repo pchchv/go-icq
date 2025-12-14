@@ -125,6 +125,27 @@ type ICQWorkInfo struct {
 	ZIPCode string
 }
 
+// ICQMoreInfo contains additional information about the user,
+// such as demographic and language preferences.
+type ICQMoreInfo struct {
+	// Gender is the user's gender, represented by a code.
+	Gender uint16
+	// HomePageAddr is the URL of the user's personal homepage.
+	HomePageAddr string
+	// BirthYear is the user's birth year.
+	BirthYear uint16
+	// BirthMonth is the user's birth month.
+	BirthMonth uint8
+	// BirthDay is the user's birth day.
+	BirthDay uint8
+	// Lang1 is the code for the user's primary language.
+	Lang1 uint8
+	// Lang2 is the code for the user's secondary language.
+	Lang2 uint8
+	// Lang3 is the code for the user's tertiary language.
+	Lang3 uint8
+}
+
 // IdentScreenName struct stores the normalized version of a user's screen name.
 // This format is used for uniformity in storage and comparison by removing spaces
 // and converting all characters to lowercase.

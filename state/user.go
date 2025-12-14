@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -288,4 +289,64 @@ func (s DisplayScreenName) ValidateAIMHandle() error {
 	}
 
 	return nil
+}
+
+// User represents a user account.
+type User struct {
+	// IdentScreenName is the AIM screen name.
+	IdentScreenName IdentScreenName
+	// DisplayScreenName is the formatted screen name.
+	DisplayScreenName DisplayScreenName
+	// AuthKey is the salt for the MD5 password hash.
+	AuthKey string
+	// StrongMD5Pass is the MD5 password hash format used by AIM v4.8-v5.9.
+	StrongMD5Pass []byte
+	// WeakMD5Pass is the MD5 password hash format used by AIM v3.5-v4.7.
+	// This hash is used to authenticate roasted passwords for AIM v1.0-v3.0.
+	WeakMD5Pass []byte
+	// IsICQ indicates whether the user is an ICQ account (true) or an
+	// AIM account (false).
+	IsICQ bool
+	// ConfirmStatus indicates whether the user has confirmed their AIM account.
+	ConfirmStatus bool
+	// RegStatus is the AIM registration status.
+	//  1: no disclosure
+	//  2: limit disclosure
+	//  3: full disclosure
+	RegStatus int
+	// SuspendedStatus is the account suspended status
+	SuspendedStatus uint16
+	// EmailAddress is the email address set by the AIM client.
+	EmailAddress string
+	// ICQAffiliations holds information about the user's affiliations,
+	// including past and current affiliations.
+	ICQAffiliations ICQAffiliations
+	// ICQInterests holds information about the user's interests,
+	// categorized by code and associated keywords.
+	ICQInterests ICQInterests
+	// ICQMoreInfo contains additional information about the user.
+	ICQMoreInfo ICQMoreInfo
+	// ICQPermissions specifies the user's privacy settings.
+	ICQPermissions ICQPermissions
+	// ICQBasicInfo contains the user's basic profile information,
+	// including contact details and personal identifiers.
+	ICQBasicInfo ICQBasicInfo
+	// ICQNotes allows the user to store personal notes or
+	// additional information within their profile.
+	ICQNotes ICQUserNotes
+	// ICQWorkInfo contains the user's professional information,
+	// including their workplace address and job-related details.
+	ICQWorkInfo      ICQWorkInfo
+	AIMDirectoryInfo AIMNameAndAddr
+	// TOCConfig is the user's saved server-side info (buddy list, etc)
+	// for on the TOC service.
+	TOCConfig string
+	// IsBot indicates whether the user is a bot.
+	IsBot bool
+	// LastWarnUpdate is the timestamp when the user's warning level was last updated.
+	LastWarnUpdate time.Time
+	// LastWarnLevel is the warning level when the user last signed off.
+	LastWarnLevel uint16
+	// OfflineMsgCount is the count of offline messages for the user.
+	OfflineMsgCount int
 }

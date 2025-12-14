@@ -2,6 +2,7 @@ package state
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 )
 
 var (
+	ErrPasswordInvalid        = errors.New("invalid password length")
 	ErrAIMHandleLength        = errors.New("screen name must be between 3 and 16 characters")
 	ErrICQUINInvalidFormat    = errors.New("uin must be a number in the range 10000-2147483646")
 	ErrAIMHandleInvalidFormat = errors.New("screen name must start with a letter, cannot end with a space, and must contain only letters, numbers, and spaces")
@@ -349,4 +351,27 @@ type User struct {
 	LastWarnLevel uint16
 	// OfflineMsgCount is the count of offline messages for the user.
 	OfflineMsgCount int
+}
+
+// validateAIMPassword returns an error if the AIM password is invalid.
+// A valid password is 4-16 characters long.
+// The min and max password length values reflect
+// AOL's password validation rules circa 2000.
+func validateAIMPassword(pass string) error {
+	if len(pass) < 4 || len(pass) > 16 {
+		return fmt.Errorf("%w: password length must be between 4-16 characters", ErrPasswordInvalid)
+	}
+	return nil
+}
+
+// validateICQPassword returns an error if the ICQ password is invalid.
+// A valid password is 6-8 characters long.
+// It's unclear what min length the ICQ service required,
+// so a plausible minimum value is set.
+// The max length reflects the password limitation imposed by old ICQ clients.
+func validateICQPassword(pass string) error {
+	if len(pass) < 6 || len(pass) > 8 {
+		return fmt.Errorf("%w: password must be between 6-8 characters", ErrPasswordInvalid)
+	}
+	return nil
 }

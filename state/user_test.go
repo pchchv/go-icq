@@ -144,3 +144,109 @@ func TestUser_HashPassword(t *testing.T) {
 		})
 	}
 }
+
+func TestUser_ValidateRoastedPass(t *testing.T) {
+	tests := []struct {
+		name        string
+		user        User
+		roastedPass []byte
+		expected    bool
+	}{
+		{
+			name: "Valid roasted password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: wire.WeakMD5PasswordHash("testPassword", "testAuthKey"),
+			},
+			roastedPass: wire.RoastOSCARPassword([]byte("testPassword")),
+			expected:    true,
+		},
+		{
+			name: "Invalid roasted password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: wire.WeakMD5PasswordHash("testPassword", "testAuthKey"),
+			},
+			roastedPass: wire.RoastOSCARPassword([]byte("wrongPassword")),
+			expected:    false,
+		},
+		{
+			name: "Empty roasted password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: wire.WeakMD5PasswordHash("testPassword", "testAuthKey"),
+			},
+			roastedPass: wire.RoastOSCARPassword([]byte("")),
+			expected:    false,
+		},
+		{
+			name: "Empty stored password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: []byte{},
+			},
+			roastedPass: wire.RoastOSCARPassword([]byte("testPassword")),
+			expected:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.user.ValidateRoastedPass(tt.roastedPass)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestUser_ValidateRoastedTOCPass(t *testing.T) {
+	tests := []struct {
+		name        string
+		user        User
+		roastedPass []byte
+		expected    bool
+	}{
+		{
+			name: "Valid roasted TOC password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: wire.WeakMD5PasswordHash("testPassword", "testAuthKey"),
+			},
+			roastedPass: wire.RoastTOCPassword([]byte("testPassword")),
+			expected:    true,
+		},
+		{
+			name: "Invalid roasted TOC password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: wire.WeakMD5PasswordHash("testPassword", "testAuthKey"),
+			},
+			roastedPass: wire.RoastTOCPassword([]byte("wrongPassword")),
+			expected:    false,
+		},
+		{
+			name: "Empty roasted TOC password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: wire.WeakMD5PasswordHash("testPassword", "testAuthKey"),
+			},
+			roastedPass: wire.RoastTOCPassword([]byte("")),
+			expected:    false,
+		},
+		{
+			name: "Empty stored password",
+			user: User{
+				AuthKey:     "testAuthKey",
+				WeakMD5Pass: []byte{},
+			},
+			roastedPass: wire.RoastTOCPassword([]byte("testPassword")),
+			expected:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.user.ValidateRoastedTOCPass(tt.roastedPass)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

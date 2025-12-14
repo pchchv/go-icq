@@ -146,6 +146,13 @@ type ICQMoreInfo struct {
 	Lang3 uint8
 }
 
+// ICQPermissions specifies the privacy settings of an ICQ user.
+type ICQPermissions struct {
+	// AuthRequired indicates where users must ask this permission to add them
+	// to their contact list.
+	AuthRequired bool
+}
+
 // IdentScreenName struct stores the normalized version of a user's screen name.
 // This format is used for uniformity in storage and comparison by removing spaces
 // and converting all characters to lowercase.

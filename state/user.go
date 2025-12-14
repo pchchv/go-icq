@@ -395,6 +395,20 @@ func (u *User) ValidateRoastedTOCPass(roastedPass []byte) bool {
 	return bytes.Equal(u.WeakMD5Pass, md5Hash)
 }
 
+// ValidateRoastedKerberosPass validates roasted passwords used in Kerberos auth.
+func (u *User) ValidateRoastedKerberosPass(roastedPass []byte) bool {
+	clearPass := wire.RoastKerberosPassword(roastedPass)
+	md5Hash := wire.WeakMD5PasswordHash(string(clearPass), u.AuthKey)
+	return bytes.Equal(u.WeakMD5Pass, md5Hash)
+}
+
+// ValidateRoastedJavaPass validates roasted passwords for the Java AIM client FLAP auth.
+func (u *User) ValidateRoastedJavaPass(roastedPass []byte) bool {
+	clearPass := wire.RoastOSCARJavaPassword(roastedPass)
+	md5Hash := wire.WeakMD5PasswordHash(string(clearPass), u.AuthKey)
+	return bytes.Equal(u.WeakMD5Pass, md5Hash)
+}
+
 // validateAIMPassword returns an error if the AIM password is invalid.
 // A valid password is 4-16 characters long.
 // The min and max password length values reflect

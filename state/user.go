@@ -487,6 +487,12 @@ type UserProfile struct {
 	UpdateTime time.Time
 }
 
+// Empty returns true if the profile has not been set
+// (all fields are zero values).
+func (p UserProfile) Empty() bool {
+	return p.ProfileText == "" && p.MIMEType == "" && p.UpdateTime.IsZero()
+}
+
 // validateAIMPassword returns an error if the AIM password is invalid.
 // A valid password is 4-16 characters long.
 // The min and max password length values reflect

@@ -22,6 +22,31 @@ type SQLiteUserStore struct {
 	db *sql.DB
 }
 
+// NewSQLiteUserStore creates a new instance of SQLiteUserStore.
+// If the database does not already exist,
+// a new one is created with the required schema.
+func NewSQLiteUserStore(dbFilePath string) (*SQLiteUserStore, error) {
+	db, err := sql.Open("sqlite", fmt.Sprintf("file:%s?_pragma=foreign_keys=on", dbFilePath))
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the maximum number of open connections to 1.
+	// This is crucial to prevent SQLITE_BUSY errors,
+	// which occur when the database is locked due to concurrent access.
+	// By limiting the number of open connections to 1,
+	// we ensure that all database operations are serialized,
+	// thus avoiding any potential locking issues.
+	db.SetMaxOpenConns(1)
+
+	store := &SQLiteUserStore{db: db}
+	if err := store.runMigrations(); err != nil {
+		return nil, fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	return store, nil
+}
+
 func (u SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

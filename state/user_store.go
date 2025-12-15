@@ -1,12 +1,14 @@
 package state
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"errors"
 	"fmt"
 	"io/fs"
 	"net/http"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	migratesqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
@@ -47,6 +49,36 @@ func NewSQLiteUserStore(dbFilePath string) (*SQLiteUserStore, error) {
 	return store, nil
 }
 
+func (f SQLiteUserStore) AllUsers(ctx context.Context) ([]User, error) {
+	q := `SELECT identScreenName, displayScreenName, isICQ, isBot FROM users`
+	rows, err := f.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var identSN, displaySN string
+		var isICQ, isBot bool
+		if err := rows.Scan(&identSN, &displaySN, &isICQ, &isBot); err != nil {
+			return nil, err
+		}
+		users = append(users, User{
+			IdentScreenName:   NewIdentScreenName(identSN),
+			DisplayScreenName: DisplayScreenName(displaySN),
+			IsICQ:             isICQ,
+			IsBot:             isBot,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
 func (u SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {
@@ -73,4 +105,205 @@ func (u SQLiteUserStore) runMigrations() error {
 	}
 
 	return nil
+}
+
+// queryUsers retrieves a list of users from the database based on the
+// specified WHERE clause and query parameters.
+// Returns a slice of User objects or an error if the query fails.
+func (f SQLiteUserStore) queryUsers(ctx context.Context, whereClause string, queryParams []any) ([]User, error) {
+	q := `
+		SELECT
+			identScreenName,
+			displayScreenName,
+			emailAddress,
+			authKey,
+			strongMD5Pass,
+			weakMD5Pass,
+			confirmStatus,
+			regStatus,
+			suspendedStatus,
+			isBot,
+			isICQ,
+			icq_affiliations_currentCode1,
+			icq_affiliations_currentCode2,
+			icq_affiliations_currentCode3,
+			icq_affiliations_currentKeyword1,
+			icq_affiliations_currentKeyword2,
+			icq_affiliations_currentKeyword3,
+			icq_affiliations_pastCode1,
+			icq_affiliations_pastCode2,
+			icq_affiliations_pastCode3,
+			icq_affiliations_pastKeyword1,
+			icq_affiliations_pastKeyword2,
+			icq_affiliations_pastKeyword3,
+			icq_basicInfo_address,
+			icq_basicInfo_cellPhone,
+			icq_basicInfo_city,
+			icq_basicInfo_countryCode,
+			icq_basicInfo_emailAddress,
+			icq_basicInfo_fax,
+			icq_basicInfo_firstName,
+			icq_basicInfo_gmtOffset,
+			icq_basicInfo_lastName,
+			icq_basicInfo_nickName,
+			icq_basicInfo_phone,
+			icq_basicInfo_publishEmail,
+			icq_basicInfo_state,
+			icq_basicInfo_zipCode,
+			icq_interests_code1,
+			icq_interests_code2,
+			icq_interests_code3,
+			icq_interests_code4,
+			icq_interests_keyword1,
+			icq_interests_keyword2,
+			icq_interests_keyword3,
+			icq_interests_keyword4,
+			icq_moreInfo_birthDay,
+			icq_moreInfo_birthMonth,
+			icq_moreInfo_birthYear,
+			icq_moreInfo_gender,
+			icq_moreInfo_homePageAddr,
+			icq_moreInfo_lang1,
+			icq_moreInfo_lang2,
+			icq_moreInfo_lang3,
+			icq_notes,
+			icq_permissions_authRequired,
+			icq_workInfo_address,
+			icq_workInfo_city,
+			icq_workInfo_company,
+			icq_workInfo_countryCode,
+			icq_workInfo_department,
+			icq_workInfo_fax,
+			icq_workInfo_occupationCode,
+			icq_workInfo_phone,
+			icq_workInfo_position,
+			icq_workInfo_state,
+			icq_workInfo_webPage,
+			icq_workInfo_zipCode,
+			aim_firstName,
+			aim_lastName,
+			aim_middleName,
+			aim_maidenName,
+			aim_country,
+			aim_state,
+			aim_city,
+			aim_nickName,
+			aim_zipCode,
+			aim_address,
+			tocConfig,
+			lastWarnUpdate,
+			lastWarnLevel,
+			offlineMsgCount
+		FROM users
+		WHERE %s
+	`
+	q = fmt.Sprintf(q, whereClause)
+	rows, err := f.db.QueryContext(ctx, q, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var u User
+		var sn string
+		var lastWarnUpdateUnix int64
+		err := rows.Scan(
+			&sn,
+			&u.DisplayScreenName,
+			&u.EmailAddress,
+			&u.AuthKey,
+			&u.StrongMD5Pass,
+			&u.WeakMD5Pass,
+			&u.ConfirmStatus,
+			&u.RegStatus,
+			&u.SuspendedStatus,
+			&u.IsBot,
+			&u.IsICQ,
+			&u.ICQAffiliations.CurrentCode1,
+			&u.ICQAffiliations.CurrentCode2,
+			&u.ICQAffiliations.CurrentCode3,
+			&u.ICQAffiliations.CurrentKeyword1,
+			&u.ICQAffiliations.CurrentKeyword2,
+			&u.ICQAffiliations.CurrentKeyword3,
+			&u.ICQAffiliations.PastCode1,
+			&u.ICQAffiliations.PastCode2,
+			&u.ICQAffiliations.PastCode3,
+			&u.ICQAffiliations.PastKeyword1,
+			&u.ICQAffiliations.PastKeyword2,
+			&u.ICQAffiliations.PastKeyword3,
+			&u.ICQBasicInfo.Address,
+			&u.ICQBasicInfo.CellPhone,
+			&u.ICQBasicInfo.City,
+			&u.ICQBasicInfo.CountryCode,
+			&u.ICQBasicInfo.EmailAddress,
+			&u.ICQBasicInfo.Fax,
+			&u.ICQBasicInfo.FirstName,
+			&u.ICQBasicInfo.GMTOffset,
+			&u.ICQBasicInfo.LastName,
+			&u.ICQBasicInfo.Nickname,
+			&u.ICQBasicInfo.Phone,
+			&u.ICQBasicInfo.PublishEmail,
+			&u.ICQBasicInfo.State,
+			&u.ICQBasicInfo.ZIPCode,
+			&u.ICQInterests.Code1,
+			&u.ICQInterests.Code2,
+			&u.ICQInterests.Code3,
+			&u.ICQInterests.Code4,
+			&u.ICQInterests.Keyword1,
+			&u.ICQInterests.Keyword2,
+			&u.ICQInterests.Keyword3,
+			&u.ICQInterests.Keyword4,
+			&u.ICQMoreInfo.BirthDay,
+			&u.ICQMoreInfo.BirthMonth,
+			&u.ICQMoreInfo.BirthYear,
+			&u.ICQMoreInfo.Gender,
+			&u.ICQMoreInfo.HomePageAddr,
+			&u.ICQMoreInfo.Lang1,
+			&u.ICQMoreInfo.Lang2,
+			&u.ICQMoreInfo.Lang3,
+			&u.ICQNotes.Notes,
+			&u.ICQPermissions.AuthRequired,
+			&u.ICQWorkInfo.Address,
+			&u.ICQWorkInfo.City,
+			&u.ICQWorkInfo.Company,
+			&u.ICQWorkInfo.CountryCode,
+			&u.ICQWorkInfo.Department,
+			&u.ICQWorkInfo.Fax,
+			&u.ICQWorkInfo.OccupationCode,
+			&u.ICQWorkInfo.Phone,
+			&u.ICQWorkInfo.Position,
+			&u.ICQWorkInfo.State,
+			&u.ICQWorkInfo.WebPage,
+			&u.ICQWorkInfo.ZIPCode,
+			&u.AIMDirectoryInfo.FirstName,
+			&u.AIMDirectoryInfo.LastName,
+			&u.AIMDirectoryInfo.MiddleName,
+			&u.AIMDirectoryInfo.MaidenName,
+			&u.AIMDirectoryInfo.Country,
+			&u.AIMDirectoryInfo.State,
+			&u.AIMDirectoryInfo.City,
+			&u.AIMDirectoryInfo.NickName,
+			&u.AIMDirectoryInfo.ZIPCode,
+			&u.AIMDirectoryInfo.Address,
+			&u.TOCConfig,
+			&lastWarnUpdateUnix,
+			&u.LastWarnLevel,
+			&u.OfflineMsgCount,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		u.IdentScreenName = NewIdentScreenName(sn)
+		u.LastWarnUpdate = time.Unix(lastWarnUpdateUnix, 0).UTC()
+		users = append(users, u)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return users, nil
 }

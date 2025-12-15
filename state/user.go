@@ -27,6 +27,14 @@ type OfflineMessage struct {
 	Message   wire.SNAC_0x04_0x06_ICBMChannelMsgToHost
 }
 
+// Category represents an AIM directory category.
+type Category struct {
+	// ID is the category ID
+	ID uint8
+	// Name is the category name
+	Name string `oscar:"len_prefix=uint16"`
+}
+
 // AIMNameAndAddr holds name and address AIM directory information.
 type AIMNameAndAddr struct {
 	// FirstName is the user's first name.

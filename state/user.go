@@ -477,6 +477,16 @@ func (u *User) Age(timeNow func() time.Time) uint16 {
 	}
 }
 
+// UserProfile represents a user's profile information.
+type UserProfile struct {
+	// ProfileText is the free-form profile body content.
+	ProfileText string
+	// MIMEType is the MIME type of the profile content.
+	MIMEType string
+	// UpdateTime is when the profile was last updated.
+	UpdateTime time.Time
+}
+
 // validateAIMPassword returns an error if the AIM password is invalid.
 // A valid password is 4-16 characters long.
 // The min and max password length values reflect

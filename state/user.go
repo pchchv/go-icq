@@ -35,6 +35,14 @@ type Category struct {
 	Name string `oscar:"len_prefix=uint16"`
 }
 
+// Keyword represents an AIM directory keyword.
+type Keyword struct {
+	// ID is the keyword ID
+	ID uint8
+	// Name is the keyword name
+	Name string `oscar:"len_prefix=uint16"`
+}
+
 // AIMNameAndAddr holds name and address AIM directory information.
 type AIMNameAndAddr struct {
 	// FirstName is the user's first name.

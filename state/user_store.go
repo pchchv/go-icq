@@ -1010,6 +1010,28 @@ func (f SQLiteUserStore) UpdateEmailAddress(ctx context.Context, screenName Iden
 	return err
 }
 
+func (f SQLiteUserStore) Profile(ctx context.Context, screenName IdentScreenName) (UserProfile, error) {
+	var profile UserProfile
+	var updateTimeUnix int64
+	q := `
+		SELECT IFNULL(body, ''), IFNULL(mimeType, ''), IFNULL(updateTime, 0)
+		FROM profile
+		WHERE screenName = ?
+	`
+	err := f.db.QueryRowContext(ctx, q, screenName.String()).Scan(&profile.ProfileText, &profile.MIMEType, &updateTimeUnix)
+	if errors.Is(err, sql.ErrNoRows) {
+		return UserProfile{}, nil
+	}
+	if err != nil {
+		return UserProfile{}, err
+	}
+	if updateTimeUnix > 0 {
+		profile.UpdateTime = time.Unix(updateTimeUnix, 0).UTC()
+	}
+
+	return profile, nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

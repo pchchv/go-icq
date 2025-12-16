@@ -700,6 +700,54 @@ func (f SQLiteUserStore) SetBotStatus(ctx context.Context, isBot bool, screenNam
 	return err
 }
 
+func (f SQLiteUserStore) SetKeywords(ctx context.Context, screenName IdentScreenName, keywords [5]string) error {
+	q := `
+		WITH interests AS (SELECT CASE WHEN name = ? THEN id ELSE NULL END AS aim_keyword1,
+								  CASE WHEN name = ? THEN id ELSE NULL END AS aim_keyword2,
+								  CASE WHEN name = ? THEN id ELSE NULL END AS aim_keyword3,
+								  CASE WHEN name = ? THEN id ELSE NULL END AS aim_keyword4,
+								  CASE WHEN name = ? THEN id ELSE NULL END AS aim_keyword5
+						   FROM aimKeyword
+						   WHERE name IN (?, ?, ?, ?, ?))
+		UPDATE users
+		SET aim_keyword1 = (SELECT aim_keyword1 FROM interests WHERE aim_keyword1 IS NOT NULL),
+			aim_keyword2 = (SELECT aim_keyword2 FROM interests WHERE aim_keyword2 IS NOT NULL),
+			aim_keyword3 = (SELECT aim_keyword3 FROM interests WHERE aim_keyword3 IS NOT NULL),
+			aim_keyword4 = (SELECT aim_keyword4 FROM interests WHERE aim_keyword4 IS NOT NULL),
+			aim_keyword5 = (SELECT aim_keyword5 FROM interests WHERE aim_keyword5 IS NOT NULL)
+		WHERE identScreenName = ?
+	`
+	_, err := f.db.ExecContext(ctx, q,
+		keywords[0], keywords[1], keywords[2], keywords[3], keywords[4],
+		keywords[0], keywords[1], keywords[2], keywords[3], keywords[4],
+		screenName.String())
+	return err
+}
+
+func (f SQLiteUserStore) SetTOCConfig(ctx context.Context, user IdentScreenName, config string) error {
+	q := `
+		UPDATE users
+		SET tocConfig = ?
+		WHERE identScreenName = ?
+	`
+	res, err := f.db.ExecContext(ctx,
+		q,
+		config,
+		user.String(),
+	)
+	if err != nil {
+		return fmt.Errorf("exec: %w", err)
+	}
+
+	if c, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	} else if c == 0 {
+		return ErrNoUser
+	}
+
+	return nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

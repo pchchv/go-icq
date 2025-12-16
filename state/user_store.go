@@ -79,7 +79,7 @@ func (f SQLiteUserStore) AllUsers(ctx context.Context) ([]User, error) {
 	return users, nil
 }
 
-func (u SQLiteUserStore) runMigrations() error {
+func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {
 		return fmt.Errorf("failed to prepare migration subdirectory: %v", err)
@@ -90,7 +90,7 @@ func (u SQLiteUserStore) runMigrations() error {
 		return fmt.Errorf("failed to create source instance from embedded filesystem: %v", err)
 	}
 
-	driver, err := migratesqlite.WithInstance(u.db, &migratesqlite.Config{})
+	driver, err := migratesqlite.WithInstance(us.db, &migratesqlite.Config{})
 	if err != nil {
 		return fmt.Errorf("cannot create database driver: %v", err)
 	}
@@ -110,7 +110,7 @@ func (u SQLiteUserStore) runMigrations() error {
 // queryUsers retrieves a list of users from the database based on the
 // specified WHERE clause and query parameters.
 // Returns a slice of User objects or an error if the query fails.
-func (f SQLiteUserStore) queryUsers(ctx context.Context, whereClause string, queryParams []any) ([]User, error) {
+func (us SQLiteUserStore) queryUsers(ctx context.Context, whereClause string, queryParams []any) ([]User, error) {
 	q := `
 		SELECT
 			identScreenName,
@@ -198,7 +198,7 @@ func (f SQLiteUserStore) queryUsers(ctx context.Context, whereClause string, que
 		WHERE %s
 	`
 	q = fmt.Sprintf(q, whereClause)
-	rows, err := f.db.QueryContext(ctx, q, queryParams...)
+	rows, err := us.db.QueryContext(ctx, q, queryParams...)
 	if err != nil {
 		return nil, err
 	}

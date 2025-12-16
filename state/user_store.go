@@ -1,6 +1,7 @@
 package state
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"embed"
@@ -833,6 +834,53 @@ func (f SQLiteUserStore) SetPDMode(ctx context.Context, me IdentScreenName, pdMo
 	}
 
 	return nil
+}
+
+func (f SQLiteUserStore) Feedbag(ctx context.Context, screenName IdentScreenName) ([]wire.FeedbagItem, error) {
+	q := `
+		SELECT
+			groupID,
+			itemID,
+			classID,
+			name,
+			attributes
+		FROM feedbag
+		WHERE screenName = ?
+	`
+	rows, err := f.db.QueryContext(ctx, q, screenName.String())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []wire.FeedbagItem
+	for rows.Next() {
+		var attrs []byte
+		var item wire.FeedbagItem
+		if err := rows.Scan(&item.GroupID, &item.ItemID, &item.ClassID, &item.Name, &attrs); err != nil {
+			return nil, err
+		}
+
+		if err := wire.UnmarshalBE(&item.TLVLBlock, bytes.NewBuffer(attrs)); err != nil {
+			return items, err
+		}
+
+		items = append(items, item)
+	}
+
+	return items, nil
+}
+
+func (f SQLiteUserStore) UseFeedbag(ctx context.Context, screenName IdentScreenName) error {
+	q := `
+		INSERT INTO buddyListMode (screenName, useFeedbag)
+		VALUES (?, ?)
+		ON CONFLICT (screenName)
+			DO UPDATE SET clientSidePDMode = 0,
+						  useFeedbag       = true
+	`
+	_, err := f.db.ExecContext(ctx, q, screenName.String(), true)
+	return err
 }
 
 func (us SQLiteUserStore) runMigrations() error {

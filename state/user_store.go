@@ -235,6 +235,32 @@ func (f SQLiteUserStore) FindByAIMNameAndAddr(ctx context.Context, info AIMNameA
 	return users, nil
 }
 
+func (f SQLiteUserStore) FindByAIMEmail(ctx context.Context, email string) (User, error) {
+	users, err := f.queryUsers(ctx, `emailAddress = ?`, []any{email})
+	if err != nil {
+		return User{}, fmt.Errorf("FindByAIMEmail: %w", err)
+	}
+
+	if len(users) == 0 {
+		return User{}, ErrNoUser
+	}
+
+	return users[0], nil
+}
+
+func (f SQLiteUserStore) FindByAIMKeyword(ctx context.Context, keyword string) ([]User, error) {
+	where := `
+		(SELECT id FROM aimKeyword WHERE name = ?) IN
+		(aim_keyword1, aim_keyword2, aim_keyword3, aim_keyword4, aim_keyword5)
+	`
+	users, err := f.queryUsers(ctx, where, []any{keyword})
+	if err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

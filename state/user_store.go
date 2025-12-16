@@ -1053,3 +1053,17 @@ func clearBlankClientSideBuddies(ctx context.Context, tx *sql.Tx, me IdentScreen
 	_, err := tx.ExecContext(ctx, q, me.String(), pdMode)
 	return err
 }
+
+// setClientSidePDMode sets the permit/deny mode for my client-side buddy list.
+func setClientSidePDMode(ctx context.Context, tx *sql.Tx, me IdentScreenName, pdMode wire.FeedbagPDMode) error {
+	q := `
+		INSERT INTO buddyListMode (screenName, clientSidePDMode) VALUES(?, ?)
+		ON CONFLICT (screenName)
+			DO UPDATE SET clientSidePDMode = excluded.clientSidePDMode
+	`
+	if _, err := tx.ExecContext(ctx, q, me.String(), pdMode); err != nil {
+		return err
+	}
+
+	return nil
+}

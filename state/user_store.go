@@ -15,6 +15,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	migratesqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/httpfs"
+	"github.com/pchchv/go-icq/wire"
 )
 
 //go:embed migrations/*
@@ -1026,4 +1027,29 @@ func (us SQLiteUserStore) queryUsers(ctx context.Context, whereClause string, qu
 	}
 
 	return users, nil
+}
+
+// clearClientSidePDFlags clears permit/deny flags.
+func clearClientSidePDFlags(ctx context.Context, tx *sql.Tx, me IdentScreenName, pdMode wire.FeedbagPDMode) error {
+	q := `
+		UPDATE clientSideBuddyList
+		SET isDeny = false, isPermit = false
+		WHERE me = ?
+	`
+	_, err := tx.ExecContext(ctx, q, me.String(), pdMode)
+	return err
+}
+
+// clearBlankClientSideBuddies removes client-side buddy where
+// all flags (isBuddy, isPermit, isDeny) are false.
+func clearBlankClientSideBuddies(ctx context.Context, tx *sql.Tx, me IdentScreenName, pdMode wire.FeedbagPDMode) error {
+	q := `
+		DELETE FROM clientSideBuddyList
+		WHERE isBuddy IS FALSE
+		  AND isPermit IS FALSE
+		  AND isDeny IS FALSE
+		  AND me = ?
+	`
+	_, err := tx.ExecContext(ctx, q, me.String(), pdMode)
+	return err
 }

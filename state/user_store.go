@@ -413,6 +413,65 @@ func (f SQLiteUserStore) SetUserPassword(ctx context.Context, screenName IdentSc
 	return tx.Commit()
 }
 
+func (f SQLiteUserStore) SetProfile(ctx context.Context, screenName IdentScreenName, profile UserProfile) error {
+	var updateTimeUnix int64
+	if !profile.UpdateTime.IsZero() {
+		updateTimeUnix = profile.UpdateTime.Unix()
+	}
+	q := `
+		INSERT INTO profile (screenName, body, mimeType, updateTime)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT (screenName)
+			DO UPDATE SET body = excluded.body,
+			              mimeType = excluded.mimeType,
+			              updateTime = excluded.updateTime
+	`
+	_, err := f.db.ExecContext(ctx, q, screenName.String(), profile.ProfileText, profile.MIMEType, updateTimeUnix)
+	return err
+}
+
+func (f SQLiteUserStore) SetDirectoryInfo(ctx context.Context, screenName IdentScreenName, info AIMNameAndAddr) error {
+	q := `
+		UPDATE users SET
+			aim_firstName = ?,
+			aim_lastName = ?,
+			aim_middleName = ?,
+			aim_maidenName = ?,
+			aim_country = ?,
+			aim_state = ?,
+			aim_city = ?,
+			aim_nickName = ?,
+			aim_zipCode = ?,
+			aim_address = ?
+		WHERE identScreenName = ?
+	`
+	res, err := f.db.ExecContext(ctx,
+		q,
+		info.FirstName,
+		info.LastName,
+		info.MiddleName,
+		info.MaidenName,
+		info.Country,
+		info.State,
+		info.City,
+		info.NickName,
+		info.ZIPCode,
+		info.Address,
+		screenName.String(),
+	)
+	if err != nil {
+		return fmt.Errorf("exec: %w", err)
+	}
+
+	if c, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	} else if c == 0 {
+		return ErrNoUser
+	}
+
+	return nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

@@ -883,6 +883,57 @@ func (f SQLiteUserStore) UseFeedbag(ctx context.Context, screenName IdentScreenN
 	return err
 }
 
+func (f SQLiteUserStore) FeedbagUpsert(ctx context.Context, screenName IdentScreenName, items []wire.FeedbagItem) error {
+	q := `
+		INSERT INTO feedbag (screenName, groupID, itemID, classID, name, attributes, pdMode, lastModified)
+		VALUES (?, ?, ?, ?, ?, ?, ?, UNIXEPOCH())
+		ON CONFLICT (screenName, groupID, itemID)
+			DO UPDATE SET classID      = excluded.classID,
+						  name         = excluded.name,
+						  attributes   = excluded.attributes,
+						  pdMode       = excluded.pdMode,
+						  lastModified = UNIXEPOCH()
+	`
+	for _, item := range items {
+		buf := &bytes.Buffer{}
+		if err := wire.MarshalBE(item.TLVLBlock, buf); err != nil {
+			return err
+		}
+
+		if item.ClassID == wire.FeedbagClassIdBuddy ||
+			item.ClassID == wire.FeedbagClassIDPermit ||
+			item.ClassID == wire.FeedbagClassIDDeny {
+			// insert screen name identifier
+			item.Name = NewIdentScreenName(item.Name).String()
+		}
+
+		pdMode := uint8(0)
+		if item.ClassID == wire.FeedbagClassIdPdinfo {
+			var hasMode bool
+			pdMode, hasMode = item.Uint8(wire.FeedbagAttributesPdMode)
+			if !hasMode {
+				// by default, QIP sends a PD info item entry with no mode
+				pdMode = uint8(wire.FeedbagPDModePermitAll)
+			}
+		}
+
+		_, err := f.db.ExecContext(ctx,
+			q,
+			screenName.String(),
+			item.GroupID,
+			item.ItemID,
+			item.ClassID,
+			item.Name,
+			buf.Bytes(),
+			pdMode)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

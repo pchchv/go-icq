@@ -748,6 +748,57 @@ func (f SQLiteUserStore) SetTOCConfig(ctx context.Context, user IdentScreenName,
 	return nil
 }
 
+// SetWarnLevel updates the last warn update time and warning level for a user.
+func (f SQLiteUserStore) SetWarnLevel(ctx context.Context, user IdentScreenName, lastWarnUpdate time.Time, lastWarnLevel uint16) error {
+	q := `
+		UPDATE users
+		SET lastWarnUpdate = ?, lastWarnLevel = ?
+		WHERE identScreenName = ?
+	`
+	res, err := f.db.ExecContext(ctx,
+		q,
+		lastWarnUpdate.Unix(),
+		lastWarnLevel,
+		user.String(),
+	)
+	if err != nil {
+		return fmt.Errorf("exec: %w", err)
+	}
+
+	if c, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	} else if c == 0 {
+		return ErrNoUser
+	}
+
+	return nil
+}
+
+// SetOfflineMsgCount updates the offline message count for a user.
+func (f SQLiteUserStore) SetOfflineMsgCount(ctx context.Context, screenName IdentScreenName, count int) error {
+	q := `
+		UPDATE users
+		SET offlineMsgCount = ?
+		WHERE identScreenName = ?
+	`
+	res, err := f.db.ExecContext(ctx,
+		q,
+		count,
+		screenName.String(),
+	)
+	if err != nil {
+		return fmt.Errorf("exec: %w", err)
+	}
+
+	if c, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	} else if c == 0 {
+		return ErrNoUser
+	}
+
+	return nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

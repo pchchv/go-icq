@@ -640,6 +640,66 @@ func (f SQLiteUserStore) SetAffiliations(ctx context.Context, name IdentScreenNa
 	return nil
 }
 
+func (f SQLiteUserStore) SetBasicInfo(ctx context.Context, name IdentScreenName, data ICQBasicInfo) error {
+	q := `
+		UPDATE users SET
+			icq_basicInfo_cellPhone = ?,
+			icq_basicInfo_countryCode = ?,
+			icq_basicInfo_emailAddress = ?,
+			icq_basicInfo_firstName = ?,
+			icq_basicInfo_gmtOffset = ?,
+			icq_basicInfo_address = ?,
+			icq_basicInfo_city = ?,
+			icq_basicInfo_fax = ?,
+			icq_basicInfo_phone = ?,
+			icq_basicInfo_state = ?,
+			icq_basicInfo_lastName = ?,
+			icq_basicInfo_nickName = ?,
+			icq_basicInfo_publishEmail = ?,
+			icq_basicInfo_zipCode = ?
+		WHERE identScreenName = ?
+	`
+	res, err := f.db.ExecContext(ctx,
+		q,
+		data.CellPhone,
+		data.CountryCode,
+		data.EmailAddress,
+		data.FirstName,
+		data.GMTOffset,
+		data.Address,
+		data.City,
+		data.Fax,
+		data.Phone,
+		data.State,
+		data.LastName,
+		data.Nickname,
+		data.PublishEmail,
+		data.ZIPCode,
+		name.String(),
+	)
+	if err != nil {
+		return fmt.Errorf("exec: %w", err)
+	}
+
+	if c, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	} else if c == 0 {
+		return ErrNoUser
+	}
+
+	return nil
+}
+
+func (f SQLiteUserStore) SetBotStatus(ctx context.Context, isBot bool, screenName IdentScreenName) error {
+	q := `
+		UPDATE users
+		SET isBot = ?
+		WHERE identScreenName = ?
+	`
+	_, err := f.db.ExecContext(ctx, q, isBot, screenName.String())
+	return err
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

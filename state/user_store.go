@@ -800,6 +800,41 @@ func (f SQLiteUserStore) SetOfflineMsgCount(ctx context.Context, screenName Iden
 	return nil
 }
 
+func (f SQLiteUserStore) SetPDMode(ctx context.Context, me IdentScreenName, pdMode wire.FeedbagPDMode) error {
+	if alreadySet, err := f.isPDModeEqual(ctx, me, pdMode); err != nil {
+		return fmt.Errorf("isPDModeEqual: %w", err)
+	} else if alreadySet {
+		return nil
+	}
+
+	tx, err := f.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	if err := setClientSidePDMode(ctx, tx, me, pdMode); err != nil {
+		return fmt.Errorf("setClientSidePDMode: %w", err)
+	}
+
+	if err := clearClientSidePDFlags(ctx, tx, me, pdMode); err != nil {
+		return fmt.Errorf("clearClientSidePDFlags: %w", err)
+	}
+
+	if err := clearBlankClientSideBuddies(ctx, tx, me, pdMode); err != nil {
+		return fmt.Errorf("clearBlankClientSideBuddies: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+
+	return nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {
@@ -1027,6 +1062,22 @@ func (us SQLiteUserStore) queryUsers(ctx context.Context, whereClause string, qu
 	}
 
 	return users, nil
+}
+
+// isPDModeEqual indicates whether the
+// current permit/deny mode is already set to pdMode.
+func (f SQLiteUserStore) isPDModeEqual(ctx context.Context, me IdentScreenName, pdMode wire.FeedbagPDMode) (isEqual bool, err error) {
+	q := `
+		SELECT true
+		FROM buddyListMode
+		WHERE screenName = ? AND clientSidePDMode = ?
+	`
+	err = f.db.QueryRowContext(ctx, q, me.String(), pdMode).Scan(&isEqual)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return false, err
+	}
+
+	return isEqual, nil
 }
 
 // clearClientSidePDFlags clears permit/deny flags.

@@ -472,6 +472,90 @@ func (f SQLiteUserStore) SetDirectoryInfo(ctx context.Context, screenName IdentS
 	return nil
 }
 
+func (f SQLiteUserStore) SetWorkInfo(ctx context.Context, name IdentScreenName, data ICQWorkInfo) error {
+	q := `
+		UPDATE users SET
+			icq_workInfo_company = ?,
+			icq_workInfo_department = ?,
+			icq_workInfo_occupationCode = ?,
+			icq_workInfo_position = ?,
+			icq_workInfo_address = ?,
+			icq_workInfo_city = ?,
+			icq_workInfo_countryCode = ?,
+			icq_workInfo_fax = ?,
+			icq_workInfo_phone = ?,
+			icq_workInfo_state = ?,
+			icq_workInfo_webPage = ?,
+			icq_workInfo_zipCode = ?
+		WHERE identScreenName = ?
+	`
+	res, err := f.db.ExecContext(ctx,
+		q,
+		data.Company,
+		data.Department,
+		data.OccupationCode,
+		data.Position,
+		data.Address,
+		data.City,
+		data.CountryCode,
+		data.Fax,
+		data.Phone,
+		data.State,
+		data.WebPage,
+		data.ZIPCode,
+		name.String(),
+	)
+	if err != nil {
+		return fmt.Errorf("exec: %w", err)
+	}
+
+	if c, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	} else if c == 0 {
+		return ErrNoUser
+	}
+
+	return nil
+}
+
+func (f SQLiteUserStore) SetMoreInfo(ctx context.Context, name IdentScreenName, data ICQMoreInfo) error {
+	q := `
+		UPDATE users SET
+			icq_moreInfo_birthDay = ?,
+			icq_moreInfo_birthMonth = ?,
+			icq_moreInfo_birthYear = ?,
+			icq_moreInfo_gender = ?,
+			icq_moreInfo_homePageAddr = ?,
+			icq_moreInfo_lang1 = ?,
+			icq_moreInfo_lang2 = ?,
+			icq_moreInfo_lang3 = ?
+		WHERE identScreenName = ?
+	`
+	res, err := f.db.ExecContext(ctx,
+		q,
+		data.BirthDay,
+		data.BirthMonth,
+		data.BirthYear,
+		data.Gender,
+		data.HomePageAddr,
+		data.Lang1,
+		data.Lang2,
+		data.Lang3,
+		name.String(),
+	)
+	if err != nil {
+		return fmt.Errorf("exec: %w", err)
+	}
+
+	if c, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	} else if c == 0 {
+		return ErrNoUser
+	}
+
+	return nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

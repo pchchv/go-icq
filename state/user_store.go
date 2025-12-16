@@ -51,6 +51,19 @@ func NewSQLiteUserStore(dbFilePath string) (*SQLiteUserStore, error) {
 	return store, nil
 }
 
+func (f SQLiteUserStore) User(ctx context.Context, screenName IdentScreenName) (*User, error) {
+	users, err := f.queryUsers(ctx, `identScreenName = ?`, []any{screenName.String()})
+	if err != nil {
+		return nil, fmt.Errorf("User: %w", err)
+	}
+
+	if len(users) == 0 {
+		return nil, nil
+	}
+
+	return &users[0], nil
+}
+
 func (f SQLiteUserStore) AllUsers(ctx context.Context) ([]User, error) {
 	q := `SELECT identScreenName, displayScreenName, isICQ, isBot FROM users`
 	rows, err := f.db.QueryContext(ctx, q)

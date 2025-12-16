@@ -173,6 +173,68 @@ func (f SQLiteUserStore) FindByICQKeyword(ctx context.Context, keyword string) (
 	return users, nil
 }
 
+func (f SQLiteUserStore) FindByAIMNameAndAddr(ctx context.Context, info AIMNameAndAddr) ([]User, error) {
+	var args []any
+	var clauses []string
+	if info.FirstName != "" {
+		args = append(args, info.FirstName)
+		clauses = append(clauses, `LOWER(aim_firstName) = LOWER(?)`)
+	}
+
+	if info.LastName != "" {
+		args = append(args, info.LastName)
+		clauses = append(clauses, `LOWER(aim_lastName) = LOWER(?)`)
+	}
+
+	if info.MiddleName != "" {
+		args = append(args, info.MiddleName)
+		clauses = append(clauses, `LOWER(aim_middleName) = LOWER(?)`)
+	}
+
+	if info.MaidenName != "" {
+		args = append(args, info.MaidenName)
+		clauses = append(clauses, `LOWER(aim_maidenName) = LOWER(?)`)
+	}
+
+	if info.Country != "" {
+		args = append(args, info.Country)
+		clauses = append(clauses, `LOWER(aim_country) = LOWER(?)`)
+	}
+
+	if info.State != "" {
+		args = append(args, info.State)
+		clauses = append(clauses, `LOWER(aim_state) = LOWER(?)`)
+	}
+
+	if info.City != "" {
+		args = append(args, info.City)
+		clauses = append(clauses, `LOWER(aim_city) = LOWER(?)`)
+	}
+
+	if info.NickName != "" {
+		args = append(args, info.NickName)
+		clauses = append(clauses, `LOWER(aim_nickName) = LOWER(?)`)
+	}
+
+	if info.ZIPCode != "" {
+		args = append(args, info.ZIPCode)
+		clauses = append(clauses, `LOWER(aim_zipCode) = LOWER(?)`)
+	}
+
+	if info.Address != "" {
+		args = append(args, info.Address)
+		clauses = append(clauses, `LOWER(aim_address) = LOWER(?)`)
+	}
+
+	whereClause := strings.Join(clauses, " AND ")
+	users, err := f.queryUsers(ctx, whereClause, args)
+	if err != nil {
+		return users, fmt.Errorf("FindByAIMNameAndAddr: %w", err)
+	}
+
+	return users, nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

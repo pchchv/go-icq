@@ -556,6 +556,90 @@ func (f SQLiteUserStore) SetMoreInfo(ctx context.Context, name IdentScreenName, 
 	return nil
 }
 
+func (f SQLiteUserStore) SetInterests(ctx context.Context, name IdentScreenName, data ICQInterests) error {
+	q := `
+		UPDATE users SET
+			icq_interests_code1 = ?,
+			icq_interests_keyword1 = ?,
+			icq_interests_code2 = ?,
+			icq_interests_keyword2 = ?,
+			icq_interests_code3 = ?,
+			icq_interests_keyword3 = ?,
+			icq_interests_code4 = ?,
+			icq_interests_keyword4 = ?
+		WHERE identScreenName = ?
+	`
+	res, err := f.db.ExecContext(ctx,
+		q,
+		data.Code1,
+		data.Keyword1,
+		data.Code2,
+		data.Keyword2,
+		data.Code3,
+		data.Keyword3,
+		data.Code4,
+		data.Keyword4,
+		name.String(),
+	)
+	if err != nil {
+		return fmt.Errorf("exec: %w", err)
+	}
+
+	if c, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	} else if c == 0 {
+		return ErrNoUser
+	}
+
+	return nil
+}
+
+func (f SQLiteUserStore) SetAffiliations(ctx context.Context, name IdentScreenName, data ICQAffiliations) error {
+	q := `
+		UPDATE users SET
+			icq_affiliations_currentCode1 = ?,
+			icq_affiliations_currentKeyword1 = ?,
+			icq_affiliations_currentCode2 = ?,
+			icq_affiliations_currentKeyword2 = ?,
+			icq_affiliations_currentCode3 = ?,
+			icq_affiliations_currentKeyword3 = ?,
+			icq_affiliations_pastCode1 = ?,
+			icq_affiliations_pastKeyword1 = ?,
+			icq_affiliations_pastCode2 = ?,
+			icq_affiliations_pastKeyword2 = ?,
+			icq_affiliations_pastCode3 = ?,
+			icq_affiliations_pastKeyword3 = ?
+		WHERE identScreenName = ?
+	`
+	res, err := f.db.ExecContext(ctx,
+		q,
+		data.CurrentCode1,
+		data.CurrentKeyword1,
+		data.CurrentCode2,
+		data.CurrentKeyword2,
+		data.CurrentCode3,
+		data.CurrentKeyword3,
+		data.PastCode1,
+		data.PastKeyword1,
+		data.PastCode2,
+		data.PastKeyword2,
+		data.PastCode3,
+		data.PastKeyword3,
+		name.String(),
+	)
+	if err != nil {
+		return fmt.Errorf("exec: %w", err)
+	}
+
+	if c, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	} else if c == 0 {
+		return ErrNoUser
+	}
+
+	return nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

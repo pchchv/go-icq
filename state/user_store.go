@@ -934,6 +934,26 @@ func (f SQLiteUserStore) FeedbagUpsert(ctx context.Context, screenName IdentScre
 	return nil
 }
 
+func (f SQLiteUserStore) FeedbagLastModified(ctx context.Context, screenName IdentScreenName) (time.Time, error) {
+	var lastModified sql.NullInt64
+	q := `SELECT MAX(lastModified) FROM feedbag WHERE screenName = ?`
+	err := f.db.QueryRowContext(ctx, q, screenName.String()).Scan(&lastModified)
+	return time.Unix(lastModified.Int64, 0), err
+}
+
+func (f SQLiteUserStore) FeedbagDelete(ctx context.Context, screenName IdentScreenName, items []wire.FeedbagItem) error {
+	// todo add transaction
+	q := `DELETE FROM feedbag WHERE screenName = ? AND itemID = ?`
+
+	for _, item := range items {
+		if _, err := f.db.ExecContext(ctx, q, screenName.String(), item.ItemID); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

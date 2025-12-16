@@ -64,6 +64,56 @@ func (f SQLiteUserStore) User(ctx context.Context, screenName IdentScreenName) (
 	return &users[0], nil
 }
 
+func (f SQLiteUserStore) InsertUser(ctx context.Context, u User) error {
+	if u.DisplayScreenName.IsUIN() && !u.IsICQ {
+		return errors.New("inserting user with UIN and isICQ=false")
+	}
+	q := `
+		INSERT INTO users (identScreenName, displayScreenName, authKey, weakMD5Pass, strongMD5Pass, isICQ, isBot)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT (identScreenName) DO NOTHING
+	`
+	result, err := f.db.ExecContext(ctx,
+		q,
+		u.IdentScreenName.String(),
+		u.DisplayScreenName,
+		u.AuthKey,
+		u.WeakMD5Pass,
+		u.StrongMD5Pass,
+		u.IsICQ,
+		u.IsBot,
+	)
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected, err := result.RowsAffected(); err != nil {
+		return err
+	} else if rowsAffected == 0 {
+		return ErrDupUser
+	}
+
+	return nil
+}
+
+func (f SQLiteUserStore) DeleteUser(ctx context.Context, screenName IdentScreenName) error {
+	q := `
+		DELETE FROM users WHERE identScreenName = ?
+	`
+	result, err := f.db.ExecContext(ctx, q, screenName.String())
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected, err := result.RowsAffected(); err != nil {
+		return err
+	} else if rowsAffected == 0 {
+		return ErrNoUser
+	}
+
+	return nil
+}
+
 func (f SQLiteUserStore) AllUsers(ctx context.Context) ([]User, error) {
 	q := `SELECT identScreenName, displayScreenName, isICQ, isBot FROM users`
 	rows, err := f.db.QueryContext(ctx, q)

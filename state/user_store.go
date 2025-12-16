@@ -954,6 +954,30 @@ func (f SQLiteUserStore) FeedbagDelete(ctx context.Context, screenName IdentScre
 	return nil
 }
 
+func (f SQLiteUserStore) Categories(ctx context.Context) ([]Category, error) {
+	q := `SELECT id, name FROM aimKeywordCategory ORDER BY name`
+	rows, err := f.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var categories []Category
+	for rows.Next() {
+		category := Category{}
+		if err := rows.Scan(&category.ID, &category.Name); err != nil {
+			return nil, err
+		}
+		categories = append(categories, category)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return categories, nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

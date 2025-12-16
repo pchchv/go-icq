@@ -14,6 +14,8 @@ import (
 )
 
 var (
+	// ErrNoUser indicates that a user does not exist.
+	ErrNoUser                 = errors.New("user does not exist")
 	ErrPasswordInvalid        = errors.New("invalid password length")
 	ErrAIMHandleLength        = errors.New("screen name must be between 3 and 16 characters")
 	ErrICQUINInvalidFormat    = errors.New("uin must be a number in the range 10000-2147483646")

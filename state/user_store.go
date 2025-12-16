@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -77,6 +78,32 @@ func (f SQLiteUserStore) AllUsers(ctx context.Context) ([]User, error) {
 	}
 
 	return users, nil
+}
+
+func (f SQLiteUserStore) FindByUIN(ctx context.Context, UIN uint32) (User, error) {
+	users, err := f.queryUsers(ctx, `identScreenName = ?`, []any{strconv.Itoa(int(UIN))})
+	if err != nil {
+		return User{}, fmt.Errorf("FindByUIN: %w", err)
+	}
+
+	if len(users) == 0 {
+		return User{}, ErrNoUser
+	}
+
+	return users[0], nil
+}
+
+func (f SQLiteUserStore) FindByICQEmail(ctx context.Context, email string) (User, error) {
+	users, err := f.queryUsers(ctx, `icq_basicInfo_emailAddress = ?`, []any{email})
+	if err != nil {
+		return User{}, fmt.Errorf("FindByICQEmail: %w", err)
+	}
+
+	if len(users) == 0 {
+		return User{}, ErrNoUser
+	}
+
+	return users[0], nil
 }
 
 func (us SQLiteUserStore) runMigrations() error {

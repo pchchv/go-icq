@@ -324,6 +324,95 @@ func (f SQLiteUserStore) FindByAIMKeyword(ctx context.Context, keyword string) (
 	return users, nil
 }
 
+func (f SQLiteUserStore) SetUserNotes(ctx context.Context, name IdentScreenName, data ICQUserNotes) error {
+	q := `
+		UPDATE users
+		SET icq_notes = ?
+		WHERE identScreenName = ?
+	`
+	res, err := f.db.ExecContext(ctx,
+		q,
+		data.Notes,
+		name.String(),
+	)
+	if err != nil {
+		return fmt.Errorf("exec: %w", err)
+	}
+
+	if c, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	} else if c == 0 {
+		return ErrNoUser
+	}
+
+	return nil
+}
+
+func (f SQLiteUserStore) SetUserPassword(ctx context.Context, screenName IdentScreenName, newPassword string) error {
+	tx, err := f.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, tx.Rollback())
+		}
+	}()
+
+	q := `
+		SELECT
+			authKey,
+			isICQ
+		FROM users
+		WHERE identScreenName = ?
+	`
+	u := User{}
+	err = tx.QueryRowContext(ctx, q, screenName.String()).Scan(
+		&u.AuthKey,
+		&u.IsICQ,
+	)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNoUser
+	}
+
+	if err = u.HashPassword(newPassword); err != nil {
+		return err
+	}
+
+	q = `
+		UPDATE users
+		SET authKey = ?, weakMD5Pass = ?, strongMD5Pass = ?
+		WHERE identScreenName = ?
+	`
+	result, err := tx.ExecContext(ctx, q, u.AuthKey, u.WeakMD5Pass, u.StrongMD5Pass, screenName.String())
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		// it's possible the user didn't change OR the user doesn't exist.
+		// check if the user exists.
+		var exists int
+		err = tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM users WHERE identScreenName = ?", u.IdentScreenName.String()).Scan(&exists)
+		if err != nil {
+			return err // Handle possible SQL errors during the select
+		}
+		if exists == 0 {
+			err = ErrNoUser // User does not exist
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

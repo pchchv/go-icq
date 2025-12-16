@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"net/mail"
 	"strconv"
 	"strings"
 	"time"
@@ -976,6 +977,37 @@ func (f SQLiteUserStore) Categories(ctx context.Context) ([]Category, error) {
 	}
 
 	return categories, nil
+}
+
+func (f SQLiteUserStore) EmailAddress(ctx context.Context, screenName IdentScreenName) (*mail.Address, error) {
+	q := `
+		SELECT emailAddress
+		FROM users
+		WHERE identScreenName = ?
+	`
+	var emailAddress string
+	err := f.db.QueryRowContext(ctx, q, screenName.String()).Scan(&emailAddress)
+	// username isn't found for some reason
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+
+	e, err := mail.ParseAddress(emailAddress)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrNoEmailAddress, err)
+	}
+
+	return e, nil
+}
+
+func (f SQLiteUserStore) UpdateEmailAddress(ctx context.Context, screenName IdentScreenName, emailAddress *mail.Address) error {
+	q := `
+		UPDATE users
+		SET emailAddress = ?
+		WHERE identScreenName = ?
+	`
+	_, err := f.db.ExecContext(ctx, q, emailAddress.Address, screenName.String())
+	return err
 }
 
 func (us SQLiteUserStore) runMigrations() error {

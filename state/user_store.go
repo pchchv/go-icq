@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -104,6 +105,72 @@ func (f SQLiteUserStore) FindByICQEmail(ctx context.Context, email string) (User
 	}
 
 	return users[0], nil
+}
+
+func (f SQLiteUserStore) FindByICQName(ctx context.Context, firstName, lastName, nickName string) ([]User, error) {
+	var args []any
+	var clauses []string
+	if firstName != "" {
+		args = append(args, firstName)
+		clauses = append(clauses, `LOWER(icq_basicInfo_firstName) = LOWER(?)`)
+	}
+
+	if lastName != "" {
+		args = append(args, lastName)
+		clauses = append(clauses, `LOWER(icq_basicInfo_lastName) = LOWER(?)`)
+	}
+
+	if nickName != "" {
+		args = append(args, nickName)
+		clauses = append(clauses, `LOWER(icq_basicInfo_nickName) = LOWER(?)`)
+	}
+
+	whereClause := strings.Join(clauses, " AND ")
+	users, err := f.queryUsers(ctx, whereClause, args)
+	if err != nil {
+		return users, fmt.Errorf("FindByICQName: %w", err)
+	}
+
+	return users, nil
+}
+
+func (f SQLiteUserStore) FindByICQInterests(ctx context.Context, code uint16, keywords []string) ([]User, error) {
+	var args []any
+	var clauses []string
+	for i := 1; i <= 4; i++ {
+		var subClauses []string
+		args = append(args, code)
+		for _, key := range keywords {
+			subClauses = append(subClauses, fmt.Sprintf("icq_interests_keyword%d LIKE ?", i))
+			args = append(args, "%"+key+"%")
+		}
+		clauses = append(clauses, fmt.Sprintf("(icq_interests_code%d = ? AND (%s))", i, strings.Join(subClauses, " OR ")))
+	}
+
+	cond := strings.Join(clauses, " OR ")
+	users, err := f.queryUsers(ctx, cond, args)
+	if err != nil {
+		return users, fmt.Errorf("FindByICQInterests: %w", err)
+	}
+
+	return users, nil
+}
+
+func (f SQLiteUserStore) FindByICQKeyword(ctx context.Context, keyword string) ([]User, error) {
+	var args []any
+	var clauses []string
+	for i := 1; i <= 4; i++ {
+		args = append(args, "%"+keyword+"%")
+		clauses = append(clauses, fmt.Sprintf("icq_interests_keyword%d LIKE ?", i))
+	}
+
+	whereClause := strings.Join(clauses, " OR ")
+	users, err := f.queryUsers(ctx, whereClause, args)
+	if err != nil {
+		return users, fmt.Errorf("FindByICQKeyword: %w", err)
+	}
+
+	return users, nil
 }
 
 func (us SQLiteUserStore) runMigrations() error {

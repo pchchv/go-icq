@@ -1717,6 +1717,25 @@ func (f SQLiteUserStore) RemoveBuddy(ctx context.Context, me IdentScreenName, th
 	return err
 }
 
+func (f SQLiteUserStore) DenyBuddy(ctx context.Context, me IdentScreenName, them IdentScreenName) error {
+	q := `
+		INSERT INTO clientSideBuddyList (me, them, isDeny)
+		VALUES (?, ?, 1)
+		ON CONFLICT (me, them) DO UPDATE SET isDeny = 1
+	`
+	_, err := f.db.ExecContext(ctx, q, me.String(), them.String())
+	return err
+}
+
+func (f SQLiteUserStore) PermitBuddy(ctx context.Context, me IdentScreenName, them IdentScreenName) error {
+	q := `
+		INSERT INTO clientSideBuddyList (me, them, isPermit)
+		VALUES (?, ?, 1)
+		ON CONFLICT (me, them) DO UPDATE SET isPermit = 1
+	`
+	_, err := f.db.ExecContext(ctx, q, me.String(), them.String())
+	return err
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

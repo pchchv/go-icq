@@ -1032,6 +1032,67 @@ func (f SQLiteUserStore) Profile(ctx context.Context, screenName IdentScreenName
 	return profile, nil
 }
 
+func (f SQLiteUserStore) AllChatRooms(ctx context.Context, exchange uint16) ([]ChatRoom, error) {
+	q := `
+		SELECT created, creator, name
+		FROM chatRoom
+		WHERE exchange = ?
+		ORDER BY created ASC
+	`
+	rows, err := f.db.QueryContext(ctx, q, exchange)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []ChatRoom
+	for rows.Next() {
+		var creator string
+		cr := ChatRoom{
+			exchange: exchange,
+		}
+
+		if err := rows.Scan(&cr.createTime, &creator, &cr.name); err != nil {
+			return nil, err
+		}
+
+		cr.creator = NewIdentScreenName(creator)
+		users = append(users, cr)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
+func (f SQLiteUserStore) DeleteChatRooms(ctx context.Context, exchange uint16, names []string) error {
+	if len(names) == 0 {
+		return nil
+	}
+
+	// build the query with placeholders for each name
+	placeholders := make([]string, len(names))
+	args := make([]interface{}, 0, len(names)+1)
+	args = append(args, exchange)
+	for i, name := range names {
+		placeholders[i] = "?"
+		args = append(args, name)
+	}
+
+	q := fmt.Sprintf(`
+		DELETE FROM chatRoom
+		WHERE exchange = ? AND name IN (%s)
+	`, strings.Join(placeholders, ","))
+	_, err := f.db.ExecContext(ctx, q, args...)
+	if err != nil {
+		return fmt.Errorf("DeleteChatRooms: %w", err)
+	}
+
+	return nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

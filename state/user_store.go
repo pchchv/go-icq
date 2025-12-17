@@ -23,10 +23,13 @@ import (
 	lib "modernc.org/sqlite/lib"
 )
 
+const offlineInboxLimit = 10
+
 var (
 	//go:embed migrations/*
 	migrations embed.FS
 
+	ErrOfflineInboxFull        = errors.New("offline inbox full")
 	ErrKeywordInUse            = errors.New("can't delete keyword that is associated with a user")
 	ErrKeywordExists           = errors.New("keyword already exists")
 	ErrKeywordNotFound         = errors.New("keyword not found")
@@ -1402,6 +1405,136 @@ func (f SQLiteUserStore) InterestList(ctx context.Context) ([]wire.ODirKeywordLi
 	}
 
 	return list, nil
+}
+
+func (f SQLiteUserStore) SaveMessage(ctx context.Context, offlineMessage OfflineMessage) (newCount int, err error) {
+	buf := &bytes.Buffer{}
+	if err := wire.MarshalBE(offlineMessage.Message, buf); err != nil {
+		return 0, fmt.Errorf("marshal: %w", err)
+	}
+
+	var tx *sql.Tx
+	tx, err = f.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	const countQuery = `
+		SELECT COUNT(1)
+		FROM offlineMessage
+		WHERE sender = ? AND recipient = ?
+	`
+	var currentCount int
+	if err = tx.QueryRowContext(
+		ctx,
+		countQuery,
+		offlineMessage.Sender.String(),
+		offlineMessage.Recipient.String(),
+	).Scan(&currentCount); err != nil {
+		return 0, fmt.Errorf("count: %w", err)
+	}
+
+	if currentCount >= offlineInboxLimit {
+		err = ErrOfflineInboxFull
+		return 0, err
+	}
+
+	q := `
+		INSERT INTO offlineMessage (sender, recipient, message, sent)
+		VALUES (?, ?, ?, ?)
+	`
+	if _, err = tx.ExecContext(ctx,
+		q,
+		offlineMessage.Sender.String(),
+		offlineMessage.Recipient.String(),
+		buf.Bytes(),
+		offlineMessage.Sent,
+	); err != nil {
+		if sqliteErr, ok := err.(*sqlite.Error); ok && sqliteErr.Code() == lib.SQLITE_CONSTRAINT_FOREIGNKEY {
+			err = ErrNoUser
+		} else {
+			err = fmt.Errorf("insert: %w", err)
+		}
+		return 0, err
+	}
+
+	newCount = currentCount + 1
+	updateQuery := `
+		UPDATE users
+		SET offlineMsgCount = ?
+		WHERE identScreenName = ?
+	`
+	_, err = tx.ExecContext(ctx,
+		updateQuery,
+		newCount,
+		offlineMessage.Recipient.String(),
+	)
+	if err != nil {
+		return 0, fmt.Errorf("update offlineMsgCount: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return 0, fmt.Errorf("commit: %w", err)
+	}
+
+	return newCount, nil
+}
+
+func (f SQLiteUserStore) RetrieveMessages(ctx context.Context, recip IdentScreenName) ([]OfflineMessage, error) {
+	q := `
+		SELECT
+		    sender,
+		    message,
+		    sent
+		FROM offlineMessage
+		WHERE recipient = ?
+	`
+	rows, err := f.db.QueryContext(ctx, q, recip.String())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []OfflineMessage
+	for rows.Next() {
+		var sender string
+		var buf []byte
+		var sent time.Time
+		if err := rows.Scan(&sender, &buf, &sent); err != nil {
+			return nil, err
+		}
+
+		var msg wire.SNAC_0x04_0x06_ICBMChannelMsgToHost
+		if err := wire.UnmarshalBE(&msg, bytes.NewBuffer(buf)); err != nil {
+			return nil, fmt.Errorf("unmarshal: %w", err)
+		}
+
+		messages = append(messages, OfflineMessage{
+			Sender:    NewIdentScreenName(sender),
+			Recipient: recip,
+			Message:   msg,
+			Sent:      sent,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return messages, nil
+}
+
+func (f SQLiteUserStore) DeleteMessages(ctx context.Context, recip IdentScreenName) error {
+	q := `
+		DELETE FROM offlineMessage WHERE recipient = ?
+	`
+	_, err := f.db.ExecContext(ctx, q, recip.String())
+	return err
 }
 
 func (us SQLiteUserStore) runMigrations() error {

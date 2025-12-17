@@ -1537,6 +1537,46 @@ func (f SQLiteUserStore) DeleteMessages(ctx context.Context, recip IdentScreenNa
 	return err
 }
 
+func (f SQLiteUserStore) RegStatus(ctx context.Context, screenName IdentScreenName) (uint16, error) {
+	var regStatus uint16
+	q := `
+		SELECT regStatus
+		FROM users
+		WHERE identScreenName = ?
+	`
+	err := f.db.QueryRowContext(ctx, q, screenName.String()).Scan(&regStatus)
+	// username isn't found for some reason
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return 0, err
+	}
+	return regStatus, nil
+}
+
+func (f SQLiteUserStore) UpdateRegStatus(ctx context.Context, screenName IdentScreenName, regStatus uint16) error {
+	q := `
+		UPDATE users
+		SET regStatus = ?
+		WHERE identScreenName = ?
+	`
+	_, err := f.db.ExecContext(ctx, q, regStatus, screenName.String())
+	return err
+}
+
+func (f SQLiteUserStore) ConfirmStatus(ctx context.Context, screenName IdentScreenName) (bool, error) {
+	var confirmStatus bool
+	q := `
+		SELECT confirmStatus
+		FROM users
+		WHERE identScreenName = ?
+	`
+	err := f.db.QueryRowContext(ctx, q, screenName.String()).Scan(&confirmStatus)
+	// username isn't found for some reason
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return false, err
+	}
+	return confirmStatus, nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -1611,6 +1612,50 @@ func (f SQLiteUserStore) UpdateDisplayScreenName(ctx context.Context, displayScr
 	`
 	_, err := f.db.ExecContext(ctx, q, displayScreenName.String(), displayScreenName.IdentScreenName().String())
 	return err
+}
+
+func (f SQLiteUserStore) BARTItem(ctx context.Context, hash []byte) (body []byte, err error) {
+	q := `
+		SELECT body
+		FROM bartItem
+		WHERE hash = ?
+	`
+	if err = f.db.QueryRowContext(ctx, q, hash).Scan(&body); err != nil && errors.Is(err, sql.ErrNoRows) {
+		err = nil
+	}
+
+	return
+}
+
+func (f SQLiteUserStore) ListBARTItems(ctx context.Context, itemType uint16) ([]BARTItem, error) {
+	q := `
+		SELECT hash, type
+		FROM bartItem
+		WHERE type = ?
+	`
+	rows, err := f.db.QueryContext(ctx, q, itemType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []BARTItem
+	for rows.Next() {
+		var item BARTItem
+		var hashBytes []byte
+		err := rows.Scan(&hashBytes, &item.Type)
+		if err != nil {
+			return nil, err
+		}
+		item.Hash = hex.EncodeToString(hashBytes)
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return items, nil
 }
 
 func (us SQLiteUserStore) runMigrations() error {

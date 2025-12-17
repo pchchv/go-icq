@@ -1093,6 +1093,51 @@ func (f SQLiteUserStore) DeleteChatRooms(ctx context.Context, exchange uint16, n
 	return nil
 }
 
+func (f SQLiteUserStore) ChatRoomByCookie(ctx context.Context, chatCookie string) (ChatRoom, error) {
+	var creator string
+	chatRoom := ChatRoom{}
+	q := `
+		SELECT exchange, name, created, creator
+		FROM chatRoom
+		WHERE lower(cookie) = lower(?)
+	`
+	err := f.db.QueryRowContext(ctx, q, chatCookie).Scan(
+		&chatRoom.exchange,
+		&chatRoom.name,
+		&chatRoom.createTime,
+		&creator,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		err = fmt.Errorf("%w: %s", ErrChatRoomNotFound, chatCookie)
+	}
+	chatRoom.creator = NewIdentScreenName(creator)
+
+	return chatRoom, err
+}
+
+func (f SQLiteUserStore) ChatRoomByName(ctx context.Context, exchange uint16, name string) (ChatRoom, error) {
+	var creator string
+	chatRoom := ChatRoom{
+		exchange: exchange,
+	}
+	q := `
+		SELECT name, created, creator
+		FROM chatRoom
+		WHERE exchange = ? AND lower(name) = lower(?)
+	`
+	err := f.db.QueryRowContext(ctx, q, exchange, name).Scan(
+		&chatRoom.name,
+		&chatRoom.createTime,
+		&creator,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		err = ErrChatRoomNotFound
+	}
+	chatRoom.creator = NewIdentScreenName(creator)
+
+	return chatRoom, err
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

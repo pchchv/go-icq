@@ -1,6 +1,14 @@
 package state
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var (
+	ErrDupChatRoom      = errors.New("chat room already exists")
+	ErrChatRoomNotFound = errors.New("chat room not found")
+)
 
 // ChatRoom represents of a chat room.
 type ChatRoom struct {

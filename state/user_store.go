@@ -1781,6 +1781,17 @@ func (f SQLiteUserStore) UnregisterBuddyList(ctx context.Context, user IdentScre
 	return nil
 }
 
+func (f SQLiteUserStore) RemoveDenyBuddy(ctx context.Context, me IdentScreenName, them IdentScreenName) error {
+	q := `
+		UPDATE clientSideBuddyList
+		SET isDeny = false
+		WHERE me = ?
+		  AND them = ?
+	`
+	_, err := f.db.ExecContext(ctx, q, me.String(), them.String())
+	return err
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

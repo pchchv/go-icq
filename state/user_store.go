@@ -39,6 +39,12 @@ var (
 	errTooManyKeywords         = errors.New("there are too many keywords")
 )
 
+// BARTItem represents a BART asset with its hash and type.
+type BARTItem struct {
+	Hash string
+	Type uint16
+}
+
 // SQLiteUserStore stores user feedbag (buddy list), profile,
 // and authentication credentials information in a SQLite database.
 type SQLiteUserStore struct {

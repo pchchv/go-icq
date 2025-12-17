@@ -30,6 +30,8 @@ var (
 	//go:embed migrations/*
 	migrations embed.FS
 
+	ErrBARTItemExists          = errors.New("BART asset already exists")
+	ErrBARTItemNotFound        = errors.New("BART asset not found")
 	ErrOfflineInboxFull        = errors.New("offline inbox full")
 	ErrKeywordInUse            = errors.New("can't delete keyword that is associated with a user")
 	ErrKeywordExists           = errors.New("keyword already exists")
@@ -1656,6 +1658,42 @@ func (f SQLiteUserStore) ListBARTItems(ctx context.Context, itemType uint16) ([]
 	}
 
 	return items, nil
+}
+
+func (f SQLiteUserStore) InsertBARTItem(ctx context.Context, hash []byte, blob []byte, itemType uint16) error {
+	q := `
+		INSERT INTO bartItem (hash, body, type)
+		VALUES (?, ?, ?)
+	`
+	if _, err := f.db.ExecContext(ctx, q, hash, blob, itemType); err != nil {
+		if liteErr, ok := err.(*sqlite.Error); ok {
+			if liteErr.Code() == lib.SQLITE_CONSTRAINT_PRIMARYKEY {
+				return ErrBARTItemExists
+			}
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (f SQLiteUserStore) DeleteBARTItem(ctx context.Context, hash []byte) error {
+	q := `
+		DELETE FROM bartItem
+		WHERE hash = ?
+	`
+	result, err := f.db.ExecContext(ctx, q, hash)
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected, err := result.RowsAffected(); err != nil {
+		return err
+	} else if rowsAffected == 0 {
+		return ErrBARTItemNotFound
+	}
+
+	return nil
 }
 
 func (us SQLiteUserStore) runMigrations() error {

@@ -1760,6 +1760,27 @@ func (f SQLiteUserStore) ClearBuddyListRegistry(ctx context.Context) error {
 	return nil
 }
 
+func (f SQLiteUserStore) RegisterBuddyList(ctx context.Context, user IdentScreenName) error {
+	q := `
+		INSERT INTO buddyListMode (screenName, clientSidePDMode) VALUES(?, ?)
+		ON CONFLICT (screenName) DO NOTHING
+	`
+	_, err := f.db.ExecContext(ctx, q, user.String(), wire.FeedbagPDModePermitAll)
+	return err
+}
+
+func (f SQLiteUserStore) UnregisterBuddyList(ctx context.Context, user IdentScreenName) error {
+	if _, err := f.db.ExecContext(ctx, `DELETE FROM buddyListMode WHERE screenName = ?`, user.String()); err != nil {
+		return err
+	}
+
+	if _, err := f.db.ExecContext(ctx, `DELETE FROM clientSideBuddyList WHERE me = ?`, user.String()); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

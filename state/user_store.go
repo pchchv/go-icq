@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"net/http"
 	"net/mail"
 	"strconv"
@@ -18,10 +19,19 @@ import (
 	migratesqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/httpfs"
 	"github.com/pchchv/go-icq/wire"
+	"modernc.org/sqlite"
+	lib "modernc.org/sqlite/lib"
 )
 
-//go:embed migrations/*
-var migrations embed.FS
+var (
+	//go:embed migrations/*
+	migrations embed.FS
+
+	ErrKeywordInUse            = errors.New("can't delete keyword that is associated with a user")
+	ErrKeywordCategoryExists   = errors.New("keyword category already exists")
+	ErrKeywordCategoryNotFound = errors.New("keyword category not found")
+	errTooManyCategories       = errors.New("there are too many keyword categories")
+)
 
 // SQLiteUserStore stores user feedbag (buddy list), profile,
 // and authentication credentials information in a SQLite database.
@@ -950,6 +960,60 @@ func (f SQLiteUserStore) FeedbagDelete(ctx context.Context, screenName IdentScre
 		if _, err := f.db.ExecContext(ctx, q, screenName.String(), item.ItemID); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (f SQLiteUserStore) CreateCategory(ctx context.Context, name string) (Category, error) {
+	tx, err := f.db.Begin()
+	if err != nil {
+		return Category{}, err
+	}
+	defer tx.Rollback()
+
+	q := `INSERT INTO aimKeywordCategory (name) VALUES (?)`
+	res, err := tx.ExecContext(ctx, q, name)
+	if err != nil {
+		if sqliteErr, ok := err.(*sqlite.Error); ok && sqliteErr.Code() == lib.SQLITE_CONSTRAINT_UNIQUE {
+			err = ErrKeywordCategoryExists
+		}
+		return Category{}, err
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return Category{}, err
+	}
+
+	if id > math.MaxUint8 {
+		return Category{}, errTooManyCategories
+	}
+
+	if err := tx.Commit(); err != nil {
+		return Category{}, err
+	}
+
+	return Category{
+		ID:   uint8(id),
+		Name: name,
+	}, nil
+}
+
+func (f SQLiteUserStore) DeleteCategory(ctx context.Context, categoryID uint8) error {
+	q := `DELETE FROM aimKeywordCategory WHERE id = ?`
+	res, err := f.db.ExecContext(ctx, q, categoryID)
+	if err != nil {
+		// check if the error is a foreign key constraint violation
+		if sqliteErr, ok := err.(*sqlite.Error); ok && sqliteErr.Code() == lib.SQLITE_CONSTRAINT_FOREIGNKEY {
+			return ErrKeywordInUse
+		}
+	}
+
+	if c, err := res.RowsAffected(); err != nil {
+		return err
+	} else if c == 0 {
+		return ErrKeywordCategoryNotFound
 	}
 
 	return nil

@@ -1792,6 +1792,51 @@ func (f SQLiteUserStore) RemoveDenyBuddy(ctx context.Context, me IdentScreenName
 	return err
 }
 
+func (f SQLiteUserStore) BuddyIconMetadata(ctx context.Context, screenName IdentScreenName) (*wire.BARTID, error) {
+	var attrs []byte
+	var item wire.FeedbagItem
+	q := `
+		SELECT
+			groupID,
+			itemID,
+			classID,
+			name,
+			attributes
+		FROM feedBag
+		WHERE screenname = ? AND name = ? AND classID = ?
+	`
+	err := f.db.QueryRowContext(ctx, q, screenName.String(), wire.BARTTypesBuddyIcon, wire.FeedbagClassIdBart).Scan(&item.GroupID, &item.ItemID, &item.ClassID, &item.Name, &attrs)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		} else {
+			return nil, err
+		}
+	}
+
+	if err := wire.UnmarshalBE(&item.TLVLBlock, bytes.NewBuffer(attrs)); err != nil {
+		return nil, err
+	}
+
+	b, hasBuf := item.Bytes(wire.FeedbagAttributesBartInfo)
+	if !hasBuf {
+		return nil, errors.New("unable to extract icon payload")
+	}
+
+	bartInfo := wire.BARTInfo{}
+	if err := wire.UnmarshalBE(&bartInfo, bytes.NewBuffer(b)); err != nil {
+		return nil, err
+	}
+
+	return &wire.BARTID{
+		Type: wire.BARTTypesBuddyIcon,
+		BARTInfo: wire.BARTInfo{
+			Flags: bartInfo.Flags,
+			Hash:  bartInfo.Hash,
+		},
+	}, nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

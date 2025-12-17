@@ -1597,6 +1597,16 @@ func (f SQLiteUserStore) UpdateSuspendedStatus(ctx context.Context, suspendedSta
 	return err
 }
 
+func (f SQLiteUserStore) UpdateDisplayScreenName(ctx context.Context, displayScreenName DisplayScreenName) error {
+	q := `
+		UPDATE users
+		SET displayScreenName = ?
+		WHERE identScreenName = ?
+	`
+	_, err := f.db.ExecContext(ctx, q, displayScreenName.String(), displayScreenName.IdentScreenName().String())
+	return err
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

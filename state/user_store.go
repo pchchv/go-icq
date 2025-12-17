@@ -1305,6 +1305,105 @@ func (f SQLiteUserStore) KeywordsByCategory(ctx context.Context, categoryID uint
 	return keywords, nil
 }
 
+// InterestList returns a list of keywords grouped by category used to
+// render the AIM directory interests list.
+// The list is made up of 3 types of elements:
+//
+// Categories
+//
+//	ID: The category ID
+//	Cookie: The category name
+//	Type: [wire.ODirKeywordCategory]
+//
+// Keywords
+//
+//	ID: The parent category ID
+//	Cookie: The keyword name
+//	Type: [wire.ODirKeyword]
+//
+// Top-level Keywords
+//
+//	ID: 0 (does not have a parent category)
+//	Cookie: The keyword name
+//	Type: [wire.ODirKeyword]
+//
+// Keywords are grouped contiguously by category and
+// preceded by the category name.
+// Top-level keywords appear by themselves.
+// Categories and top-level keywords are sorted alphabetically.
+// Keyword groups are sorted alphabetically.
+//
+// Conceptually, the list looks like this:
+//
+//	> Animals (top-level keyword, id=0)
+//	> Artificial Intelligence (keyword, id=3)
+//		> Cybersecurity (keyword, id=3)
+//	> Music (category, id=1)
+//		> Jazz (keyword, id=1)
+//		> Rock (keyword, id=1)
+//	> Sports (category, id=2)
+//		> Basketball (keyword, id=2)
+//		> Soccer (keyword, id=2)
+//		> Tennis (keyword, id=2)
+//	> Technology (category, id=3)
+//	> Zoology (top-level keyword, id=0)
+func (f SQLiteUserStore) InterestList(ctx context.Context) ([]wire.ODirKeywordListItem, error) {
+	q := `
+		WITH categories AS (
+			SELECT
+				name AS grouping,
+				id,
+				0 AS sortPrio,
+				name
+			FROM aimKeywordCategory
+			UNION
+			SELECT
+				IFNULL(akc.name, ak.name) AS grouping,
+				IFNULL(ak.parent, 0) AS id,
+				CASE WHEN ak.parent IS NULL THEN 1 ELSE 2 END AS sortPrio,
+				ak.name
+			FROM aimKeyword ak
+			LEFT JOIN aimKeywordCategory akc ON akc.id = ak.parent
+			ORDER BY 1, 3, 4
+		)
+		SELECT
+			id,
+			sortPrio,
+			name
+		FROM categories
+	`
+
+	rows, err := f.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []wire.ODirKeywordListItem
+	for rows.Next() {
+		var sortPrio int
+		msg := wire.ODirKeywordListItem{}
+		if err := rows.Scan(&msg.ID, &sortPrio, &msg.Name); err != nil {
+			return nil, err
+		}
+
+		switch sortPrio {
+		case 0:
+			msg.Type = wire.ODirKeywordCategory
+		case 1, 2:
+			msg.Type = wire.ODirKeyword
+		}
+
+		list = append(list, msg)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return list, nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

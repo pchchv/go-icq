@@ -1266,6 +1266,45 @@ func (f SQLiteUserStore) DeleteKeyword(ctx context.Context, id uint8) error {
 	return nil
 }
 
+func (f SQLiteUserStore) KeywordsByCategory(ctx context.Context, categoryID uint8) ([]Keyword, error) {
+	q := `SELECT id, name FROM aimKeyword WHERE parent = ? ORDER BY name`
+	if categoryID == 0 {
+		q = `SELECT id, name FROM aimKeyword WHERE parent IS NULL ORDER BY name`
+	}
+
+	rows, err := f.db.QueryContext(ctx, q, categoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var keywords []Keyword
+	for rows.Next() {
+		keyword := Keyword{}
+		if err := rows.Scan(&keyword.ID, &keyword.Name); err != nil {
+			return nil, err
+		}
+		keywords = append(keywords, keyword)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if len(keywords) == 0 {
+		var exists int
+		err = f.db.QueryRow("SELECT COUNT(*) FROM aimKeywordCategory WHERE id = ?", categoryID).Scan(&exists)
+		if err != nil {
+			return nil, err
+		}
+		if exists == 0 {
+			return nil, ErrKeywordCategoryNotFound
+		}
+	}
+
+	return keywords, nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

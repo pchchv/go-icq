@@ -1696,6 +1696,27 @@ func (f SQLiteUserStore) DeleteBARTItem(ctx context.Context, hash []byte) error 
 	return nil
 }
 
+func (f SQLiteUserStore) AddBuddy(ctx context.Context, me IdentScreenName, them IdentScreenName) error {
+	q := `
+		INSERT INTO clientSideBuddyList (me, them, isBuddy)
+		VALUES (?, ?, true)
+		ON CONFLICT (me, them) DO UPDATE SET isBuddy = true
+	`
+	_, err := f.db.ExecContext(ctx, q, me.String(), them.String())
+	return err
+}
+
+func (f SQLiteUserStore) RemoveBuddy(ctx context.Context, me IdentScreenName, them IdentScreenName) error {
+	q := `
+		UPDATE clientSideBuddyList
+		SET isBuddy = false
+		WHERE me = ?
+		  AND them = ?
+	`
+	_, err := f.db.ExecContext(ctx, q, me.String(), them.String())
+	return err
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

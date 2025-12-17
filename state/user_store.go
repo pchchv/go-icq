@@ -28,9 +28,12 @@ var (
 	migrations embed.FS
 
 	ErrKeywordInUse            = errors.New("can't delete keyword that is associated with a user")
+	ErrKeywordExists           = errors.New("keyword already exists")
+	ErrKeywordNotFound         = errors.New("keyword not found")
 	ErrKeywordCategoryExists   = errors.New("keyword category already exists")
 	ErrKeywordCategoryNotFound = errors.New("keyword category not found")
 	errTooManyCategories       = errors.New("there are too many keyword categories")
+	errTooManyKeywords         = errors.New("there are too many keywords")
 )
 
 // SQLiteUserStore stores user feedbag (buddy list), profile,
@@ -1200,6 +1203,67 @@ func (f SQLiteUserStore) ChatRoomByName(ctx context.Context, exchange uint16, na
 	chatRoom.creator = NewIdentScreenName(creator)
 
 	return chatRoom, err
+}
+
+func (f SQLiteUserStore) CreateKeyword(ctx context.Context, name string, categoryID uint8) (Keyword, error) {
+	tx, err := f.db.Begin()
+	if err != nil {
+		return Keyword{}, err
+	}
+	defer tx.Rollback()
+
+	var parent interface{}
+	q := `INSERT INTO aimKeyword (name, parent) VALUES (?, ?)`
+	if categoryID != 0 {
+		parent = categoryID
+	}
+
+	res, err := tx.ExecContext(ctx, q, name, parent)
+	if err != nil {
+		if sqliteErr, ok := err.(*sqlite.Error); ok && sqliteErr.Code() == lib.SQLITE_CONSTRAINT_UNIQUE {
+			err = ErrKeywordExists
+		} else if sqliteErr, ok := err.(*sqlite.Error); ok && sqliteErr.Code() == lib.SQLITE_CONSTRAINT_FOREIGNKEY {
+			err = ErrKeywordCategoryNotFound
+		}
+		return Keyword{}, err
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return Keyword{}, err
+	}
+
+	if id > math.MaxUint8 {
+		return Keyword{}, errTooManyKeywords
+	}
+
+	if err := tx.Commit(); err != nil {
+		return Keyword{}, err
+	}
+
+	return Keyword{
+		ID:   uint8(id),
+		Name: name,
+	}, nil
+}
+
+func (f SQLiteUserStore) DeleteKeyword(ctx context.Context, id uint8) error {
+	q := `DELETE FROM aimKeyword WHERE id = ?`
+	res, err := f.db.ExecContext(ctx, q, id)
+	if err != nil {
+		// Check if the error is a foreign key constraint violation
+		if sqliteErr, ok := err.(*sqlite.Error); ok && sqliteErr.Code() == lib.SQLITE_CONSTRAINT_FOREIGNKEY {
+			return ErrKeywordInUse
+		}
+	}
+
+	if c, err := res.RowsAffected(); err != nil {
+		return err
+	} else if c == 0 {
+		return ErrKeywordNotFound
+	}
+
+	return nil
 }
 
 func (us SQLiteUserStore) runMigrations() error {

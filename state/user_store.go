@@ -1111,6 +1111,29 @@ func (us SQLiteUserStore) Profile(ctx context.Context, screenName IdentScreenNam
 	return profile, nil
 }
 
+func (us SQLiteUserStore) CreateChatRoom(ctx context.Context, chatRoom *ChatRoom) error {
+	chatRoom.createTime = time.Now().UTC()
+	q := `
+		INSERT INTO chatRoom (cookie, exchange, name, created, creator)
+		VALUES (?, ?, ?, ?, ?)
+	`
+	_, err := us.db.ExecContext(ctx,
+		q,
+		chatRoom.Cookie(),
+		chatRoom.Exchange(),
+		chatRoom.Name(),
+		chatRoom.createTime,
+		chatRoom.Creator().String(),
+	)
+	if err != nil {
+		if strings.Contains(err.Error(), "constraint failed") {
+			err = ErrDupChatRoom
+		}
+		err = fmt.Errorf("CreateChatRoom: %w", err)
+	}
+	return err
+}
+
 func (us SQLiteUserStore) AllChatRooms(ctx context.Context, exchange uint16) ([]ChatRoom, error) {
 	q := `
 		SELECT created, creator, name

@@ -126,3 +126,17 @@ func (s *Session) SetAwayMessage(awayMessage string) {
 	defer s.mutex.Unlock()
 	s.awayMessage = awayMessage
 }
+
+// SetChatRoomCookie sets the chatRoomCookie for the chat room the user is currently in.
+func (s *Session) SetChatRoomCookie(cookie string) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.chatRoomCookie = cookie
+}
+
+// SetUIN sets the user's ICQ number.
+func (s *Session) SetUIN(uin uint32) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.uin = uin
+}

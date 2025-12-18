@@ -202,3 +202,17 @@ func (s *Session) SetTypingEventsEnabled(enabled bool) {
 	defer s.mutex.Unlock()
 	s.typingEventsEnabled = enabled
 }
+
+// SetKerberosAuth sets whether Kerberos authentication was used for this session.
+func (s *Session) SetKerberosAuth(enabled bool) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.kerberosAuth = enabled
+}
+
+// SetFoodGroupVersions sets the client's supported food group versions
+func (s *Session) SetFoodGroupVersions(versions [wire.MDir + 1]uint16) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.foodGroupVersions = versions
+}

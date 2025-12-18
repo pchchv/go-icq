@@ -16,6 +16,17 @@ import (
 // authCookieLen is the fixed auth cookie length.
 const authCookieLen = 256
 
+// ServerCookie represents a token containing client metadata passed to
+// the BOS service upon connection.
+type ServerCookie struct {
+	Service       uint16
+	ClientID      string            `oscar:"len_prefix=uint8"`
+	ScreenName    DisplayScreenName `oscar:"len_prefix=uint8"`
+	ChatCookie    string            `oscar:"len_prefix=uint8"`
+	KerberosAuth  uint8             // indicates whether the client used Kerberos for authentication
+	MultiConnFlag uint8
+}
+
 type HMACCookieBaker struct {
 	key []byte
 }

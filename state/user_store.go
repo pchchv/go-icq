@@ -1860,6 +1860,79 @@ func (us SQLiteUserStore) BuddyIconMetadata(ctx context.Context, screenName Iden
 	}, nil
 }
 
+// Relationship retrieves the relationship between the
+// specified user (`me`) and another user (`them`).
+//
+// This method always returns a usable [Relationship] value.
+// If the user specified by `them` does not exist,
+// the returned [Relationship] will have default boolean values.
+func (f SQLiteUserStore) Relationship(ctx context.Context, me IdentScreenName, them IdentScreenName) (Relationship, error) {
+	rels, err := f.AllRelationships(ctx, me, []IdentScreenName{them})
+	if err != nil {
+		return Relationship{}, fmt.Errorf("error getting relationships: %w", err)
+	}
+
+	if len(rels) == 0 {
+		return Relationship{
+			User: them,
+		}, nil
+	}
+
+	return rels[0], nil
+}
+
+// AllRelationships retrieves the relationships between the
+// specified user (`me`) and other users.
+//
+// A relationship is defined by the [Relationship] type,
+// which describes the nature of the connection between users.
+//
+// This function only includes users who have activated their buddy list through a
+// call to [SQLiteUserStore.RegisterBuddyList].
+// The results can be optionally filtered to include only specific users by
+// providing their identifiers in the `filter` parameter.
+func (f SQLiteUserStore) AllRelationships(ctx context.Context, me IdentScreenName, filter []IdentScreenName) ([]Relationship, error) {
+	tpl := queryWithoutFiltering
+	args := make([]any, 1, len(filter)+1)
+	args[0] = me.String()
+	if len(filter) > 0 {
+		// add placeholders to template
+		placeholders := strings.TrimRight(strings.Repeat("(?),", len(filter)), ",")
+		tpl = fmt.Sprintf(queryWithFiltering, placeholders)
+		// assemble arguments to match placeholders
+		for _, sn := range filter {
+			args = append(args, sn.String())
+		}
+	}
+
+	rows, err := f.db.QueryContext(ctx, tpl, args...)
+	if err != nil {
+		return nil, fmt.Errorf("error querying relationships: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var relationships []Relationship
+	for rows.Next() {
+		var screenName string
+		rel := Relationship{}
+		err = rows.Scan(&screenName, &rel.YouBlock, &rel.BlocksYou, &rel.IsOnTheirList, &rel.IsOnYourList)
+		if err != nil {
+			return nil, fmt.Errorf("error scanning row: %w", err)
+		}
+
+		rel.User = NewIdentScreenName(screenName)
+		relationships = append(relationships, rel)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over relationship rows: %w", err)
+	}
+
+	return relationships, nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {

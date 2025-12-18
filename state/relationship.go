@@ -127,6 +127,11 @@ FROM theirBuddyLists
          JOIN yourPrivacyPrefs ON (1 = 1)
 `
 
+var (
+	queryWithFiltering    = tmplMustCompile(struct{ DoFilter bool }{DoFilter: true})
+	queryWithoutFiltering = tmplMustCompile(struct{ DoFilter bool }{DoFilter: false})
+)
+
 // Relationship represents the relationship between two users.
 // Users A and B are related if:
 //   - A has user B on their buddy list, or vice versa

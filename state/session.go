@@ -140,3 +140,35 @@ func (s *Session) SetUIN(uin uint32) {
 	defer s.mutex.Unlock()
 	s.uin = uin
 }
+
+// SetSignonComplete indicates that the client has completed the sign-on sequence.
+func (s *Session) SetSignonComplete() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.signonComplete = true
+}
+
+func (s *Session) SetRateClasses(now time.Time, classes wire.RateLimitClasses) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	var newStates [5]RateClassState
+	for i, class := range classes.All() {
+		newStates[i] = RateClassState{
+			CurrentLevel:  class.MaxLevel,
+			CurrentStatus: wire.RateLimitStatusClear,
+			LastTime:      now,
+			RateClass:     class,
+			Subscribed:    s.lastObservedStates[i].Subscribed,
+		}
+	}
+
+	if s.lastObservedStates[0].ID == 0 {
+		s.lastObservedStates = newStates
+	} else {
+		s.lastObservedStates = s.rateLimitStates
+	}
+
+	s.rateLimitStates = newStates
+	s.rateLimitStatesOriginal = newStates
+}

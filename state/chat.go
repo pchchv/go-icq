@@ -9,6 +9,10 @@ import (
 	"github.com/pchchv/go-icq/wire"
 )
 
+// PublicExchange is the ID of the exchange that
+// hosts public chat rooms created by the server operator exclusively.
+const PublicExchange uint16 = 5
+
 var (
 	ErrDupChatRoom      = errors.New("chat room already exists")
 	ErrChatRoomNotFound = errors.New("chat room not found")

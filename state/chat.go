@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"time"
+
+	"github.com/pchchv/go-icq/wire"
 )
 
 var (
@@ -97,4 +99,14 @@ func (c ChatRoom) TLVList() []wire.TLV {
 		wire.NewTLVBE(wire.ChatRoomTLVRoomName, c.name),
 		wire.NewTLVBE(wire.ChatRoomTLVMaxMsgVisLen, uint16(1024)),
 	}
+}
+
+// CreateTime returns when the chat room was inserted in the database.
+func (c ChatRoom) CreateTime() time.Time {
+	return c.createTime
+}
+
+// DetailLevel returns the detail level of the chat room (whatever that means).
+func (c ChatRoom) DetailLevel() uint8 {
+	return 0x02 // Pidgin 2.13.0 expects value 0x02
 }

@@ -21,6 +21,11 @@ func NewHMACCookieBaker() (HMACCookieBaker, error) {
 	return cb, nil
 }
 
+type hmacTokenPayload struct {
+	Expiry uint32
+	Data   []byte `oscar:"len_prefix=uint16"`
+}
+
 type hmacToken struct {
 	Data []byte `oscar:"len_prefix=uint16"`
 	Sig  []byte `oscar:"len_prefix=uint16"`

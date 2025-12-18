@@ -3,6 +3,7 @@ package state
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"time"
 )
 
@@ -52,4 +53,21 @@ func (c ChatRoom) Cookie() string {
 // Exchange returns which exchange the chat room belongs to.
 func (c ChatRoom) Exchange() uint16 {
 	return c.exchange
+}
+
+// Name returns the chat room name.
+func (c ChatRoom) Name() string {
+	return c.name
+}
+
+// URL creates a URL that can be used to join a chat room.
+func (c ChatRoom) URL() *url.URL {
+	// macOS client v4.0.9 requires the `roomname` param to precede `exchange` param.
+	// Create the path using string concatenation rather than
+	// url.Values because url.Values sorts the params alphabetically.
+	opaque := fmt.Sprintf("gochat?roomname=%s&exchange=%d", url.QueryEscape(c.name), c.exchange)
+	return &url.URL{
+		Scheme: "aim",
+		Opaque: opaque,
+	}
 }

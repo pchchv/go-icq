@@ -2,6 +2,7 @@ package state
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -36,4 +37,19 @@ func (c ChatRoom) Creator() IdentScreenName {
 // rooms do not exist yet, so all chats happen in the same instance.
 func (c ChatRoom) InstanceNumber() uint16 {
 	return 0
+}
+
+// Cookie returns the chat room unique identifier.
+func (c ChatRoom) Cookie() string {
+	// According to Pidgin, the chat cookie is a 3-part identifier.
+	// The third segment is the chat name, which is shown explicitly in the Pidgin code.
+	// We can assume that the first two parts were the exchange and instance number.
+	// As of now, Pidgin is the only client that cares about the cookie format,
+	// and it only cares about the chat name segment.
+	return fmt.Sprintf("%d-%d-%s", c.exchange, c.InstanceNumber(), c.name)
+}
+
+// Exchange returns which exchange the chat room belongs to.
+func (c ChatRoom) Exchange() uint16 {
+	return c.exchange
 }

@@ -172,3 +172,18 @@ func (s *Session) SetRateClasses(now time.Time, classes wire.RateLimitClasses) {
 	s.rateLimitStates = newStates
 	s.rateLimitStatesOriginal = newStates
 }
+
+// SetUserInfoFlag sets a flag to and returns UserInfoBitmask
+func (s *Session) SetUserInfoFlag(flag uint16) (flags uint16) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.userInfoBitmask |= flag
+	return s.userInfoBitmask
+}
+
+// SetOfflineMsgCount sets the offline message count.
+func (s *Session) SetOfflineMsgCount(count int) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.offlineMsgCount = count
+}

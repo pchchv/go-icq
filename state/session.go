@@ -112,3 +112,17 @@ func NewSession() *Session {
 		warningCh: make(chan uint16, 1),
 	}
 }
+
+// SetRemoteAddr sets the user's remote IP address
+func (s *Session) SetRemoteAddr(remoteAddr *netip.AddrPort) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.remoteAddr = remoteAddr
+}
+
+// SetAwayMessage sets the user's away message.
+func (s *Session) SetAwayMessage(awayMessage string) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.awayMessage = awayMessage
+}

@@ -187,3 +187,18 @@ func (s *Session) SetOfflineMsgCount(count int) {
 	defer s.mutex.Unlock()
 	s.offlineMsgCount = count
 }
+
+// SetProfile sets the user's profile information.
+func (s *Session) SetProfile(profile UserProfile) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.profile = profile
+}
+
+// SetTypingEventsEnabled sets whether the client wants to send and receive
+// typing events.
+func (s *Session) SetTypingEventsEnabled(enabled bool) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.typingEventsEnabled = enabled
+}

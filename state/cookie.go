@@ -1,12 +1,20 @@
 package state
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
+	"time"
+
+	"github.com/pchchv/go-icq/wire"
 )
+
+// authCookieLen is the fixed auth cookie length.
+const authCookieLen = 256
 
 type HMACCookieBaker struct {
 	key []byte
@@ -19,6 +27,61 @@ func NewHMACCookieBaker() (HMACCookieBaker, error) {
 		return cb, fmt.Errorf("cannot generate random HMAC key: %w", err)
 	}
 	return cb, nil
+}
+
+func (c HMACCookieBaker) Crack(data []byte) ([]byte, error) {
+	hmacTok := hmacToken{}
+	if err := wire.UnmarshalBE(&hmacTok, bytes.NewBuffer(data)); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal HMAC cooie: %w", err)
+	}
+	if !hmacTok.validate(c.key) {
+		return nil, errors.New("invalid HMAC cookie")
+	}
+
+	payload := hmacTokenPayload{}
+	if err := wire.UnmarshalBE(&payload, bytes.NewBuffer(hmacTok.Data)); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal HMAC cookie payload: %w", err)
+	}
+
+	expiry := time.Unix(int64(payload.Expiry), 0)
+	if expiry.Before(time.Now()) {
+		return nil, errors.New("HMAC cookie expired")
+	}
+
+	return payload.Data, nil
+}
+
+func (c HMACCookieBaker) Issue(data []byte) ([]byte, error) {
+	payload := hmacTokenPayload{
+		Expiry: uint32(time.Now().Add(1 * time.Minute).Unix()),
+		Data:   data,
+	}
+	buf := &bytes.Buffer{}
+	if err := wire.MarshalBE(payload, buf); err != nil {
+		return nil, fmt.Errorf("unable to marshal auth authCookie: %w", err)
+	}
+
+	hmacTok := hmacToken{
+		Data: buf.Bytes(),
+	}
+	hmacTok.hash(c.key)
+
+	buf.Reset()
+
+	if err := wire.MarshalBE(hmacTok, buf); err != nil {
+		return nil, fmt.Errorf("unable to marshal auth authCookie: %w", err)
+	}
+
+	// Some clients (such as perl NET::OSCAR)
+	// expect the auth cookie to be exactly 256 bytes,
+	// even though the cookie is stored in a variable-length TLV.
+	// Pad the auth cookie to make sure it's exactly 256 bytes.
+	if buf.Len() > authCookieLen {
+		return nil, fmt.Errorf("sess is too long, expect 256 bytes, got %d", buf.Len())
+	}
+	buf.Write(make([]byte, authCookieLen-buf.Len()))
+
+	return buf.Bytes(), nil
 }
 
 type hmacTokenPayload struct {

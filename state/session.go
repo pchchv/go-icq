@@ -216,3 +216,17 @@ func (s *Session) SetFoodGroupVersions(versions [wire.MDir + 1]uint16) {
 	defer s.mutex.Unlock()
 	s.foodGroupVersions = versions
 }
+
+// SetUserStatusBitmask sets the user status bitmask from the client.
+func (s *Session) SetUserStatusBitmask(bitmask uint32) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.userStatusBitmask = bitmask
+}
+
+// SetIdentScreenName sets the user's screen name.
+func (s *Session) SetIdentScreenName(screenName IdentScreenName) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.identScreenName = screenName
+}

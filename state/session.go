@@ -420,6 +420,13 @@ func (s *Session) Caps() [][16]byte {
 	return s.caps
 }
 
+// DisplayScreenName returns the user's screen name.
+func (s *Session) DisplayScreenName() DisplayScreenName {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.displayScreenName
+}
+
 // Idle reports the user's idle state.
 func (s *Session) Idle() bool {
 	s.mutex.RLock()
@@ -439,4 +446,21 @@ func (s *Session) UnsetIdle() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.idle = false
+}
+
+// BuddyIcon returns the session's buddy icon metadata and
+// reports whether it has been set.
+// The icon is considered set if its type is non-zero.
+func (s *Session) BuddyIcon() (wire.BARTID, bool) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	icon := s.buddyIcon
+	return icon, icon.Type != 0
+}
+
+// ClientID retrieves the client ID.
+func (s *Session) ClientID() string {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.clientID
 }

@@ -419,3 +419,24 @@ func (s *Session) Caps() [][16]byte {
 	defer s.mutex.RUnlock()
 	return s.caps
 }
+
+// Idle reports the user's idle state.
+func (s *Session) Idle() bool {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.idle
+}
+
+// IdleTime reports when the user went idle
+func (s *Session) IdleTime() time.Time {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.idleTime
+}
+
+// UnsetIdle removes the user's idle state.
+func (s *Session) UnsetIdle() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.idle = false
+}

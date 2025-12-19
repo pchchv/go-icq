@@ -581,6 +581,42 @@ func (s *Session) EvaluateRateLimit(now time.Time, rateClassID wire.RateLimitCla
 	return status
 }
 
+// ObserveRateChanges updates rate limit states forall known classes and
+// returns any classes and class states that have changed since the previous observation.
+func (s *Session) ObserveRateChanges(now time.Time) (classDelta []RateClassState, stateDelta []RateClassState) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	for i, params := range s.rateLimitStates {
+		if !params.Subscribed {
+			continue
+		}
+
+		state, level := wire.CheckRateLimit(params.LastTime, now, params.RateClass, params.CurrentLevel, params.LimitedNow)
+		s.rateLimitStates[i].CurrentStatus = state
+		// clear limited now flag if passing from limited state to clear state
+		if s.rateLimitStates[i].LimitedNow && state == wire.RateLimitStatusClear {
+			s.rateLimitStates[i].LimitedNow = false
+			s.rateLimitStates[i].CurrentLevel = level
+		}
+
+		// did rate class change?
+		if params.RateClass != s.lastObservedStates[i].RateClass {
+			classDelta = append(classDelta, s.rateLimitStates[i])
+		}
+
+		// did rate limit status change?
+		if s.lastObservedStates[i].CurrentStatus != s.rateLimitStates[i].CurrentStatus {
+			stateDelta = append(stateDelta, s.rateLimitStates[i])
+		}
+
+		// save it for next time
+		s.lastObservedStates[i] = s.rateLimitStates[i]
+	}
+
+	return classDelta, stateDelta
+}
+
 // Close shuts down the session's ability to relay messages.
 // Once invoked, RelayMessage returns SessQueueFull and Closed returns a closed channel.
 // It is not possible to re-open message relaying once closed.

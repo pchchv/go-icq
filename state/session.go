@@ -244,3 +244,19 @@ func (s *Session) SetSignonTime(t time.Time) {
 	defer s.mutex.Unlock()
 	s.signonTime = t
 }
+
+// SetWarning sets the user's last warning level.
+func (s *Session) SetWarning(warning uint16) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.warning = warning
+}
+
+// SetCaps sets capability UUIDs that represent the
+// features the client supports.
+// If set, capability metadata appears in the user info TLV list.
+func (s *Session) SetCaps(caps [][16]byte) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.caps = caps
+}

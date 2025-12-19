@@ -230,3 +230,17 @@ func (s *Session) SetIdentScreenName(screenName IdentScreenName) {
 	defer s.mutex.Unlock()
 	s.identScreenName = screenName
 }
+
+// SetMultiConnFlag sets the multi-connection flag for this session.
+func (s *Session) SetMultiConnFlag(flag wire.MultiConnFlag) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.multiConnFlag = flag
+}
+
+// SetSignonTime sets the user's sign-ontime.
+func (s *Session) SetSignonTime(t time.Time) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.signonTime = t
+}

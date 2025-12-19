@@ -486,3 +486,54 @@ func (s *Session) ClearUserInfoFlag(flag uint16) (flags uint16) {
 	s.userInfoBitmask &^= flag
 	return s.userInfoBitmask
 }
+
+// ScaleWarningAndRateLimit increments the user's warning level and scales a rate limit accordingly.
+// The incr parameter is the warning increment (negative to decrease),
+// and classID specifies which rate limit class to scale.
+// The incr param is a percentage represented as an integer where 30 = 3.0%, 100 = 10.0%, etc.
+func (s *Session) ScaleWarningAndRateLimit(incr int16, classID wire.RateLimitClassID) (bool, uint16) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	// handle warning level increment
+	newWarning := int32(s.warning) + int32(incr)
+	if newWarning < 0 {
+		s.warning = 0 // clamp min at 0
+	} else if newWarning > 1000 {
+		return false, 0
+	} else {
+		s.warning = uint16(newWarning)
+	}
+
+	pct := float32(incr) / 1000.0
+	rateClass := &s.rateLimitStates[classID-1]
+	originalRateClass := &s.rateLimitStatesOriginal[classID-1]
+	clamp := func(value, min, max int32) int32 {
+		if value < min {
+			return min
+		} else if value > max {
+			return max
+		} else {
+			return value
+		}
+	}
+
+	// apply a buffer to limit/clear/alert levels so that
+	// they never approach too close to the maximum level
+	// otherwise, AIM 4.8 exhibits instability
+	// (client crashes, IM window glitches)
+	// when the warning level reaches 90-100%
+	maxLevel := originalRateClass.MaxLevel - 150
+	// scale the rate limit parameters
+	newLimitLevel := rateClass.LimitLevel + int32(float32(maxLevel-originalRateClass.LimitLevel)*pct)
+	rateClass.LimitLevel = clamp(newLimitLevel, originalRateClass.LimitLevel, originalRateClass.MaxLevel)
+
+	newLimitLevel = rateClass.ClearLevel + int32(float32(maxLevel-originalRateClass.ClearLevel)*pct)
+	rateClass.ClearLevel = clamp(newLimitLevel, originalRateClass.ClearLevel, originalRateClass.MaxLevel)
+
+	newLimitLevel = rateClass.AlertLevel + int32(float32(maxLevel-originalRateClass.AlertLevel)*pct)
+	rateClass.AlertLevel = clamp(newLimitLevel, originalRateClass.AlertLevel, originalRateClass.MaxLevel)
+
+	s.warningCh <- s.warning
+	return true, s.warning
+}

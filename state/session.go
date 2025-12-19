@@ -537,3 +537,28 @@ func (s *Session) ScaleWarningAndRateLimit(incr int16, classID wire.RateLimitCla
 	s.warningCh <- s.warning
 	return true, s.warning
 }
+
+// Close shuts down the session's ability to relay messages.
+// Once invoked, RelayMessage returns SessQueueFull and Closed returns a closed channel.
+// It is not possible to re-open message relaying once closed.
+// It is safe to call from multiple go routines.
+func (s *Session) Close() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.close()
+}
+
+// Closed blocks until the session is closed.
+func (s *Session) Closed() <-chan struct{} {
+	return s.stopCh
+}
+
+func (s *Session) close() {
+	if s.closed {
+		return
+	}
+
+	close(s.stopCh)
+	s.closed = true
+}

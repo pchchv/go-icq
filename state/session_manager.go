@@ -59,6 +59,22 @@ func (s *InMemorySessionManager) RelayToAll(ctx context.Context, msg wire.SNACMe
 	}
 }
 
+// RelayToScreenName relays a message to a session with a matching screen name.
+func (s *InMemorySessionManager) RelayToScreenName(ctx context.Context, screenName IdentScreenName, msg wire.SNACMessage) {
+	if sess := s.RetrieveSession(screenName); sess == nil {
+		s.logger.WarnContext(ctx, "can't send notification because user is not online", "recipient", screenName, "message", msg)
+	} else {
+		s.maybeRelayMessage(ctx, msg, sess)
+	}
+}
+
+// RelayToScreenNames relays a message to sessions with matching screenNames.
+func (s *InMemorySessionManager) RelayToScreenNames(ctx context.Context, screenNames []IdentScreenName, msg wire.SNACMessage) {
+	for _, sess := range s.retrieveByScreenNames(screenNames) {
+		s.maybeRelayMessage(ctx, msg, sess)
+	}
+}
+
 func (s *InMemorySessionManager) retrieveByScreenNames(screenNames []IdentScreenName) (ret []*Session) {
 	s.mapMutex.RLock()
 	defer s.mapMutex.RUnlock()

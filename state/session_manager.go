@@ -2,11 +2,15 @@ package state
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"sync"
 
 	"github.com/pchchv/go-icq/wire"
 )
+
+var errSessConflict = errors.New("session conflict: another session was created concurrently for this user")
 
 type sessionSlot struct {
 	sess    *Session
@@ -90,6 +94,46 @@ func (s *InMemorySessionManager) retrieveByScreenNames(screenNames []IdentScreen
 	return ret
 }
 
+func (s *InMemorySessionManager) AddSession(ctx context.Context, screenName DisplayScreenName) (*Session, error) {
+	s.mapMutex.Lock()
+	active := s.findRec(screenName.IdentScreenName())
+	if active != nil {
+		// there's an active session that needs to be removed
+		// don't hold the lock while we wait
+		s.mapMutex.Unlock()
+
+		// signal to callers that this session has to go
+		active.sess.Close()
+
+		select {
+		// wait for RemoveSession to be called
+		case <-active.removed:
+		case <-ctx.Done():
+			return nil, fmt.Errorf("waiting for previous session to terminate: %w", ctx.Err())
+		}
+
+		// the session has been removed, let's try to replace it
+		s.mapMutex.Lock()
+	}
+
+	defer s.mapMutex.Unlock()
+
+	// make sure a concurrent call didn't already add a session
+	if active != nil && s.findRec(screenName.IdentScreenName()) != nil {
+		return nil, errSessConflict
+	}
+
+	sess := NewSession()
+	sess.SetIdentScreenName(screenName.IdentScreenName())
+	sess.SetDisplayScreenName(screenName)
+	s.store[sess.IdentScreenName()] = &sessionSlot{
+		sess:    sess,
+		removed: make(chan bool),
+	}
+
+	return sess, nil
+}
+
 func (s *InMemorySessionManager) maybeRelayMessage(ctx context.Context, msg wire.SNACMessage, sess *Session) {
 	switch sess.RelayMessage(msg) {
 	case SessSendClosed:
@@ -98,4 +142,13 @@ func (s *InMemorySessionManager) maybeRelayMessage(ctx context.Context, msg wire
 		s.logger.WarnContext(ctx, "can't send notification because queue is full", "recipient", sess.IdentScreenName(), "message", msg)
 		sess.Close()
 	}
+}
+
+func (s *InMemorySessionManager) findRec(identScreenName IdentScreenName) *sessionSlot {
+	for _, rec := range s.store {
+		if identScreenName == rec.sess.IdentScreenName() {
+			return rec
+		}
+	}
+	return nil
 }

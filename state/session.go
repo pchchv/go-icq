@@ -645,6 +645,36 @@ func (s *Session) Closed() <-chan struct{} {
 	return s.stopCh
 }
 
+// ReceiveMessage returns a channel of messages relayed via this session.
+// It may only be read by one consumer.
+// The channel never closes.
+// Call this method in a select block along with Closed in order to detect session closure.
+func (s *Session) ReceiveMessage() chan wire.SNACMessage {
+	return s.msgCh
+}
+
+// RelayMessage receives a SNAC message from a user and passes it on
+// asynchronously to the consumer of this session's messages.
+// It returns SessSendStatus to indicate whether the message was successfully sent or not.
+// This method is non-blocking.
+func (s *Session) RelayMessage(msg wire.SNACMessage) SessSendStatus {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	if s.closed {
+		return SessSendClosed
+	}
+
+	select {
+	case s.msgCh <- msg:
+		return SessSendOK
+	case <-s.stopCh:
+		return SessSendClosed
+	default:
+		return SessQueueFull
+	}
+}
+
 func (s *Session) close() {
 	if s.closed {
 		return

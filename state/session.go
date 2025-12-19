@@ -260,3 +260,19 @@ func (s *Session) SetCaps(caps [][16]byte) {
 	defer s.mutex.Unlock()
 	s.caps = caps
 }
+
+// SetDisplayScreenName sets the user's screen name.
+func (s *Session) SetDisplayScreenName(displayScreenName DisplayScreenName) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.displayScreenName = displayScreenName
+}
+
+// SetIdle sets the user's idle state.
+func (s *Session) SetIdle(dur time.Duration) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.idle = true
+	// set the time the user became idle
+	s.idleTime = s.nowFn().Add(-dur)
+}

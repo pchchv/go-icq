@@ -332,3 +332,25 @@ func (s *Session) SignonComplete() bool {
 	defer s.mutex.RUnlock()
 	return s.signonComplete
 }
+
+// OfflineMsgCount returns the offline message count.
+func (s *Session) OfflineMsgCount() int {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.offlineMsgCount
+}
+
+// Profile returns the user's profile information.
+func (s *Session) Profile() UserProfile {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.profile
+}
+
+// TypingEventsEnabled indicates whether the client wants to
+// send and receive typing events.
+func (s *Session) TypingEventsEnabled() bool {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.typingEventsEnabled
+}

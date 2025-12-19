@@ -1,8 +1,11 @@
 package state
 
 import (
+	"context"
 	"log/slog"
 	"sync"
+
+	"github.com/pchchv/go-icq/wire"
 )
 
 type sessionSlot struct {
@@ -43,6 +46,19 @@ func (s *InMemorySessionManager) RetrieveSession(screenName IdentScreenName) *Se
 	return nil
 }
 
+// RelayToAll relays a message to all sessions in the session pool.
+func (s *InMemorySessionManager) RelayToAll(ctx context.Context, msg wire.SNACMessage) {
+	s.mapMutex.RLock()
+	defer s.mapMutex.RUnlock()
+
+	for _, rec := range s.store {
+		if !rec.sess.SignonComplete() {
+			continue
+		}
+		s.maybeRelayMessage(ctx, msg, rec.sess)
+	}
+}
+
 func (s *InMemorySessionManager) retrieveByScreenNames(screenNames []IdentScreenName) (ret []*Session) {
 	s.mapMutex.RLock()
 	defer s.mapMutex.RUnlock()
@@ -56,4 +72,14 @@ func (s *InMemorySessionManager) retrieveByScreenNames(screenNames []IdentScreen
 	}
 
 	return ret
+}
+
+func (s *InMemorySessionManager) maybeRelayMessage(ctx context.Context, msg wire.SNACMessage, sess *Session) {
+	switch sess.RelayMessage(msg) {
+	case SessSendClosed:
+		s.logger.WarnContext(ctx, "can't send notification because the user's session is closed", "recipient", sess.IdentScreenName(), "message", msg)
+	case SessQueueFull:
+		s.logger.WarnContext(ctx, "can't send notification because queue is full", "recipient", sess.IdentScreenName(), "message", msg)
+		sess.Close()
+	}
 }

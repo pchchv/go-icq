@@ -396,3 +396,26 @@ func (s *Session) SignonTime() time.Time {
 	defer s.mutex.RUnlock()
 	return s.signonTime
 }
+
+// Warning returns the user's current warning level as a percentage.
+// The warning level is stored as an integer representation of a percentage
+// where 30 = 3.0%, 100 = 10.0%, 1000 = 100.0%, etc.
+// This is how the OSCAR protocol represents warning percentages.
+func (s *Session) Warning() uint16 {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.warning
+}
+
+// WarningCh returns the warning notification channel.
+// Listeners can receive from this channel to be notified when warnings occur.
+func (s *Session) WarningCh() chan uint16 {
+	return s.warningCh
+}
+
+// Caps retrieves user capabilities.
+func (s *Session) Caps() [][16]byte {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.caps
+}

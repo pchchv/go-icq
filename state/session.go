@@ -375,3 +375,24 @@ func (s *Session) UserStatusBitmask() uint32 {
 	defer s.mutex.RUnlock()
 	return s.userStatusBitmask
 }
+
+// IdentScreenName returns the user's screen name.
+func (s *Session) IdentScreenName() IdentScreenName {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.identScreenName
+}
+
+// MultiConnFlag retrieves the multi-connection flag for this session.
+func (s *Session) MultiConnFlag() wire.MultiConnFlag {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.multiConnFlag
+}
+
+// SignonTime reports when the user signed on
+func (s *Session) SignonTime() time.Time {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.signonTime
+}

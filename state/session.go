@@ -675,6 +675,21 @@ func (s *Session) RelayMessage(msg wire.SNACMessage) SessSendStatus {
 	}
 }
 
+// TLVUserInfo returns a TLV list containing session information required by
+// multiple SNAC message types that convey user information.
+func (s *Session) TLVUserInfo() wire.TLVUserInfo {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	return wire.TLVUserInfo{
+		ScreenName:   string(s.displayScreenName),
+		WarningLevel: uint16(s.warning),
+		TLVBlock: wire.TLVBlock{
+			TLVList: s.userInfo(),
+		},
+	}
+}
+
 func (s *Session) close() {
 	if s.closed {
 		return
@@ -682,4 +697,45 @@ func (s *Session) close() {
 
 	close(s.stopCh)
 	s.closed = true
+}
+
+func (s *Session) userInfo() wire.TLVList {
+	tlvs := wire.TLVList{}
+
+	// sign-in timestamp
+	tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoSignonTOD, uint32(s.signonTime.Unix())))
+
+	// user info flags
+	uFlags := s.userInfoBitmask
+	if s.awayMessage != "" {
+		uFlags |= wire.OServiceUserFlagUnavailable
+	}
+	tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoUserFlags, uFlags))
+
+	// user status flags
+	tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoStatus, s.userStatusBitmask))
+
+	// idle status
+	if s.idle {
+		tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoIdleTime, uint16(s.nowFn().Sub(s.idleTime).Minutes())))
+	}
+
+	// set buddy icon metadata, if user has buddy icon
+	if bartID, hasIcon := s.BuddyIcon(); hasIcon {
+		tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoBARTInfo, bartID))
+	}
+
+	// ICQ direct-connect info. The TLV is required for buddy arrival events to
+	// work in ICQ, even if the values are set to default.
+	if s.userInfoBitmask&wire.OServiceUserFlagICQ == wire.OServiceUserFlagICQ {
+		tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoICQDC, wire.ICQDCInfo{}))
+	}
+
+	// capabilities (buddy icon, chat, etc...)
+	if len(s.caps) > 0 {
+		tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoOscarCaps, s.caps))
+	}
+
+	tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoMySubscriptions, uint32(0)))
+	return tlvs
 }

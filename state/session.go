@@ -464,3 +464,25 @@ func (s *Session) ClientID() string {
 	defer s.mutex.RUnlock()
 	return s.clientID
 }
+
+// MemberSince reports when the user became a member.
+func (s *Session) MemberSince() time.Time {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.memberSince
+}
+
+// UserInfoBitmask returns UserInfoBitmask.
+func (s *Session) UserInfoBitmask() (flags uint16) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.userInfoBitmask
+}
+
+// ClearUserInfoFlag clear a flag from and returns UserInfoBitmask.
+func (s *Session) ClearUserInfoFlag(flag uint16) (flags uint16) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.userInfoBitmask &^= flag
+	return s.userInfoBitmask
+}

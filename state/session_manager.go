@@ -26,3 +26,34 @@ func NewInMemorySessionManager(logger *slog.Logger) *InMemorySessionManager {
 		store:  make(map[IdentScreenName]*sessionSlot),
 	}
 }
+
+// RetrieveSession finds a session with a matching sessionID.
+// Returns nil if session is not found.
+func (s *InMemorySessionManager) RetrieveSession(screenName IdentScreenName) *Session {
+	s.mapMutex.RLock()
+	defer s.mapMutex.RUnlock()
+
+	if rec, ok := s.store[screenName]; ok {
+		if rec.sess.SignonComplete() {
+			return rec.sess
+		}
+		return nil
+	}
+
+	return nil
+}
+
+func (s *InMemorySessionManager) retrieveByScreenNames(screenNames []IdentScreenName) (ret []*Session) {
+	s.mapMutex.RLock()
+	defer s.mapMutex.RUnlock()
+
+	for _, sn := range screenNames {
+		for _, rec := range s.store {
+			if rec.sess.SignonComplete() && sn == rec.sess.IdentScreenName() {
+				ret = append(ret, rec.sess)
+			}
+		}
+	}
+
+	return ret
+}

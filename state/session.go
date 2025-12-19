@@ -8,6 +8,18 @@ import (
 	"github.com/pchchv/go-icq/wire"
 )
 
+const (
+	// SessSendOK indicates message was sent to recipient.
+	SessSendOK SessSendStatus = iota
+	// SessQueueFull indicates send failed due to full queue -- client is likely dead.
+	SessQueueFull
+	// SessSendClosed indicates send did not complete because session is closed.
+	SessSendClosed
+)
+
+// SessSendStatus is the result of sending a message to a user.
+type SessSendStatus int
+
 // RateClassState tracks the rate limiting state for a
 // specific rate class within a user's session.
 //

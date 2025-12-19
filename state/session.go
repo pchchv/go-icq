@@ -538,6 +538,49 @@ func (s *Session) ScaleWarningAndRateLimit(incr int16, classID wire.RateLimitCla
 	return true, s.warning
 }
 
+// RateLimitStates returns the current session rate limits.
+func (s *Session) RateLimitStates() [5]RateClassState {
+	return s.rateLimitStates
+}
+
+// SubscribeRateLimits subscribes the Session to
+// updates for the specified rate limit classes.
+// Future calls to ObserveRateChanges will report changes for these classes.
+func (s *Session) SubscribeRateLimits(classes []wire.RateLimitClassID) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	for _, classID := range classes {
+		s.rateLimitStates[classID-1].Subscribed = true
+	}
+}
+
+// EvaluateRateLimit checks and updates the
+// session’s rate limit state for the given rate class ID.
+// If the rate status reaches 'disconnect', the session is closed.
+// Rate limits are not enforced if the user is a bot
+// (has wire.OServiceUserFlagBot set in their user info bitmask).
+func (s *Session) EvaluateRateLimit(now time.Time, rateClassID wire.RateLimitClassID) wire.RateLimitStatus {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.userInfoBitmask&wire.OServiceUserFlagBot == wire.OServiceUserFlagBot {
+		return wire.RateLimitStatusClear // don't rate limit bots
+	}
+
+	rateClass := &s.rateLimitStates[rateClassID-1]
+	status, newLevel := wire.CheckRateLimit(rateClass.LastTime, now, rateClass.RateClass, rateClass.CurrentLevel, rateClass.LimitedNow)
+	rateClass.CurrentLevel = newLevel
+	rateClass.CurrentStatus = status
+	rateClass.LastTime = now
+	rateClass.LimitedNow = status == wire.RateLimitStatusLimited
+	if status == wire.RateLimitStatusDisconnect {
+		s.close()
+	}
+
+	return status
+}
+
 // Close shuts down the session's ability to relay messages.
 // Once invoked, RelayMessage returns SessQueueFull and Closed returns a closed channel.
 // It is not possible to re-open message relaying once closed.

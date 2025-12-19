@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/pchchv/go-icq/wire"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -110,4 +111,65 @@ func TestInMemorySessionManager_RetrieveSession_CompleteSignon(t *testing.T) {
 	sess := sm.RetrieveSession(NewIdentScreenName("user-screen-name-1"))
 	assert.NotNil(t, sess)
 	assert.Equal(t, user1, sess)
+}
+
+func TestInMemorySessionManager_RelayToScreenNames(t *testing.T) {
+	sm := NewInMemorySessionManager(slog.Default())
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	assert.NoError(t, err)
+	user1.SetSignonComplete()
+	user2, err := sm.AddSession(context.Background(), "user-screen-name-2")
+	assert.NoError(t, err)
+	user2.SetSignonComplete()
+	user3, err := sm.AddSession(context.Background(), "user-screen-name-3")
+	assert.NoError(t, err)
+	user3.SetSignonComplete()
+
+	want := wire.SNACMessage{Frame: wire.SNACFrame{FoodGroup: wire.ICBM}}
+	recips := []IdentScreenName{
+		NewIdentScreenName("user-screen-name-1"),
+		NewIdentScreenName("user-screen-name-2"),
+	}
+	sm.RelayToScreenNames(context.Background(), recips, want)
+
+	have := <-user1.ReceiveMessage()
+	assert.Equal(t, want, have)
+
+	have = <-user2.ReceiveMessage()
+	assert.Equal(t, want, have)
+
+	<-user3.ReceiveMessage()
+	assert.Fail(t, "user 3 should not receive a message")
+}
+
+func TestInMemorySessionManager_RelayToScreenNames_SkipIncompleteSignon(t *testing.T) {
+	sm := NewInMemorySessionManager(slog.Default())
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	assert.NoError(t, err)
+	user1.SetSignonComplete()
+
+	user2, err := sm.AddSession(context.Background(), "user-screen-name-2")
+	assert.NoError(t, err)
+	// user2 has not completed signon
+
+	user3, err := sm.AddSession(context.Background(), "user-screen-name-3")
+	assert.NoError(t, err)
+	user3.SetSignonComplete()
+
+	want := wire.SNACMessage{Frame: wire.SNACFrame{FoodGroup: wire.ICBM}}
+	recips := []IdentScreenName{
+		NewIdentScreenName("user-screen-name-1"),
+		NewIdentScreenName("user-screen-name-2"), // incomplete signon
+		NewIdentScreenName("user-screen-name-3"),
+	}
+	sm.RelayToScreenNames(context.Background(), recips, want)
+
+	have := <-user1.ReceiveMessage()
+	assert.Equal(t, want, have)
+
+	<-user2.ReceiveMessage()
+	assert.Fail(t, "user 2 should not receive a message because signon is incomplete")
+
+	have = <-user3.ReceiveMessage()
+	assert.Equal(t, want, have)
 }

@@ -690,6 +690,13 @@ func (s *Session) TLVUserInfo() wire.TLVUserInfo {
 	}
 }
 
+// Invisible returns true if the user is idle.
+func (s *Session) Invisible() bool {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.userStatusBitmask&wire.OServiceUserStatusInvisible == wire.OServiceUserStatusInvisible
+}
+
 func (s *Session) close() {
 	if s.closed {
 		return

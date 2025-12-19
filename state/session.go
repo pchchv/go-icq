@@ -354,3 +354,24 @@ func (s *Session) TypingEventsEnabled() bool {
 	defer s.mutex.RUnlock()
 	return s.typingEventsEnabled
 }
+
+// KerberosAuth indicates whether Kerberos authentication was used for this session.
+func (s *Session) KerberosAuth() bool {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.kerberosAuth
+}
+
+// FoodGroupVersions retrieves the client's supported food group versions.
+func (s *Session) FoodGroupVersions() [wire.MDir + 1]uint16 {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.foodGroupVersions
+}
+
+// UserStatusBitmask returns the user status bitmask.
+func (s *Session) UserStatusBitmask() uint32 {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.userStatusBitmask
+}

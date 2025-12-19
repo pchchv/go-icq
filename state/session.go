@@ -311,3 +311,24 @@ func (s *Session) AwayMessage() string {
 	defer s.mutex.RUnlock()
 	return s.awayMessage
 }
+
+// ChatRoomCookie gets the chatRoomCookie for the chat room the user is currently in.
+func (s *Session) ChatRoomCookie() string {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.chatRoomCookie
+}
+
+// UIN returns the user's ICQ number.
+func (s *Session) UIN() uint32 {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.uin
+}
+
+// SignonComplete indicates whether the client has completed the sign-on sequence.
+func (s *Session) SignonComplete() bool {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.signonComplete
+}

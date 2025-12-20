@@ -27,6 +27,15 @@ type WebAPIKey struct {
 	Capabilities   []string   `json:"capabilities"`
 }
 
+// WebAPIKeyUpdate represents fields that can be updated for an API key.
+type WebAPIKeyUpdate struct {
+	AppName        *string   `json:"app_name,omitempty"`
+	IsActive       *bool     `json:"is_active,omitempty"`
+	RateLimit      *int      `json:"rate_limit,omitempty"`
+	Capabilities   *[]string `json:"capabilities,omitempty"`
+	AllowedOrigins *[]string `json:"allowed_origins,omitempty"`
+}
+
 // DeleteAPIKey removes an API key from the database.
 func (f SQLiteUserStore) DeleteAPIKey(ctx context.Context, devID string) error {
 	q := `

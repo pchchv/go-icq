@@ -34,3 +34,12 @@ type APIAnalytics struct {
 	ticker    *time.Ticker
 	done      chan bool
 }
+
+// nullString returns a sql.NullString for the given string.
+func nullString(s string) sql.NullString {
+	if s == "" {
+		return sql.NullString{Valid: false}
+	} else {
+		return sql.NullString{String: s, Valid: true}
+	}
+}

@@ -173,3 +173,44 @@ func TestInMemorySessionManager_RelayToScreenNames_SkipIncompleteSignon(t *testi
 	have = <-user3.ReceiveMessage()
 	assert.Equal(t, want, have)
 }
+
+func TestInMemorySessionManager_Broadcast(t *testing.T) {
+	sm := NewInMemorySessionManager(slog.Default())
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	assert.NoError(t, err)
+	user1.SetSignonComplete()
+	user2, err := sm.AddSession(context.Background(), "user-screen-name-2")
+	assert.NoError(t, err)
+	user2.SetSignonComplete()
+
+	want := wire.SNACMessage{Frame: wire.SNACFrame{FoodGroup: wire.ICBM}}
+
+	sm.RelayToAll(context.Background(), want)
+
+	have := <-user1.ReceiveMessage()
+	assert.Equal(t, want, have)
+
+	have = <-user2.ReceiveMessage()
+	assert.Equal(t, want, have)
+}
+
+func TestInMemorySessionManager_Broadcast_SkipClosedSession(t *testing.T) {
+	sm := NewInMemorySessionManager(slog.Default())
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	assert.NoError(t, err)
+	user1.SetSignonComplete()
+	user2, err := sm.AddSession(context.Background(), "user-screen-name-2")
+	assert.NoError(t, err)
+	user2.SetSignonComplete()
+	user2.Close()
+
+	want := wire.SNACMessage{Frame: wire.SNACFrame{FoodGroup: wire.ICBM}}
+
+	sm.RelayToAll(context.Background(), want)
+
+	have := <-user1.ReceiveMessage()
+	assert.Equal(t, want, have)
+
+	<-user2.ReceiveMessage()
+	assert.Fail(t, "user 2 should not receive a message")
+}

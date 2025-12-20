@@ -36,3 +36,13 @@ func (u *SQLiteUserStore) AuthenticateUser(ctx context.Context, username, passwo
 func (u *SQLiteUserStore) FindUserByScreenName(ctx context.Context, screenName IdentScreenName) (*User, error) {
 	return u.User(ctx, screenName)
 }
+
+// WebAPITokenStore manages authentication tokens for Web API sessions.
+type WebAPITokenStore struct {
+	store *SQLiteUserStore
+}
+
+// NewWebAPITokenStore creates a new token store.
+func (s *SQLiteUserStore) NewWebAPITokenStore() *WebAPITokenStore {
+	return &WebAPITokenStore{store: s}
+}

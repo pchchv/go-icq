@@ -254,3 +254,17 @@ func (f SQLiteUserStore) ListAPIKeys(ctx context.Context) ([]WebAPIKey, error) {
 
 	return keys, nil
 }
+
+// joinStrings is a helper function to join strings with a separator.
+func joinStrings(strs []string, sep string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+
+	result := strs[0]
+	for i := 1; i < len(strs); i++ {
+		result += sep + strs[i]
+	}
+
+	return result
+}

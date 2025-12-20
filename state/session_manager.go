@@ -185,3 +185,21 @@ func (s *InMemorySessionManager) findRec(identScreenName IdentScreenName) *sessi
 	}
 	return nil
 }
+
+// InMemoryChatSessionManager manages chat sessions for
+// multiple chat rooms stored in memory.
+// It provides thread-safe operations to add,
+// remove, and manipulate sessions as well as relay messages to participants.
+type InMemoryChatSessionManager struct {
+	logger   *slog.Logger
+	mapMutex sync.RWMutex
+	store    map[string]*InMemorySessionManager
+}
+
+// NewInMemoryChatSessionManager creates a new instance of InMemoryChatSessionManager.
+func NewInMemoryChatSessionManager(logger *slog.Logger) *InMemoryChatSessionManager {
+	return &InMemoryChatSessionManager{
+		store:  make(map[string]*InMemorySessionManager),
+		logger: logger,
+	}
+}

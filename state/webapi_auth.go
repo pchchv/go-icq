@@ -2,8 +2,10 @@ package state
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 )
 
 // AuthenticateUser verifies username and password.
@@ -45,4 +47,41 @@ type WebAPITokenStore struct {
 // NewWebAPITokenStore creates a new token store.
 func (s *SQLiteUserStore) NewWebAPITokenStore() *WebAPITokenStore {
 	return &WebAPITokenStore{store: s}
+}
+
+// ValidateToken checks if a token is valid and returns the associated screen name.
+func (s *WebAPITokenStore) ValidateToken(ctx context.Context, token string) (IdentScreenName, error) {
+	var screenNameStr string
+	var expiresAt time.Time
+	query := `
+		SELECT screen_name, expires_at
+		FROM webapi_tokens
+		WHERE token = ?
+	`
+	if err := s.store.db.QueryRowContext(ctx, query, token).Scan(&screenNameStr, &expiresAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return NewIdentScreenName(""), errors.New("invalid token")
+		} else {
+			return NewIdentScreenName(""), fmt.Errorf("failed to validate token: %w", err)
+		}
+	}
+
+	// check if token has expired
+	if time.Now().After(expiresAt) {
+		// clean up expired token
+		s.DeleteToken(ctx, token)
+		return NewIdentScreenName(""), errors.New("token expired")
+	} else {
+		return NewIdentScreenName(screenNameStr), nil
+	}
+}
+
+// DeleteToken removes a token.
+func (s *WebAPITokenStore) DeleteToken(ctx context.Context, token string) error {
+	query := `DELETE FROM webapi_tokens WHERE token = ?`
+	if _, err := s.store.db.ExecContext(ctx, query, token); err != nil {
+		return fmt.Errorf("failed to delete token: %w", err)
+	}
+
+	return nil
 }

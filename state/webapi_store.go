@@ -2,12 +2,17 @@ package state
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 )
 
-// ErrDupAPIKey = errors.New("API key already exists")
-var ErrNoAPIKey = errors.New("API key not found") // returned when an API key is not found
+var (
+	ErrNoAPIKey  = errors.New("API key not found")      // returned when an API key is not found
+	ErrDupAPIKey = errors.New("API key already exists") // returned when attempting to insert a duplicate API key
+)
 
 // WebAPIKey represents a Web API authentication key.
 type WebAPIKey struct {
@@ -50,4 +55,90 @@ func (f *SQLiteUserStore) UpdateLastUsed(ctx context.Context, devKey string) err
 	`
 	_, err := f.db.ExecContext(ctx, q, time.Now().Unix(), devKey)
 	return err
+}
+
+// CreateAPIKey inserts a new API key into the database.
+func (f SQLiteUserStore) CreateAPIKey(ctx context.Context, key WebAPIKey) error {
+	originsJSON, err := json.Marshal(key.AllowedOrigins)
+	if err != nil {
+		return fmt.Errorf("failed to marshal allowed origins: %w", err)
+	}
+
+	capabilitiesJSON, err := json.Marshal(key.Capabilities)
+	if err != nil {
+		return fmt.Errorf("failed to marshal capabilities: %w", err)
+	}
+
+	q := `
+		INSERT INTO web_api_keys (dev_id, dev_key, app_name, created_at, is_active, rate_limit, allowed_origins, capabilities)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT (dev_id) DO NOTHING
+	`
+	result, err := f.db.ExecContext(ctx,
+		q,
+		key.DevID,
+		key.DevKey,
+		key.AppName,
+		key.CreatedAt.Unix(),
+		key.IsActive,
+		key.RateLimit,
+		string(originsJSON),
+		string(capabilitiesJSON),
+	)
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected, err := result.RowsAffected(); err != nil {
+		return err
+	} else if rowsAffected == 0 {
+		return ErrDupAPIKey
+	}
+
+	return nil
+}
+
+// GetAPIKeyByDevKey retrieves an API key by its dev_key value.
+func (f *SQLiteUserStore) GetAPIKeyByDevKey(ctx context.Context, devKey string) (*WebAPIKey, error) {
+	q := `
+		SELECT dev_id, dev_key, app_name, created_at, last_used, is_active, rate_limit, allowed_origins, capabilities
+		FROM web_api_keys
+		WHERE dev_key = ? AND is_active = 1
+	`
+	var key WebAPIKey
+	var createdAt, lastUsed sql.NullInt64
+	var originsJSON, capabilitiesJSON string
+	err := f.db.QueryRowContext(ctx, q, devKey).Scan(
+		&key.DevID,
+		&key.DevKey,
+		&key.AppName,
+		&createdAt,
+		&lastUsed,
+		&key.IsActive,
+		&key.RateLimit,
+		&originsJSON,
+		&capabilitiesJSON,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			err = ErrNoAPIKey
+		}
+		return nil, err
+	}
+
+	key.CreatedAt = time.Unix(createdAt.Int64, 0)
+	if lastUsed.Valid {
+		t := time.Unix(lastUsed.Int64, 0)
+		key.LastUsed = &t
+	}
+
+	if err = json.Unmarshal([]byte(originsJSON), &key.AllowedOrigins); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal allowed origins: %w", err)
+	}
+
+	if err = json.Unmarshal([]byte(capabilitiesJSON), &key.Capabilities); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal capabilities: %w", err)
+	}
+
+	return &key, nil
 }

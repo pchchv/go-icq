@@ -369,3 +369,49 @@ func TestInMemorySessionManager_AllSessions_SkipIncompleteSignon(t *testing.T) {
 	assert.False(t, lookup[user2], "user2 should not be included (incomplete signon)")
 	assert.True(t, lookup[user3], "user3 should be included (complete signon)")
 }
+
+func TestInMemorySessionManager_Remove_Existing(t *testing.T) {
+	sm := NewInMemorySessionManager(slog.Default())
+	user1Old, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	assert.NoError(t, err)
+	sm.RemoveSession(user1Old)
+
+	user1New, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	assert.NoError(t, err)
+	user1New.SetSignonComplete()
+
+	user2, err := sm.AddSession(context.Background(), "user-screen-name-2")
+	assert.NoError(t, err)
+	user2.SetSignonComplete()
+
+	sm.RemoveSession(user1New)
+
+	if assert.Len(t, sm.AllSessions(), 1) {
+		assert.NotContains(t, sm.AllSessions(), user1Old)
+		assert.NotContains(t, sm.AllSessions(), user1New)
+		assert.Contains(t, sm.AllSessions(), user2)
+	}
+}
+
+func TestInMemorySessionManager_Remove_MissingSameScreenName(t *testing.T) {
+	sm := NewInMemorySessionManager(slog.Default())
+	user1Old, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	assert.NoError(t, err)
+	sm.RemoveSession(user1Old)
+
+	user1New, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	assert.NoError(t, err)
+	user1New.SetSignonComplete()
+
+	user2, err := sm.AddSession(context.Background(), "user-screen-name-2")
+	assert.NoError(t, err)
+	user2.SetSignonComplete()
+
+	sm.RemoveSession(user1Old)
+
+	if assert.Len(t, sm.AllSessions(), 2) {
+		assert.NotContains(t, sm.AllSessions(), user1Old)
+		assert.Contains(t, sm.AllSessions(), user1New)
+		assert.Contains(t, sm.AllSessions(), user2)
+	}
+}

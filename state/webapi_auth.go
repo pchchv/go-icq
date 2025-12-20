@@ -85,3 +85,29 @@ func (s *WebAPITokenStore) DeleteToken(ctx context.Context, token string) error 
 
 	return nil
 }
+
+// StoreToken saves an authentication token for a user.
+func (s *WebAPITokenStore) StoreToken(ctx context.Context, token string, screenName IdentScreenName, expiresAt time.Time) error {
+	query := `
+		INSERT INTO webapi_tokens (token, screen_name, expires_at, created_at)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(token) DO UPDATE SET
+			screen_name = excluded.screen_name,
+			expires_at = excluded.expires_at
+	`
+	if _, err := s.store.db.ExecContext(ctx, query, token, screenName.String(), expiresAt, time.Now()); err != nil {
+		return fmt.Errorf("failed to store token: %w", err)
+	}
+
+	return nil
+}
+
+// CleanupExpiredTokens removes all expired tokens from the database.
+func (s *WebAPITokenStore) CleanupExpiredTokens(ctx context.Context) error {
+	query := `DELETE FROM webapi_tokens WHERE expires_at < ?`
+	if _, err := s.store.db.ExecContext(ctx, query, time.Now()); err != nil {
+		return fmt.Errorf("failed to cleanup expired tokens: %w", err)
+	}
+
+	return nil
+}

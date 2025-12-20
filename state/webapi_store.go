@@ -142,3 +142,106 @@ func (f *SQLiteUserStore) GetAPIKeyByDevKey(ctx context.Context, devKey string) 
 
 	return &key, nil
 }
+
+// GetAPIKeyByDevID retrieves an API key by its dev_id value.
+func (f SQLiteUserStore) GetAPIKeyByDevID(ctx context.Context, devID string) (*WebAPIKey, error) {
+	q := `
+		SELECT dev_id, dev_key, app_name, created_at, last_used, is_active, rate_limit, allowed_origins, capabilities
+		FROM web_api_keys
+		WHERE dev_id = ?
+	`
+	var key WebAPIKey
+	var createdAt, lastUsed sql.NullInt64
+	var originsJSON, capabilitiesJSON string
+	err := f.db.QueryRowContext(ctx, q, devID).Scan(
+		&key.DevID,
+		&key.DevKey,
+		&key.AppName,
+		&createdAt,
+		&lastUsed,
+		&key.IsActive,
+		&key.RateLimit,
+		&originsJSON,
+		&capabilitiesJSON,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			err = ErrNoAPIKey
+		}
+		return nil, err
+	}
+
+	key.CreatedAt = time.Unix(createdAt.Int64, 0)
+	if lastUsed.Valid {
+		t := time.Unix(lastUsed.Int64, 0)
+		key.LastUsed = &t
+	}
+
+	if err := json.Unmarshal([]byte(originsJSON), &key.AllowedOrigins); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal allowed origins: %w", err)
+	}
+
+	if err := json.Unmarshal([]byte(capabilitiesJSON), &key.Capabilities); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal capabilities: %w", err)
+	}
+
+	return &key, nil
+}
+
+// ListAPIKeys retrieves all API keys from the database.
+func (f SQLiteUserStore) ListAPIKeys(ctx context.Context) ([]WebAPIKey, error) {
+	q := `
+		SELECT dev_id, dev_key, app_name, created_at, last_used, is_active, rate_limit, allowed_origins, capabilities
+		FROM web_api_keys
+		ORDER BY created_at DESC
+	`
+	rows, err := f.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var keys []WebAPIKey
+	for rows.Next() {
+		var key WebAPIKey
+		var createdAt, lastUsed sql.NullInt64
+		var originsJSON, capabilitiesJSON string
+		err := rows.Scan(
+			&key.DevID,
+			&key.DevKey,
+			&key.AppName,
+			&createdAt,
+			&lastUsed,
+			&key.IsActive,
+			&key.RateLimit,
+			&originsJSON,
+			&capabilitiesJSON,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		key.CreatedAt = time.Unix(createdAt.Int64, 0)
+		if lastUsed.Valid {
+			t := time.Unix(lastUsed.Int64, 0)
+			key.LastUsed = &t
+		}
+
+		if err := json.Unmarshal([]byte(originsJSON), &key.AllowedOrigins); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal allowed origins: %w", err)
+		}
+
+		if err := json.Unmarshal([]byte(capabilitiesJSON), &key.Capabilities); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal capabilities: %w", err)
+		}
+
+		keys = append(keys, key)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return keys, nil
+}

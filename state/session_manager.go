@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/pchchv/go-icq/wire"
 )
@@ -201,5 +202,75 @@ func NewInMemoryChatSessionManager(logger *slog.Logger) *InMemoryChatSessionMana
 	return &InMemoryChatSessionManager{
 		store:  make(map[string]*InMemorySessionManager),
 		logger: logger,
+	}
+}
+
+// AddSession adds a user to a chat room.
+// If screenName already exists, the old session is replaced by a new one.
+func (s *InMemoryChatSessionManager) AddSession(ctx context.Context, chatCookie string, screenName DisplayScreenName) (*Session, error) {
+	s.mapMutex.Lock()
+	if _, ok := s.store[chatCookie]; !ok {
+		s.store[chatCookie] = NewInMemorySessionManager(s.logger)
+	}
+	sessionManager := s.store[chatCookie]
+	s.mapMutex.Unlock()
+
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	defer cancel()
+
+	sess, err := sessionManager.AddSession(ctx, screenName)
+	if err != nil {
+		return nil, fmt.Errorf("AddSession: %w", err)
+	}
+
+	sess.SetChatRoomCookie(chatCookie)
+
+	s.mapMutex.Lock()
+	defer s.mapMutex.Unlock()
+
+	// at this point it's guaranteed that the prior chat session and
+	// corresponding session manager (if the room count dropped to 0) were removed.
+	//
+	// - SessionManager.RemoveSession() was called because that unlocks SessionManager.AddSession(),
+	//   which unblocks ChatSessionManager.AddSession()
+	// - ChatSessionManager.RemoveSession() must call room deletion routine before releasing mapMutex
+	//
+	// now restore the chat session manager,
+	// which may have been deleted by the call to RemoveSession().
+	if _, ok := s.store[chatCookie]; !ok {
+		s.store[chatCookie] = sessionManager
+	}
+
+	return sess, nil
+}
+
+// RemoveSession removes a user session from a chat room.
+// It panics if you attempt to remove the session twice.
+func (s *InMemoryChatSessionManager) RemoveSession(sess *Session) {
+	s.mapMutex.Lock()
+	defer s.mapMutex.Unlock()
+
+	sessionManager, ok := s.store[sess.ChatRoomCookie()]
+	if !ok {
+		panic("attempting to remove a session after its room has been deleted")
+	}
+	sessionManager.RemoveSession(sess)
+
+	if sessionManager.Empty() {
+		delete(s.store, sess.ChatRoomCookie())
+	}
+}
+
+// AllSessions returns all chat room participants.
+// Returns ErrChatRoomNotFound if the room does not exist.
+func (s *InMemoryChatSessionManager) AllSessions(cookie string) []*Session {
+	s.mapMutex.RLock()
+	defer s.mapMutex.RUnlock()
+
+	if sessionManager, ok := s.store[cookie]; !ok {
+		s.logger.Debug("trying to get sessions for non-existent room", "cookie", cookie)
+		return nil
+	} else {
+		return sessionManager.AllSessions()
 	}
 }

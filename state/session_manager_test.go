@@ -322,3 +322,50 @@ func TestInMemorySessionManager_RelayToAll_SkipIncompleteSignon(t *testing.T) {
 	<-user2.ReceiveMessage()
 	assert.Fail(t, "user 2 should not receive a message because signon is incomplete")
 }
+
+func TestInMemorySessionManager_AddSession(t *testing.T) {
+	sm := NewInMemorySessionManager(slog.Default())
+	ctx := context.Background()
+	sess1, err := sm.AddSession(ctx, "user-screen-name")
+	assert.NoError(t, err)
+	sess1.SetSignonComplete()
+
+	go func() {
+		<-sess1.Closed()
+		sm.RemoveSession(sess1)
+	}()
+
+	sess2, err := sm.AddSession(ctx, "user-screen-name")
+	assert.NoError(t, err)
+	sess2.SetSignonComplete()
+
+	assert.NotSame(t, sess1, sess2)
+	assert.Contains(t, sm.AllSessions(), sess2)
+}
+
+func TestInMemorySessionManager_AllSessions_SkipIncompleteSignon(t *testing.T) {
+	sm := NewInMemorySessionManager(slog.Default())
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	assert.NoError(t, err)
+	user1.SetSignonComplete()
+
+	user2, err := sm.AddSession(context.Background(), "user-screen-name-2")
+	assert.NoError(t, err)
+	// user2 has not completed signon
+
+	user3, err := sm.AddSession(context.Background(), "user-screen-name-3")
+	assert.NoError(t, err)
+	user3.SetSignonComplete()
+
+	sessions := sm.AllSessions()
+	assert.Len(t, sessions, 2, "should only return sessions with complete signon")
+
+	lookup := make(map[*Session]bool)
+	for _, session := range sessions {
+		lookup[session] = true
+	}
+
+	assert.True(t, lookup[user1], "user1 should be included (complete signon)")
+	assert.False(t, lookup[user2], "user2 should not be included (incomplete signon)")
+	assert.True(t, lookup[user3], "user3 should be included (complete signon)")
+}

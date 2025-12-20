@@ -255,6 +255,70 @@ func (f SQLiteUserStore) ListAPIKeys(ctx context.Context) ([]WebAPIKey, error) {
 	return keys, nil
 }
 
+// UpdateAPIKey updates an existing API key's fields.
+func (f SQLiteUserStore) UpdateAPIKey(ctx context.Context, devID string, updates WebAPIKeyUpdate) error {
+	// build dynamic UPDATE query based on provided fields
+	var setClauses []string
+	var args []interface{}
+	if updates.AppName != nil {
+		setClauses = append(setClauses, "app_name = ?")
+		args = append(args, *updates.AppName)
+	}
+
+	if updates.IsActive != nil {
+		setClauses = append(setClauses, "is_active = ?")
+		args = append(args, *updates.IsActive)
+	}
+
+	if updates.RateLimit != nil {
+		setClauses = append(setClauses, "rate_limit = ?")
+		args = append(args, *updates.RateLimit)
+	}
+
+	if updates.AllowedOrigins != nil {
+		originsJSON, err := json.Marshal(*updates.AllowedOrigins)
+		if err != nil {
+			return fmt.Errorf("failed to marshal allowed origins: %w", err)
+		}
+
+		setClauses = append(setClauses, "allowed_origins = ?")
+		args = append(args, string(originsJSON))
+	}
+
+	if updates.Capabilities != nil {
+		capabilitiesJSON, err := json.Marshal(*updates.Capabilities)
+		if err != nil {
+			return fmt.Errorf("failed to marshal capabilities: %w", err)
+		}
+
+		setClauses = append(setClauses, "capabilities = ?")
+		args = append(args, string(capabilitiesJSON))
+	}
+
+	if len(setClauses) == 0 {
+		return nil // no updates to perform
+	}
+
+	// add WHERE clause argument
+	args = append(args, devID)
+	q := fmt.Sprintf(`
+		UPDATE web_api_keys
+		SET %s
+		WHERE dev_id = ?
+	`, joinStrings(setClauses, ", "))
+	if result, err := f.db.ExecContext(ctx, q, args...); err != nil {
+		return err
+	} else {
+		if rowsAffected, err := result.RowsAffected(); err != nil {
+			return err
+		} else if rowsAffected == 0 {
+			return ErrNoAPIKey
+		}
+	}
+
+	return nil
+}
+
 // joinStrings is a helper function to join strings with a separator.
 func joinStrings(strs []string, sep string) string {
 	if len(strs) == 0 {

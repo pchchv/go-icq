@@ -274,3 +274,36 @@ func (s *InMemoryChatSessionManager) AllSessions(cookie string) []*Session {
 		return sessionManager.AllSessions()
 	}
 }
+
+// RelayToAllExcept sends a message to all chat room participants except for
+// the participant with a particular screen name.
+// Returns ErrChatRoomNotFound if the room does not exist for cookie.
+func (s *InMemoryChatSessionManager) RelayToAllExcept(ctx context.Context, cookie string, except IdentScreenName, msg wire.SNACMessage) {
+	s.mapMutex.RLock()
+	defer s.mapMutex.RUnlock()
+
+	if sessionManager, ok := s.store[cookie]; !ok {
+		s.logger.Error("trying to relay message to all for non-existent room", "cookie", cookie)
+		return
+	} else {
+		for _, sess := range sessionManager.AllSessions() {
+			if sess.IdentScreenName() != except {
+				sessionManager.maybeRelayMessage(ctx, msg, sess)
+			}
+		}
+	}
+}
+
+// RelayToScreenName sends a message to a chat room user.
+// Returns ErrChatRoomNotFound if the room does not exist for cookie.
+func (s *InMemoryChatSessionManager) RelayToScreenName(ctx context.Context, cookie string, recipient IdentScreenName, msg wire.SNACMessage) {
+	s.mapMutex.RLock()
+	defer s.mapMutex.RUnlock()
+
+	if sessionManager, ok := s.store[cookie]; !ok {
+		s.logger.Error("trying to relay message to screen name for non-existent room", "cookie", cookie)
+		return
+	} else {
+		sessionManager.RelayToScreenName(ctx, recipient, msg)
+	}
+}

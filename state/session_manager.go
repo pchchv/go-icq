@@ -160,6 +160,13 @@ func (s *InMemorySessionManager) AllSessions() (sessions []*Session) {
 	return
 }
 
+// Empty returns true if the session pool contains 0 sessions.
+func (s *InMemorySessionManager) Empty() bool {
+	s.mapMutex.RLock()
+	defer s.mapMutex.RUnlock()
+	return len(s.store) == 0
+}
+
 func (s *InMemorySessionManager) maybeRelayMessage(ctx context.Context, msg wire.SNACMessage, sess *Session) {
 	switch sess.RelayMessage(msg) {
 	case SessSendClosed:

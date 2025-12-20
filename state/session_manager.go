@@ -134,6 +134,32 @@ func (s *InMemorySessionManager) AddSession(ctx context.Context, screenName Disp
 	return sess, nil
 }
 
+// RemoveSession takes a session out of the session pool.
+func (s *InMemorySessionManager) RemoveSession(sess *Session) {
+	s.mapMutex.Lock()
+	defer s.mapMutex.Unlock()
+
+	if rec, ok := s.store[sess.IdentScreenName()]; ok && rec.sess == sess {
+		delete(s.store, sess.IdentScreenName())
+		close(rec.removed)
+	}
+}
+
+// AllSessions returns all sessions in the session pool.
+func (s *InMemorySessionManager) AllSessions() (sessions []*Session) {
+	s.mapMutex.RLock()
+	defer s.mapMutex.RUnlock()
+
+	for _, rec := range s.store {
+		if !rec.sess.SignonComplete() {
+			continue
+		}
+		sessions = append(sessions, rec.sess)
+	}
+
+	return
+}
+
 func (s *InMemorySessionManager) maybeRelayMessage(ctx context.Context, msg wire.SNACMessage, sess *Session) {
 	switch sess.RelayMessage(msg) {
 	case SessSendClosed:

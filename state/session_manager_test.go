@@ -3,7 +3,9 @@ package state
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"testing"
+	"testing/synctest"
 
 	"github.com/pchchv/go-icq/wire"
 	"github.com/stretchr/testify/assert"
@@ -370,6 +372,27 @@ func TestInMemorySessionManager_AllSessions_SkipIncompleteSignon(t *testing.T) {
 	assert.True(t, lookup[user3], "user3 should be included (complete signon)")
 }
 
+func TestInMemoryChatSessionManager_AllSessions_RoomExists(t *testing.T) {
+	sm := NewInMemoryChatSessionManager(slog.Default())
+	user1, err := sm.AddSession(context.Background(), "the-cookie", "user-screen-name-1")
+	assert.NoError(t, err)
+	user1.SetSignonComplete()
+	user2, err := sm.AddSession(context.Background(), "the-cookie", "user-screen-name-2")
+	assert.NoError(t, err)
+	user2.SetSignonComplete()
+
+	sessions := sm.AllSessions("the-cookie")
+	assert.Len(t, sessions, 2)
+
+	lookup := make(map[*Session]bool)
+	for _, session := range sessions {
+		lookup[session] = true
+	}
+
+	assert.True(t, lookup[user1])
+	assert.True(t, lookup[user2])
+}
+
 func TestInMemorySessionManager_Remove_Existing(t *testing.T) {
 	sm := NewInMemorySessionManager(slog.Default())
 	user1Old, err := sm.AddSession(context.Background(), "user-screen-name-1")
@@ -447,6 +470,56 @@ func TestInMemorySessionManager_Empty(t *testing.T) {
 
 			have := sm.Empty()
 			assert.Equal(t, tt.want, have)
+		})
+	}
+}
+
+func TestInMemoryChatSessionManager_RemoveSession(t *testing.T) {
+	sm := NewInMemoryChatSessionManager(slog.Default())
+	user1, err := sm.AddSession(context.Background(), "chat-room-1", "user-screen-name-1")
+	assert.NoError(t, err)
+	user1.SetSignonComplete()
+	user2, err := sm.AddSession(context.Background(), "chat-room-1", "user-screen-name-2")
+	assert.NoError(t, err)
+	user2.SetSignonComplete()
+
+	assert.Len(t, sm.AllSessions("chat-room-1"), 2)
+
+	sm.RemoveSession(user1)
+	sm.RemoveSession(user2)
+
+	assert.Empty(t, sm.AllSessions("chat-room-1"))
+}
+
+func TestInMemoryChatSessionManager_RemoveSession_DoubleLogin(t *testing.T) {
+	for i := 0; i < 50; i++ { // shake out race conditions
+		synctest.Test(t, func(t *testing.T) {
+			sm := NewInMemoryChatSessionManager(slog.Default())
+			chatSess1, err := sm.AddSession(context.Background(), "chat-room-1", "user-screen-name-1")
+			assert.NoError(t, err)
+			chatSess1.SetSignonComplete()
+
+			wg := &sync.WaitGroup{}
+			wg.Add(1)
+
+			go func() {
+				// add the session again. this call blocks until RemoveSession makes
+				// room for the new session
+				chatSess2, err := sm.AddSession(context.Background(), "chat-room-1", "user-screen-name-1")
+				assert.NoError(t, err)
+				assert.NotNil(t, chatSess2)
+				chatSess2.SetSignonComplete()
+				assert.Equal(t, chatSess1.DisplayScreenName(), chatSess2.DisplayScreenName())
+				wg.Done()
+			}()
+
+			// wait for second call to AddSession() to block
+			synctest.Wait()
+
+			// AddSession() is blocked waiting for the lock, now unblock it
+			sm.RemoveSession(chatSess1)
+
+			wg.Wait()
 		})
 	}
 }

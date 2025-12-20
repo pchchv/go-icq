@@ -415,3 +415,38 @@ func TestInMemorySessionManager_Remove_MissingSameScreenName(t *testing.T) {
 		assert.Contains(t, sm.AllSessions(), user2)
 	}
 }
+
+func TestInMemorySessionManager_Empty(t *testing.T) {
+	tests := []struct {
+		name  string
+		given []DisplayScreenName
+		want  bool
+	}{
+		{
+			name: "session manager is not empty",
+			given: []DisplayScreenName{
+				"user-screen-name-1",
+			},
+			want: false,
+		},
+		{
+			name:  "session manager is empty",
+			given: []DisplayScreenName{},
+			want:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sm := NewInMemorySessionManager(slog.Default())
+			for _, screenName := range tt.given {
+				sess, err := sm.AddSession(context.Background(), screenName)
+				assert.NoError(t, err)
+				sess.SetSignonComplete()
+			}
+
+			have := sm.Empty()
+			assert.Equal(t, tt.want, have)
+		})
+	}
+}

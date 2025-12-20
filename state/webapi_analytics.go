@@ -36,6 +36,23 @@ type APIAnalytics struct {
 	done      chan bool
 }
 
+// NewAPIAnalytics creates a new API analytics instance.
+func NewAPIAnalytics(db *sql.DB, logger *slog.Logger) *APIAnalytics {
+	analytics := &APIAnalytics{
+		db:        db,
+		logger:    logger,
+		batchSize: 100,
+		buffer:    make([]APIUsageLog, 0, 100),
+		ticker:    time.NewTicker(5 * time.Second),
+		done:      make(chan bool),
+	}
+
+	// start background worker for batch processing
+	go analytics.batchProcessor()
+
+	return analytics
+}
+
 // Close stops the analytics processor.
 func (a *APIAnalytics) Close() {
 	close(a.done)
@@ -101,7 +118,7 @@ func (a *APIAnalytics) batchProcessor() {
 		case <-a.ticker.C:
 			a.flush(context.Background())
 		case <-a.done:
-			a.flush(context.Background()) // Final flush
+			a.flush(context.Background())
 			return
 		}
 	}

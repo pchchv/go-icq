@@ -307,3 +307,16 @@ func (s *InMemoryChatSessionManager) RelayToScreenName(ctx context.Context, cook
 		sessionManager.RelayToScreenName(ctx, recipient, msg)
 	}
 }
+
+// RemoveUserFromAllChats removes a user's session from all chat rooms.
+func (s *InMemoryChatSessionManager) RemoveUserFromAllChats(user IdentScreenName) {
+	s.mapMutex.Lock()
+	defer s.mapMutex.Unlock()
+
+	for _, sessionManager := range s.store {
+		if userSess := sessionManager.RetrieveSession(user); userSess != nil {
+			userSess.Close()
+			sessionManager.RemoveSession(userSess)
+		}
+	}
+}

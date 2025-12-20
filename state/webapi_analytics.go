@@ -1,6 +1,11 @@
 package state
 
-import "time"
+import (
+	"database/sql"
+	"log/slog"
+	"sync"
+	"time"
+)
 
 // APIUsageLog represents a single API request log entry.
 type APIUsageLog struct {
@@ -17,4 +22,15 @@ type APIUsageLog struct {
 	UserAgent      string    `json:"user_agent"`
 	RequestSize    int       `json:"request_size"`
 	ResponseSize   int       `json:"response_size"`
+}
+
+// APIAnalytics provides analytics tracking for the Web API.
+type APIAnalytics struct {
+	db        *sql.DB
+	logger    *slog.Logger
+	buffer    []APIUsageLog
+	bufferMu  sync.Mutex
+	batchSize int
+	ticker    *time.Ticker
+	done      chan bool
 }

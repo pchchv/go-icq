@@ -9,6 +9,19 @@ import (
 // ErrDupAPIKey = errors.New("API key already exists")
 var ErrNoAPIKey = errors.New("API key not found") // returned when an API key is not found
 
+// WebAPIKey represents a Web API authentication key.
+type WebAPIKey struct {
+	DevID          string     `json:"dev_id"`
+	DevKey         string     `json:"dev_key"`
+	AppName        string     `json:"app_name"`
+	CreatedAt      time.Time  `json:"created_at"`
+	LastUsed       *time.Time `json:"last_used,omitempty"`
+	IsActive       bool       `json:"is_active"`
+	RateLimit      int        `json:"rate_limit"`
+	AllowedOrigins []string   `json:"allowed_origins"`
+	Capabilities   []string   `json:"capabilities"`
+}
+
 // DeleteAPIKey removes an API key from the database.
 func (f SQLiteUserStore) DeleteAPIKey(ctx context.Context, devID string) error {
 	q := `

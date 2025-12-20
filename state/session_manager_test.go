@@ -214,3 +214,91 @@ func TestInMemorySessionManager_Broadcast_SkipClosedSession(t *testing.T) {
 	<-user2.ReceiveMessage()
 	assert.Fail(t, "user 2 should not receive a message")
 }
+
+func TestInMemorySessionManager_RelayToScreenName_SessionExists(t *testing.T) {
+	sm := NewInMemorySessionManager(slog.Default())
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	assert.NoError(t, err)
+	user1.SetSignonComplete()
+	user2, err := sm.AddSession(context.Background(), "user-screen-name-2")
+	assert.NoError(t, err)
+	user2.SetSignonComplete()
+
+	want := wire.SNACMessage{Frame: wire.SNACFrame{FoodGroup: wire.ICBM}}
+	recip := NewIdentScreenName("user-screen-name-1")
+	sm.RelayToScreenName(context.Background(), recip, want)
+
+	have := <-user1.ReceiveMessage()
+	assert.Equal(t, want, have)
+
+	<-user2.ReceiveMessage()
+	assert.Fail(t, "user 2 should not receive a message")
+}
+
+func TestInMemorySessionManager_RelayToScreenName_SessionNotExist(t *testing.T) {
+	sm := NewInMemorySessionManager(slog.Default())
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	assert.NoError(t, err)
+	user1.SetSignonComplete()
+
+	want := wire.SNACMessage{Frame: wire.SNACFrame{FoodGroup: wire.ICBM}}
+
+	recip := NewIdentScreenName("user-screen-name-2")
+	sm.RelayToScreenName(context.Background(), recip, want)
+
+	select {
+	case <-user1.ReceiveMessage():
+		assert.Fail(t, "user 1 should not receive a message")
+	default:
+	}
+}
+
+func TestInMemorySessionManager_RelayToScreenName_SkipFullSession(t *testing.T) {
+	sm := NewInMemorySessionManager(slog.Default())
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	assert.NoError(t, err)
+	user1.SetSignonComplete()
+	msg := wire.SNACMessage{Frame: wire.SNACFrame{FoodGroup: wire.ICBM}}
+
+	var wantCount int
+	for {
+		if user1.RelayMessage(msg) == SessQueueFull {
+			break
+		}
+		wantCount++
+	}
+
+	recip := NewIdentScreenName("user-screen-name-1")
+	sm.RelayToScreenName(context.Background(), recip, msg)
+
+	var haveCount int
+loop:
+	for {
+		select {
+		case <-user1.ReceiveMessage():
+			haveCount++
+		default:
+			break loop
+		}
+	}
+
+	assert.Equal(t, wantCount, haveCount)
+}
+
+func TestInMemorySessionManager_RelayToScreenName_IncompleteSignon(t *testing.T) {
+	sm := NewInMemorySessionManager(slog.Default())
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	assert.NoError(t, err)
+	// user1 has not completed signon
+
+	want := wire.SNACMessage{Frame: wire.SNACFrame{FoodGroup: wire.ICBM}}
+
+	recip := NewIdentScreenName("user-screen-name-1")
+	sm.RelayToScreenName(context.Background(), recip, want)
+
+	select {
+	case <-user1.ReceiveMessage():
+		assert.Fail(t, "user 1 should not receive a message because signon is incomplete")
+	default:
+	}
+}

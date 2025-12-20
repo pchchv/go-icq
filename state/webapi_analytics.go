@@ -36,6 +36,12 @@ type APIAnalytics struct {
 	done      chan bool
 }
 
+// Close stops the analytics processor.
+func (a *APIAnalytics) Close() {
+	close(a.done)
+	a.ticker.Stop()
+}
+
 // flush writes buffered logs to the database.
 func (a *APIAnalytics) flush(ctx context.Context) {
 	a.bufferMu.Lock()
@@ -85,6 +91,19 @@ func (a *APIAnalytics) flush(ctx context.Context) {
 
 	if err := tx.Commit(); err != nil {
 		a.logger.Error("failed to commit analytics transaction", "error", err)
+	}
+}
+
+// batchProcessor processes buffered logs in batches.
+func (a *APIAnalytics) batchProcessor() {
+	for {
+		select {
+		case <-a.ticker.C:
+			a.flush(context.Background())
+		case <-a.done:
+			a.flush(context.Background()) // Final flush
+			return
+		}
 	}
 }
 

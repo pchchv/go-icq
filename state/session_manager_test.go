@@ -523,3 +523,51 @@ func TestInMemoryChatSessionManager_RemoveSession_DoubleLogin(t *testing.T) {
 		})
 	}
 }
+
+func TestInMemoryChatSessionManager_RelayToScreenName_SessionAndChatRoomExist(t *testing.T) {
+	sm := NewInMemoryChatSessionManager(slog.Default())
+	user1, err := sm.AddSession(context.Background(), "chat-room-1", "user-screen-name-1")
+	assert.NoError(t, err)
+	user1.SetSignonComplete()
+	user2, err := sm.AddSession(context.Background(), "chat-room-1", "user-screen-name-2")
+	assert.NoError(t, err)
+	user2.SetSignonComplete()
+
+	want := wire.SNACMessage{Frame: wire.SNACFrame{FoodGroup: wire.ICBM}}
+
+	recip := NewIdentScreenName("user-screen-name-1")
+	sm.RelayToScreenName(context.Background(), "chat-room-1", recip, want)
+
+	have := <-user1.ReceiveMessage()
+	assert.Equal(t, want, have)
+
+	<-user2.ReceiveMessage()
+	assert.Fail(t, "user 2 should not receive a message")
+}
+
+func TestInMemoryChatSessionManager_RelayToAllExcept_HappyPath(t *testing.T) {
+	sm := NewInMemoryChatSessionManager(slog.Default())
+	cookie := "the-cookie"
+	user1, err := sm.AddSession(context.Background(), cookie, "user-screen-name-1")
+	assert.NoError(t, err)
+	user1.SetSignonComplete()
+	user2, err := sm.AddSession(context.Background(), cookie, "user-screen-name-2")
+	assert.NoError(t, err)
+	user2.SetSignonComplete()
+	user3, err := sm.AddSession(context.Background(), cookie, "user-screen-name-3")
+	assert.NoError(t, err)
+	user3.SetSignonComplete()
+
+	want := wire.SNACMessage{Frame: wire.SNACFrame{FoodGroup: wire.ICBM}}
+
+	sm.RelayToAllExcept(context.Background(), cookie, user2.IdentScreenName(), want)
+
+	have := <-user1.ReceiveMessage()
+	assert.Equal(t, want, have)
+
+	<-user2.ReceiveMessage()
+	assert.Fail(t, "user 2 should not receive a message")
+
+	have = <-user3.ReceiveMessage()
+	assert.Equal(t, want, have)
+}

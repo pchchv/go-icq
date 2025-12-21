@@ -59,3 +59,13 @@ func (m *WebPreferenceManager) SetPreferences(ctx context.Context, screenName Id
 	_, err = m.store.db.ExecContext(ctx, q, screenName.String(), string(prefsJSON), now, now)
 	return err
 }
+
+// WebPermitDenyManager handles Web API permit/deny list management.
+type WebPermitDenyManager struct {
+	store *SQLiteUserStore
+}
+
+// NewWebPermitDenyManager creates a new WebPermitDenyManager.
+func (s *SQLiteUserStore) NewWebPermitDenyManager() *WebPermitDenyManager {
+	return &WebPermitDenyManager{store: s}
+}

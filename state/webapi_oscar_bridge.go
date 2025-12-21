@@ -6,6 +6,20 @@ import (
 	"time"
 )
 
+// OSCARBridgeSession represents a bridge between WebAPI and OSCAR sessions.
+type OSCARBridgeSession struct {
+	WebSessionID  string    // WebAPI session identifier
+	OSCARCookie   []byte    // OSCAR authentication cookie
+	BOSHost       string    // BOS server hostname
+	BOSPort       int       // BOS server port
+	UseSSL        bool      // Whether to use SSL connection
+	ScreenName    string    // Screen name associated with the session
+	ClientName    string    // Client application name
+	ClientVersion string    // Client application version
+	CreatedAt     time.Time // Bridge creation timestamp
+	LastAccessed  time.Time // Last access timestamp
+}
+
 // OSCARBridgeStore manages the persistence of OSCAR bridge sessions in the database.
 // It provides methods to store, retrieve,
 // and manage the mapping between WebAPI sessions and OSCAR authentication cookies.

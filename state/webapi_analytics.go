@@ -151,6 +151,56 @@ func (a *APIAnalytics) LogHTTPRequest(
 	a.LogRequest(ctx, log)
 }
 
+// IncrementQuotaUsage increments the usage counters for a developer.
+func (a *APIAnalytics) IncrementQuotaUsage(ctx context.Context, devID string) error {
+	query := `
+		UPDATE api_quotas
+		SET daily_used = daily_used + 1,
+		    monthly_used = monthly_used + 1
+		WHERE dev_id = ?
+	`
+	_, err := a.db.ExecContext(ctx, query, devID)
+	return err
+}
+
+// CheckQuota checks if a developer has exceeded their usage quota.
+func (a *APIAnalytics) CheckQuota(ctx context.Context, devID string) (bool, *APIQuota, error) {
+	// get or create quota record
+	quota, err := a.getOrCreateQuota(ctx, devID)
+	if err != nil {
+		return false, nil, err
+	}
+
+	// check if quotas need to be reset
+	now := time.Now()
+	needsUpdate := false
+
+	// reset daily quota if needed
+	if now.Sub(quota.LastResetDaily) >= 24*time.Hour {
+		quota.DailyUsed = 0
+		quota.LastResetDaily = now.Truncate(24 * time.Hour)
+		needsUpdate = true
+	}
+
+	// reset monthly quota if needed
+	if now.Month() != quota.LastResetMonthly.Month() || now.Year() != quota.LastResetMonthly.Year() {
+		quota.MonthlyUsed = 0
+		quota.LastResetMonthly = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		needsUpdate = true
+	}
+
+	// update quota if needed
+	if needsUpdate {
+		if err := a.updateQuota(ctx, quota); err != nil {
+			return false, nil, err
+		}
+	}
+
+	// check if within limits
+	withinLimits := (quota.DailyUsed < quota.DailyLimit && quota.MonthlyUsed < quota.MonthlyLimit) || quota.OverageAllowed
+	return withinLimits, quota, nil
+}
+
 // flush writes buffered logs to the database.
 func (a *APIAnalytics) flush(ctx context.Context) {
 	a.bufferMu.Lock()

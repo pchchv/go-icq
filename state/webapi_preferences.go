@@ -175,3 +175,25 @@ func (m *WebPermitDenyManager) AddPermitBuddy(ctx context.Context, me IdentScree
 	_, err := m.store.db.ExecContext(ctx, q, me.String(), them.String())
 	return err
 }
+
+// RemovePermitBuddy removes a user from the permit list.
+func (m *WebPermitDenyManager) RemovePermitBuddy(ctx context.Context, me IdentScreenName, them IdentScreenName) error {
+	q := `
+		UPDATE clientSideBuddyList
+		SET isPermit = 0
+		WHERE me = ? AND them = ?
+	`
+	_, err := m.store.db.ExecContext(ctx, q, me.String(), them.String())
+	return err
+}
+
+// RemoveDenyBuddy removes a user from the deny list.
+func (m *WebPermitDenyManager) RemoveDenyBuddy(ctx context.Context, me IdentScreenName, them IdentScreenName) error {
+	q := `
+		UPDATE clientSideBuddyList
+		SET isDeny = 0
+		WHERE me = ? AND them = ?
+	`
+	_, err := m.store.db.ExecContext(ctx, q, me.String(), them.String())
+	return err
+}

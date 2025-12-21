@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"log/slog"
+	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -57,6 +59,68 @@ func NewAPIAnalytics(db *sql.DB, logger *slog.Logger) *APIAnalytics {
 func (a *APIAnalytics) Close() {
 	close(a.done)
 	a.ticker.Stop()
+}
+
+// LogRequest logs an API request asynchronously.
+func (a *APIAnalytics) LogRequest(ctx context.Context, log APIUsageLog) {
+	a.bufferMu.Lock()
+	defer a.bufferMu.Unlock()
+
+	a.buffer = append(a.buffer, log)
+	// flush if buffer is full
+	if len(a.buffer) >= a.batchSize {
+		go a.flush(context.Background())
+	}
+}
+
+// LogHTTPRequest logs an HTTP request with timing information.
+func (a *APIAnalytics) LogHTTPRequest(
+	ctx context.Context,
+	r *http.Request,
+	statusCode int,
+	responseTime time.Duration,
+	responseSize int,
+	errorMsg string) {
+	// extract IP address
+	ip := r.RemoteAddr
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		ip = strings.Split(forwarded, ",")[0]
+	}
+
+	// get request size
+	var requestSize int
+	if r.ContentLength > 0 {
+		requestSize = int(r.ContentLength)
+	}
+
+	// extract dev_id from context (set by auth middleware)
+	var devID string
+	if val := r.Context().Value("dev_id"); val != nil {
+		devID = val.(string)
+	}
+
+	// extract screen name if available
+	var screenName string
+	if val := r.Context().Value("screen_name"); val != nil {
+		screenName = val.(string)
+	}
+
+	log := APIUsageLog{
+		DevID:          devID,
+		Endpoint:       r.URL.Path,
+		Method:         r.Method,
+		Timestamp:      time.Now(),
+		ResponseTimeMs: int(responseTime.Milliseconds()),
+		StatusCode:     statusCode,
+		IPAddress:      ip,
+		UserAgent:      r.UserAgent(),
+		ScreenName:     screenName,
+		ErrorMessage:   errorMsg,
+		RequestSize:    requestSize,
+		ResponseSize:   responseSize,
+	}
+
+	a.LogRequest(ctx, log)
 }
 
 // flush writes buffered logs to the database.

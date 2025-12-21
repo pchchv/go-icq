@@ -3,6 +3,8 @@ package state
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -272,6 +274,77 @@ func (s *OSCARBridgeStore) GetAllBridgeSessions(ctx context.Context) ([]*OSCARBr
 	}
 
 	return sessions, nil
+}
+
+// ValidateOSCARCookie checks if an OSCAR cookie exists in the bridge store.
+// This can be used to validate incoming OSCAR connections.
+func (s *OSCARBridgeStore) ValidateOSCARCookie(ctx context.Context, cookie []byte) (*OSCARBridgeSession, error) {
+	var session OSCARBridgeSession
+	var clientName, clientVersion sql.NullString
+	// convert cookie to hex for comparison
+	cookieHex := hex.EncodeToString(cookie)
+	query := `
+		SELECT web_session_id, oscar_cookie, bos_host, bos_port, use_ssl, screen_name,
+		       client_name, client_version, created_at, last_accessed
+		FROM oscar_bridge_sessions
+		WHERE hex(oscar_cookie) = ?
+	`
+	err := s.store.db.QueryRowContext(ctx, query, cookieHex).Scan(
+		&session.WebSessionID,
+		&session.OSCARCookie,
+		&session.BOSHost,
+		&session.BOSPort,
+		&session.UseSSL,
+		&session.ScreenName,
+		&clientName,
+		&clientVersion,
+		&session.CreatedAt,
+		&session.LastAccessed,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("cookie not found")
+		}
+		return nil, fmt.Errorf("failed to validate cookie: %w", err)
+	}
+
+	// handle nullable fields
+	if clientName.Valid {
+		session.ClientName = clientName.String
+	}
+	if clientVersion.Valid {
+		session.ClientVersion = clientVersion.String
+	}
+
+	// update last accessed time
+	go s.touchSession(context.Background(), session.WebSessionID)
+
+	return &session, nil
+}
+
+// SaveBridgeSessionWithDetails stores a complete bridge session with all details.
+func (s *OSCARBridgeStore) SaveBridgeSessionWithDetails(ctx context.Context, session *OSCARBridgeSession) error {
+	query := `
+		INSERT INTO oscar_bridge_sessions
+		(web_session_id, oscar_cookie, bos_host, bos_port, use_ssl, screen_name,
+		 client_name, client_version, created_at, last_accessed)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(web_session_id) DO UPDATE SET
+			oscar_cookie = excluded.oscar_cookie,
+			bos_host = excluded.bos_host,
+			bos_port = excluded.bos_port,
+			use_ssl = excluded.use_ssl,
+			last_accessed = excluded.last_accessed
+	`
+	_, err := s.store.db.ExecContext(ctx, query,
+		session.WebSessionID, session.OSCARCookie, session.BOSHost, session.BOSPort,
+		session.UseSSL, session.ScreenName, session.ClientName, session.ClientVersion,
+		session.CreatedAt, session.LastAccessed)
+	if err != nil {
+		return fmt.Errorf("failed to save bridge session: %w", err)
+	}
+
+	return nil
 }
 
 // touchSession updates the last accessed time for a session (internal helper).

@@ -1,6 +1,10 @@
 package state
 
-import "time"
+import (
+	"database/sql"
+	"log/slog"
+	"time"
+)
 
 // VanityInfo represents the response for vanity URL lookups.
 type VanityInfo struct {
@@ -38,4 +42,27 @@ type VanityURLRedirect struct {
 	IPAddress  string    `json:"ipAddress,omitempty"`
 	UserAgent  string    `json:"userAgent,omitempty"`
 	Referer    string    `json:"referer,omitempty"`
+}
+
+// VanityURLManager manages vanity URL operations.
+type VanityURLManager struct {
+	db       *sql.DB
+	logger   *slog.Logger
+	baseURL  string   // Base URL for the service (e.g., "https://aim.example.com")
+	reserved []string // Reserved URLs that cannot be claimed
+}
+
+// NewVanityURLManager creates a new vanity URL manager.
+func NewVanityURLManager(db *sql.DB, logger *slog.Logger, baseURL string) *VanityURLManager {
+	return &VanityURLManager{
+		db:      db,
+		logger:  logger,
+		baseURL: baseURL,
+		reserved: []string{
+			"api", "admin", "help", "support", "about", "terms", "privacy",
+			"login", "logout", "register", "signup", "signin", "settings",
+			"profile", "user", "users", "aim", "aol", "webapi", "oscar",
+			"chat", "im", "message", "buddy", "buddies", "feed", "rss",
+		},
+	}
 }

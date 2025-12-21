@@ -139,6 +139,59 @@ func (m *VanityURLManager) CreateOrUpdateVanityURL(ctx context.Context, screenNa
 	return nil
 }
 
+// GetVanityInfo retrieves vanity URL information.
+func (m *VanityURLManager) GetVanityInfo(ctx context.Context, vanityURL string) (*VanityInfo, error) {
+	var v VanityURL
+	var createdAt, updatedAt int64
+	var lastAccessed sql.NullInt64
+	// clean the vanity URL
+	vanityURL = strings.ToLower(strings.TrimSpace(vanityURL))
+	query := `
+		SELECT screen_name, vanity_url, display_name, bio, location,
+		       website, created_at, updated_at, is_active, click_count, last_accessed
+		FROM vanity_urls
+		WHERE vanity_url = ? AND is_active = 1
+	`
+	err := m.db.QueryRowContext(ctx, query, vanityURL).Scan(
+		&v.ScreenName, &v.VanityURL, &v.DisplayName, &v.Bio, &v.Location,
+		&v.Website, &createdAt, &updatedAt, &v.IsActive, &v.ClickCount, &lastAccessed,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("vanity URL not found: %s", vanityURL)
+		}
+		return nil, fmt.Errorf("failed to get vanity info: %w", err)
+	}
+
+	v.CreatedAt = time.Unix(createdAt, 0)
+	v.UpdatedAt = time.Unix(updatedAt, 0)
+	if lastAccessed.Valid {
+		t := time.Unix(lastAccessed.Int64, 0)
+		v.LastAccessed = &t
+	}
+
+	// create response info
+	info := &VanityInfo{
+		ScreenName:  v.ScreenName,
+		VanityURL:   v.VanityURL,
+		DisplayName: v.DisplayName,
+		Bio:         v.Bio,
+		Location:    v.Location,
+		Website:     v.Website,
+		ProfileURL:  m.buildProfileURL(v.VanityURL),
+		IsActive:    v.IsActive,
+		Extra: map[string]interface{}{
+			"createdAt":  v.CreatedAt.Unix(),
+			"clickCount": v.ClickCount,
+		},
+	}
+
+	// update click count and last accessed asynchronously
+	go m.recordAccess(context.Background(), vanityURL)
+
+	return info, nil
+}
+
 // isReserved checks if a vanity URL is in the reserved list.
 func (m *VanityURLManager) isReserved(vanityURL string) bool {
 	vanityURL = strings.ToLower(vanityURL)
@@ -170,4 +223,26 @@ func (m *VanityURLManager) validateVanityURL(vanityURL string) error {
 	}
 
 	return nil
+}
+
+// buildProfileURL builds the full profile URL for a vanity URL.
+func (m *VanityURLManager) buildProfileURL(vanityURL string) string {
+	if m.baseURL == "" {
+		return fmt.Sprintf("/profile/%s", vanityURL)
+	} else {
+		return fmt.Sprintf("%s/profile/%s", strings.TrimRight(m.baseURL, "/"), vanityURL)
+	}
+}
+
+// recordAccess records a vanity URL access.
+func (m *VanityURLManager) recordAccess(ctx context.Context, vanityURL string) {
+	// update click count and last accessed time
+	updateQuery := `
+		UPDATE vanity_urls
+		SET click_count = click_count + 1, last_accessed = ?
+		WHERE vanity_url = ?
+	`
+	if _, err := m.db.ExecContext(ctx, updateQuery, time.Now().Unix(), vanityURL); err != nil {
+		m.logger.Error("failed to record vanity URL access", "error", err, "vanityURL", vanityURL)
+	}
 }

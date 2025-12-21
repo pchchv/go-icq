@@ -141,3 +141,37 @@ func (m *WebPermitDenyManager) GetDenyList(ctx context.Context, screenName Ident
 
 	return users, rows.Err()
 }
+
+// SetPDMode sets the permit/deny mode for a user.
+func (m *WebPermitDenyManager) SetPDMode(ctx context.Context, screenName IdentScreenName, mode wire.FeedbagPDMode) error {
+	q := `
+		INSERT INTO buddyListMode (screenName, clientSidePDMode)
+		VALUES (?, ?)
+		ON CONFLICT (screenName)
+		DO UPDATE SET clientSidePDMode = excluded.clientSidePDMode
+	`
+	_, err := m.store.db.ExecContext(ctx, q, screenName.String(), int(mode))
+	return err
+}
+
+// AddDenyBuddy adds a user to the deny list.
+func (m *WebPermitDenyManager) AddDenyBuddy(ctx context.Context, me IdentScreenName, them IdentScreenName) error {
+	q := `
+		INSERT INTO clientSideBuddyList (me, them, isDeny)
+		VALUES (?, ?, 1)
+		ON CONFLICT (me, them) DO UPDATE SET isDeny = 1
+	`
+	_, err := m.store.db.ExecContext(ctx, q, me.String(), them.String())
+	return err
+}
+
+// AddPermitBuddy adds a user to the permit list.
+func (m *WebPermitDenyManager) AddPermitBuddy(ctx context.Context, me IdentScreenName, them IdentScreenName) error {
+	q := `
+		INSERT INTO clientSideBuddyList (me, them, isPermit)
+		VALUES (?, ?, 1)
+		ON CONFLICT (me, them) DO UPDATE SET isPermit = 1
+	`
+	_, err := m.store.db.ExecContext(ctx, q, me.String(), them.String())
+	return err
+}

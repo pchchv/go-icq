@@ -116,3 +116,105 @@ func (m *BuddyFeedManager) AddFeedItem(ctx context.Context, feedID int64, item B
 
 	return &item, nil
 }
+
+// GetUserFeed retrieves the feed configuration for a specific user.
+func (m *BuddyFeedManager) GetUserFeed(ctx context.Context, screenName string) (*BuddyFeed, error) {
+	var feed BuddyFeed
+	query := `
+		SELECT id, screen_name, feed_type, title, description, link,
+		       published_at, created_at, updated_at, is_active
+		FROM buddy_feeds
+		WHERE screen_name = ? AND is_active = 1
+		ORDER BY published_at DESC
+		LIMIT 1
+	`
+	err := m.db.QueryRowContext(ctx, query, screenName).Scan(
+		&feed.ID, &feed.ScreenName, &feed.FeedType, &feed.Title,
+		&feed.Description, &feed.Link, &feed.PublishedAt,
+		&feed.CreatedAt, &feed.UpdatedAt, &feed.IsActive,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		} else {
+			return nil, fmt.Errorf("failed to get user feed: %w", err)
+		}
+	}
+
+	return &feed, nil
+}
+
+// GetUserFeedItems retrieves feed items for a specific user.
+func (m *BuddyFeedManager) GetUserFeedItems(ctx context.Context, screenName string, limit int) ([]BuddyFeedItem, error) {
+	query := `
+		SELECT i.id, i.feed_id, i.title, i.description, i.link, i.guid,
+		       i.author, i.categories, i.published_at, i.created_at
+		FROM buddy_feed_items i
+		JOIN buddy_feeds f ON i.feed_id = f.id
+		WHERE f.screen_name = ? AND f.is_active = 1
+		ORDER BY i.published_at DESC
+		LIMIT ?
+	`
+	rows, err := m.db.QueryContext(ctx, query, screenName, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query feed items: %w", err)
+	}
+	defer rows.Close()
+
+	var items []BuddyFeedItem
+	for rows.Next() {
+		var item BuddyFeedItem
+		var categoriesJSON sql.NullString
+		var publishedAt, createdAt int64
+		err := rows.Scan(
+			&item.ID, &item.FeedID, &item.Title, &item.Description,
+			&item.Link, &item.GUID, &item.Author, &categoriesJSON,
+			&publishedAt, &createdAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan feed item: %w", err)
+		}
+
+		item.PublishedAt = time.Unix(publishedAt, 0)
+		item.CreatedAt = time.Unix(createdAt, 0)
+		if categoriesJSON.Valid {
+			json.Unmarshal([]byte(categoriesJSON.String), &item.Categories)
+		}
+
+		items = append(items, item)
+	}
+
+	return items, nil
+}
+
+// GetOrCreateFeedForUser gets an existing feed or creates a new one for a user.
+func (m *BuddyFeedManager) GetOrCreateFeedForUser(ctx context.Context, screenName string, feedType string) (int64, error) {
+	var feedID int64
+	query := `SELECT id FROM buddy_feeds WHERE screen_name = ? AND is_active = 1 LIMIT 1`
+	if err := m.db.QueryRowContext(ctx, query, screenName).Scan(&feedID); err == nil {
+		return feedID, nil
+	} else if err != sql.ErrNoRows {
+		return 0, fmt.Errorf("failed to query feed: %w", err)
+	}
+
+	// create new feed
+	if feedType == "" {
+		feedType = "status"
+	}
+
+	feed := BuddyFeed{
+		ScreenName:  screenName,
+		FeedType:    feedType,
+		Title:       fmt.Sprintf("%s's Feed", screenName),
+		Description: fmt.Sprintf("Updates from %s", screenName),
+		Link:        fmt.Sprintf("/buddyfeed/getUser?u=%s", screenName),
+		PublishedAt: time.Now(),
+		IsActive:    true,
+	}
+	createdFeed, err := m.CreateFeed(ctx, feed)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create feed: %w", err)
+	}
+
+	return createdFeed.ID, nil
+}

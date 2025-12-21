@@ -1,6 +1,10 @@
 package state
 
-import "time"
+import (
+	"database/sql"
+	"log/slog"
+	"time"
+)
 
 // BuddyFeed represents a user's feed configuration.
 type BuddyFeed struct {
@@ -28,4 +32,27 @@ type BuddyFeedItem struct {
 	Categories  []string  `json:"categories"`
 	PublishedAt time.Time `json:"publishedAt"`
 	CreatedAt   time.Time `json:"createdAt"`
+}
+
+// BuddyFeedSubscription represents a feed subscription.
+type BuddyFeedSubscription struct {
+	ID                   int64      `json:"id"`
+	FeedID               int64      `json:"feedId"`
+	SubscribedAt         time.Time  `json:"subscribedAt"`
+	LastCheckedAt        *time.Time `json:"lastCheckedAt"`
+	SubscriberScreenName string     `json:"subscriberScreenName"`
+}
+
+// BuddyFeedManager manages buddy feed operations.
+type BuddyFeedManager struct {
+	db     *sql.DB
+	logger *slog.Logger
+}
+
+// NewBuddyFeedManager creates a new buddy feed manager.
+func NewBuddyFeedManager(db *sql.DB, logger *slog.Logger) *BuddyFeedManager {
+	return &BuddyFeedManager{
+		db:     db,
+		logger: logger,
+	}
 }

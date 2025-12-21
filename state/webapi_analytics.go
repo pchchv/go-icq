@@ -201,6 +201,86 @@ func (a *APIAnalytics) CheckQuota(ctx context.Context, devID string) (bool, *API
 	return withinLimits, quota, nil
 }
 
+// GetUsageStats retrieves aggregated usage statistics for a developer.
+func (a *APIAnalytics) GetUsageStats(ctx context.Context, devID string, periodType string, startTime, endTime time.Time) ([]APIUsageStats, error) {
+	query := `
+		SELECT
+			dev_id, endpoint, COUNT(*) as request_count,
+			SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) as error_count,
+			SUM(response_time_ms) as total_response_time,
+			AVG(response_time_ms) as avg_response_time,
+			SUM(request_size) as total_request_bytes,
+			SUM(response_size) as total_response_bytes,
+			COUNT(DISTINCT screen_name) as unique_users
+		FROM api_usage_logs
+		WHERE dev_id = ? AND timestamp >= ? AND timestamp <= ?
+		GROUP BY dev_id, endpoint
+		ORDER BY request_count DESC
+	`
+	rows, err := a.db.QueryContext(ctx, query, devID, startTime.Unix(), endTime.Unix())
+	if err != nil {
+		return nil, fmt.Errorf("failed to query usage stats: %w", err)
+	}
+	defer rows.Close()
+
+	var stats []APIUsageStats
+	for rows.Next() {
+		var s APIUsageStats
+		if err := rows.Scan(
+			&s.DevID, &s.Endpoint, &s.RequestCount,
+			&s.ErrorCount, &s.TotalResponseTime, &s.AvgResponseTime,
+			&s.TotalRequestBytes, &s.TotalResponseBytes, &s.UniqueUsers,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan usage stats: %w", err)
+		}
+
+		s.PeriodType = periodType
+		s.PeriodStart = startTime
+		stats = append(stats, s)
+	}
+
+	return stats, nil
+}
+
+// GetTopEndpoints retrieves the most used endpoints for a developer.
+func (a *APIAnalytics) GetTopEndpoints(ctx context.Context, devID string, limit int) ([]struct {
+	Endpoint string `json:"endpoint"`
+	Count    int    `json:"count"`
+}, error) {
+	query := `
+		SELECT endpoint, COUNT(*) as count
+		FROM api_usage_logs
+		WHERE dev_id = ? AND timestamp >= ?
+		GROUP BY endpoint
+		ORDER BY count DESC
+		LIMIT ?
+	`
+	// look at last 24 hours
+	since := time.Now().Add(-24 * time.Hour).Unix()
+	rows, err := a.db.QueryContext(ctx, query, devID, since, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query top endpoints: %w", err)
+	}
+	defer rows.Close()
+
+	var endpoints []struct {
+		Endpoint string `json:"endpoint"`
+		Count    int    `json:"count"`
+	}
+	for rows.Next() {
+		var e struct {
+			Endpoint string `json:"endpoint"`
+			Count    int    `json:"count"`
+		}
+		if err := rows.Scan(&e.Endpoint, &e.Count); err != nil {
+			return nil, fmt.Errorf("failed to scan endpoint: %w", err)
+		}
+		endpoints = append(endpoints, e)
+	}
+
+	return endpoints, nil
+}
+
 // flush writes buffered logs to the database.
 func (a *APIAnalytics) flush(ctx context.Context) {
 	a.bufferMu.Lock()

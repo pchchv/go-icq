@@ -192,6 +192,103 @@ func (m *VanityURLManager) GetVanityInfo(ctx context.Context, vanityURL string) 
 	return info, nil
 }
 
+// GetVanityInfoByScreenName retrieves vanity URL info by screen name.
+func (m *VanityURLManager) GetVanityInfoByScreenName(ctx context.Context, screenName string) (*VanityInfo, error) {
+	var v VanityURL
+	var createdAt, updatedAt int64
+	var lastAccessed sql.NullInt64
+	query := `
+		SELECT screen_name, vanity_url, display_name, bio, location,
+		       website, created_at, updated_at, is_active, click_count, last_accessed
+		FROM vanity_urls
+		WHERE screen_name = ? AND is_active = 1
+	`
+	err := m.db.QueryRowContext(ctx, query, screenName).Scan(
+		&v.ScreenName, &v.VanityURL, &v.DisplayName, &v.Bio, &v.Location,
+		&v.Website, &createdAt, &updatedAt, &v.IsActive, &v.ClickCount, &lastAccessed,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // No vanity URL configured
+		} else {
+			return nil, fmt.Errorf("failed to get vanity info: %w", err)
+		}
+	}
+
+	v.CreatedAt = time.Unix(createdAt, 0)
+	v.UpdatedAt = time.Unix(updatedAt, 0)
+	if lastAccessed.Valid {
+		t := time.Unix(lastAccessed.Int64, 0)
+		v.LastAccessed = &t
+	}
+
+	// create response info
+	info := &VanityInfo{
+		ScreenName:  v.ScreenName,
+		VanityURL:   v.VanityURL,
+		DisplayName: v.DisplayName,
+		Bio:         v.Bio,
+		Location:    v.Location,
+		Website:     v.Website,
+		ProfileURL:  m.buildProfileURL(v.VanityURL),
+		IsActive:    v.IsActive,
+		Extra: map[string]interface{}{
+			"createdAt":  v.CreatedAt.Unix(),
+			"clickCount": v.ClickCount,
+		},
+	}
+
+	return info, nil
+}
+
+// GetPopularVanityURLs retrieves the most accessed vanity URLs.
+func (m *VanityURLManager) GetPopularVanityURLs(ctx context.Context, limit int) ([]VanityInfo, error) {
+	query := `
+		SELECT screen_name, vanity_url, display_name, bio, location,
+		       website, is_active, click_count
+		FROM vanity_urls
+		WHERE is_active = 1
+		ORDER BY click_count DESC
+		LIMIT ?
+	`
+	rows, err := m.db.QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get popular vanity URLs: %w", err)
+	}
+	defer rows.Close()
+
+	var results []VanityInfo
+	for rows.Next() {
+		var info VanityInfo
+		var displayName, bio, location, website sql.NullString
+		err := rows.Scan(
+			&info.ScreenName, &info.VanityURL, &displayName, &bio,
+			&location, &website, &info.IsActive, &info.Extra,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan vanity info: %w", err)
+		}
+
+		if displayName.Valid {
+			info.DisplayName = displayName.String
+		}
+		if bio.Valid {
+			info.Bio = bio.String
+		}
+		if location.Valid {
+			info.Location = location.String
+		}
+		if website.Valid {
+			info.Website = website.String
+		}
+
+		info.ProfileURL = m.buildProfileURL(info.VanityURL)
+		results = append(results, info)
+	}
+
+	return results, nil
+}
+
 // isReserved checks if a vanity URL is in the reserved list.
 func (m *VanityURLManager) isReserved(vanityURL string) bool {
 	vanityURL = strings.ToLower(vanityURL)

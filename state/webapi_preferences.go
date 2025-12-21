@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"time"
+
+	"github.com/pchchv/go-icq/wire"
 )
 
 // WebPreferenceManager handles Web API user preferences.
@@ -68,4 +70,74 @@ type WebPermitDenyManager struct {
 // NewWebPermitDenyManager creates a new WebPermitDenyManager.
 func (s *SQLiteUserStore) NewWebPermitDenyManager() *WebPermitDenyManager {
 	return &WebPermitDenyManager{store: s}
+}
+
+// GetPDMode retrieves the permit/deny mode for a user.
+func (m *WebPermitDenyManager) GetPDMode(ctx context.Context, screenName IdentScreenName) (wire.FeedbagPDMode, error) {
+	var mode int
+	q := `
+		SELECT clientSidePDMode
+		FROM buddyListMode
+		WHERE screenName = ?
+	`
+	if err := m.store.db.QueryRowContext(ctx, q, screenName.String()).Scan(&mode); err != nil {
+		if err == sql.ErrNoRows {
+			// default to PermitAll if not set
+			return wire.FeedbagPDModePermitAll, nil
+		} else {
+			return 0, err
+		}
+	}
+
+	return wire.FeedbagPDMode(mode), nil
+}
+
+// GetPermitList retrieves the permit list for a user.
+func (m *WebPermitDenyManager) GetPermitList(ctx context.Context, screenName IdentScreenName) ([]IdentScreenName, error) {
+	q := `
+		SELECT them
+		FROM clientSideBuddyList
+		WHERE me = ? AND isPermit = 1
+	`
+	rows, err := m.store.db.QueryContext(ctx, q, screenName.String())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []IdentScreenName
+	for rows.Next() {
+		var user string
+		if err := rows.Scan(&user); err != nil {
+			return nil, err
+		}
+		users = append(users, NewIdentScreenName(user))
+	}
+
+	return users, rows.Err()
+}
+
+// GetDenyList retrieves the deny list for a user.
+func (m *WebPermitDenyManager) GetDenyList(ctx context.Context, screenName IdentScreenName) ([]IdentScreenName, error) {
+	q := `
+		SELECT them
+		FROM clientSideBuddyList
+		WHERE me = ? AND isDeny = 1
+	`
+	rows, err := m.store.db.QueryContext(ctx, q, screenName.String())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []IdentScreenName
+	for rows.Next() {
+		var user string
+		if err := rows.Scan(&user); err != nil {
+			return nil, err
+		}
+		users = append(users, NewIdentScreenName(user))
+	}
+
+	return users, rows.Err()
 }

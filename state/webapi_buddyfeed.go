@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 )
 
@@ -217,4 +218,89 @@ func (m *BuddyFeedManager) GetOrCreateFeedForUser(ctx context.Context, screenNam
 	}
 
 	return createdFeed.ID, nil
+}
+
+// GetBuddyListFeedItems retrieves aggregated feed items for a user's buddy list.
+func (m *BuddyFeedManager) GetBuddyListFeedItems(ctx context.Context, buddies []IdentScreenName, limit int) ([]BuddyFeedItem, error) {
+	if limit <= 0 {
+		limit = 100 // default limit
+	}
+
+	if len(buddies) == 0 {
+		return []BuddyFeedItem{}, nil
+	}
+
+	// build placeholders for IN clause
+	placeholders := make([]string, len(buddies))
+	args := make([]interface{}, len(buddies)+1)
+	for i, buddy := range buddies {
+		placeholders[i] = "?"
+		args[i] = buddy.String()
+	}
+	args[len(buddies)] = limit
+
+	// query to get feed items from all buddies, sorted by published date
+	query := fmt.Sprintf(`
+		SELECT i.id, i.feed_id, i.title, i.description, i.link, i.guid,
+		       i.author, i.categories, i.published_at, i.created_at
+		FROM buddy_feed_items i
+		JOIN buddy_feeds f ON i.feed_id = f.id
+		WHERE f.screen_name IN (%s) AND f.is_active = 1
+		ORDER BY i.published_at DESC
+		LIMIT ?
+	`, strings.Join(placeholders, ","))
+	rows, err := m.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query buddy list feed items: %w", err)
+	}
+	defer rows.Close()
+
+	return m.scanFeedItems(rows)
+}
+
+// GetFeedItems retrieves items for a specific feed.
+func (m *BuddyFeedManager) GetFeedItems(ctx context.Context, feedID int64, limit int) ([]BuddyFeedItem, error) {
+	query := `
+		SELECT id, feed_id, title, description, link, guid,
+		       author, categories, published_at, created_at
+		FROM buddy_feed_items
+		WHERE feed_id = ?
+		ORDER BY published_at DESC
+		LIMIT ?
+	`
+	rows, err := m.db.QueryContext(ctx, query, feedID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query feed items: %w", err)
+	}
+	defer rows.Close()
+
+	return m.scanFeedItems(rows)
+}
+
+// scanFeedItems is a helper to scan feed items from database rows.
+func (m *BuddyFeedManager) scanFeedItems(rows *sql.Rows) ([]BuddyFeedItem, error) {
+	var items []BuddyFeedItem
+	for rows.Next() {
+		var item BuddyFeedItem
+		var categoriesJSON sql.NullString
+		var publishedAt, createdAt int64
+		err := rows.Scan(
+			&item.ID, &item.FeedID, &item.Title, &item.Description,
+			&item.Link, &item.GUID, &item.Author, &categoriesJSON,
+			&publishedAt, &createdAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan feed item: %w", err)
+		}
+
+		item.PublishedAt = time.Unix(publishedAt, 0)
+		item.CreatedAt = time.Unix(createdAt, 0)
+		if categoriesJSON.Valid {
+			json.Unmarshal([]byte(categoriesJSON.String), &item.Categories)
+		}
+
+		items = append(items, item)
+	}
+
+	return items, nil
 }

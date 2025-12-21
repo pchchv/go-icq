@@ -27,6 +27,33 @@ type APIUsageLog struct {
 	ResponseSize   int       `json:"response_size"`
 }
 
+// APIQuota represents API usage quotas for a developer.
+type APIQuota struct {
+	DevID            string    `json:"dev_id"`
+	DailyLimit       int       `json:"daily_limit"`
+	MonthlyLimit     int       `json:"monthly_limit"`
+	DailyUsed        int       `json:"daily_used"`
+	MonthlyUsed      int       `json:"monthly_used"`
+	LastResetDaily   time.Time `json:"last_reset_daily"`
+	LastResetMonthly time.Time `json:"last_reset_monthly"`
+	OverageAllowed   bool      `json:"overage_allowed"`
+}
+
+// APIUsageStats represents aggregated API usage statistics.
+type APIUsageStats struct {
+	DevID              string    `json:"dev_id"`
+	Endpoint           string    `json:"endpoint"`
+	PeriodType         string    `json:"period_type"`
+	PeriodStart        time.Time `json:"period_start"`
+	RequestCount       int       `json:"request_count"`
+	ErrorCount         int       `json:"error_count"`
+	TotalResponseTime  int       `json:"total_response_time_ms"`
+	AvgResponseTime    int       `json:"avg_response_time_ms"`
+	TotalRequestBytes  int64     `json:"total_request_bytes"`
+	TotalResponseBytes int64     `json:"total_response_bytes"`
+	UniqueUsers        int       `json:"unique_users"`
+}
+
 // APIAnalytics provides analytics tracking for the Web API.
 type APIAnalytics struct {
 	db        *sql.DB

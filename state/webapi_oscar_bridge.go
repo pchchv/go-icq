@@ -169,6 +169,111 @@ func (s *OSCARBridgeStore) GetBridgeSession(ctx context.Context, webSessionID st
 	return &session, nil
 }
 
+// GetBridgeSessionByScreenName retrieves bridge sessions by screen name.
+func (s *OSCARBridgeStore) GetBridgeSessionByScreenName(ctx context.Context, screenName string) ([]*OSCARBridgeSession, error) {
+	query := `
+		SELECT web_session_id, oscar_cookie, bos_host, bos_port, use_ssl, screen_name,
+		       client_name, client_version, created_at, last_accessed
+		FROM oscar_bridge_sessions
+		WHERE screen_name = ?
+		ORDER BY last_accessed DESC
+	`
+	rows, err := s.store.db.QueryContext(ctx, query, screenName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query bridge sessions: %w", err)
+	}
+	defer rows.Close()
+
+	var sessions []*OSCARBridgeSession
+	for rows.Next() {
+		var session OSCARBridgeSession
+		var clientName, clientVersion sql.NullString
+		err := rows.Scan(
+			&session.WebSessionID,
+			&session.OSCARCookie,
+			&session.BOSHost,
+			&session.BOSPort,
+			&session.UseSSL,
+			&session.ScreenName,
+			&clientName,
+			&clientVersion,
+			&session.CreatedAt,
+			&session.LastAccessed,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan bridge session: %w", err)
+		}
+
+		// handle nullable fields
+		if clientName.Valid {
+			session.ClientName = clientName.String
+		}
+		if clientVersion.Valid {
+			session.ClientVersion = clientVersion.String
+		}
+
+		sessions = append(sessions, &session)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating bridge sessions: %w", err)
+	}
+
+	return sessions, nil
+}
+
+// GetAllBridgeSessions returns all active bridge sessions (for monitoring/admin).
+func (s *OSCARBridgeStore) GetAllBridgeSessions(ctx context.Context) ([]*OSCARBridgeSession, error) {
+	query := `
+		SELECT web_session_id, oscar_cookie, bos_host, bos_port, use_ssl, screen_name,
+		       client_name, client_version, created_at, last_accessed
+		FROM oscar_bridge_sessions
+		ORDER BY last_accessed DESC
+	`
+	rows, err := s.store.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query all bridge sessions: %w", err)
+	}
+	defer rows.Close()
+
+	var sessions []*OSCARBridgeSession
+	for rows.Next() {
+		var session OSCARBridgeSession
+		var clientName, clientVersion sql.NullString
+		err := rows.Scan(
+			&session.WebSessionID,
+			&session.OSCARCookie,
+			&session.BOSHost,
+			&session.BOSPort,
+			&session.UseSSL,
+			&session.ScreenName,
+			&clientName,
+			&clientVersion,
+			&session.CreatedAt,
+			&session.LastAccessed,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan bridge session: %w", err)
+		}
+
+		// handle nullable fields
+		if clientName.Valid {
+			session.ClientName = clientName.String
+		}
+		if clientVersion.Valid {
+			session.ClientVersion = clientVersion.String
+		}
+
+		sessions = append(sessions, &session)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating bridge sessions: %w", err)
+	}
+
+	return sessions, nil
+}
+
 // touchSession updates the last accessed time for a session (internal helper).
 func (s *OSCARBridgeStore) touchSession(ctx context.Context, webSessionID string) {
 	query := `UPDATE oscar_bridge_sessions SET last_accessed = ? WHERE web_session_id = ?`

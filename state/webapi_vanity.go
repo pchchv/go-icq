@@ -289,6 +289,56 @@ func (m *VanityURLManager) GetPopularVanityURLs(ctx context.Context, limit int) 
 	return results, nil
 }
 
+// CheckAvailability checks if a vanity URL is available.
+func (m *VanityURLManager) CheckAvailability(ctx context.Context, vanityURL string) (bool, error) {
+	// validate format
+	if err := m.validateVanityURL(vanityURL); err != nil {
+		return false, err
+	}
+
+	// check if reserved
+	if m.isReserved(vanityURL) {
+		return false, nil
+	}
+
+	// check database
+	var count int
+	query := `SELECT COUNT(*) FROM vanity_urls WHERE vanity_url = ? AND is_active = 1`
+	if err := m.db.QueryRowContext(ctx, query, vanityURL).Scan(&count); err != nil {
+		return false, fmt.Errorf("failed to check availability: %w", err)
+	}
+
+	return count == 0, nil
+}
+
+// LogRedirect logs a vanity URL redirect for analytics.
+func (m *VanityURLManager) LogRedirect(ctx context.Context, redirect VanityURLRedirect) error {
+	query := `
+		INSERT INTO vanity_url_redirects (vanity_url, accessed_at, ip_address, user_agent, referer)
+		VALUES (?, ?, ?, ?, ?)
+	`
+	_, err := m.db.ExecContext(ctx, query,
+		redirect.VanityURL, redirect.AccessedAt.Unix(),
+		redirect.IPAddress, redirect.UserAgent, redirect.Referer,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to log redirect: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteVanityURL removes a user's vanity URL.
+func (m *VanityURLManager) DeleteVanityURL(ctx context.Context, screenName string) error {
+	query := `UPDATE vanity_urls SET is_active = 0, updated_at = ? WHERE screen_name = ?`
+	if _, err := m.db.ExecContext(ctx, query, time.Now().Unix(), screenName); err != nil {
+		return fmt.Errorf("failed to delete vanity URL: %w", err)
+	}
+
+	m.logger.InfoContext(ctx, "deleted vanity URL", "screenName", screenName)
+	return nil
+}
+
 // isReserved checks if a vanity URL is in the reserved list.
 func (m *VanityURLManager) isReserved(vanityURL string) bool {
 	vanityURL = strings.ToLower(vanityURL)

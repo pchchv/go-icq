@@ -171,5 +171,27 @@ loop:
 func (q *EventQueue) IsClosed() bool {
 	q.closedMu.RLock()
 	defer q.closedMu.RUnlock()
+
 	return q.closed
+}
+
+// GetAllEvents returns all events in the queue (for debugging).
+func (q *EventQueue) GetAllEvents() []Event {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+
+	result := make([]Event, len(q.events))
+	copy(result, q.events)
+	return result
+}
+
+// getEventsAfter returns all events with sequence number greater than the specified value.
+// Must be called with at least a read lock held.
+func (q *EventQueue) getEventsAfter(seqNum uint64) (result []Event) {
+	for _, event := range q.events {
+		if event.SeqNum > seqNum {
+			result = append(result, event)
+		}
+	}
+	return
 }

@@ -144,3 +144,32 @@ func (q *EventQueue) Size() int {
 	defer q.mu.RUnlock()
 	return len(q.events)
 }
+
+// Close closes the event queue, unblocking any waiting fetchers.
+func (q *EventQueue) Close() {
+	q.closedMu.Lock()
+	defer q.closedMu.Unlock()
+
+	if q.closed {
+		return
+	}
+
+	q.closed = true
+
+	// send multiple signals to unblock all potential waiters
+loop:
+	for i := 0; i < 10; i++ {
+		select {
+		case q.waitChan <- struct{}{}:
+		default:
+			break loop
+		}
+	}
+}
+
+// IsClosed returns whether the queue is closed.
+func (q *EventQueue) IsClosed() bool {
+	q.closedMu.RLock()
+	defer q.closedMu.RUnlock()
+	return q.closed
+}

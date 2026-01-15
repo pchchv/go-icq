@@ -33,3 +33,21 @@ type ChatSession struct {
 	JoinedAt   int64
 	LeftAt     *int64
 }
+
+// ChatMessage represents a message sent in a chat room.
+type ChatMessage struct {
+	ID            int64
+	RoomID        string
+	Message       string
+	Timestamp     int64
+	ScreenName    string
+	WhisperTarget string
+}
+
+// ChatMessageEventData represents chat message event data.
+type ChatMessageEventData struct {
+	ScreenName    string `json:"screenName"`
+	Message       string `json:"message"`
+	Timestamp     int64  `json:"timestamp"`
+	WhisperTarget string `json:"whisperTarget,omitempty"`
+}

@@ -1,6 +1,8 @@
 package types
 
 import (
+	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -183,6 +185,56 @@ func (q *EventQueue) GetAllEvents() []Event {
 	result := make([]Event, len(q.events))
 	copy(result, q.events)
 	return result
+}
+
+// Clear removes all events from the queue.
+func (q *EventQueue) Clear() {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	q.events = make([]Event, 0)
+}
+
+// Fetch retrieves events from the queue, optionally waiting for new events.
+func (q *EventQueue) Fetch(ctx context.Context, lastSeqNum uint64, timeout time.Duration) ([]Event, error) {
+	q.closedMu.RLock()
+	if q.closed {
+		q.closedMu.RUnlock()
+		return nil, errors.New("event queue is closed")
+	}
+	q.closedMu.RUnlock()
+
+	// first, check if we have any events newer than lastSeqNum
+	q.mu.RLock()
+	events := q.getEventsAfter(lastSeqNum)
+	q.mu.RUnlock()
+
+	if len(events) > 0 {
+		return events, nil
+	}
+
+	// no events available, wait for new ones or timeout
+	timeoutChan := time.After(timeout)
+	for {
+		select {
+		case <-q.waitChan:
+			// new events may be available
+			q.mu.RLock()
+			events = q.getEventsAfter(lastSeqNum)
+			q.mu.RUnlock()
+
+			if len(events) > 0 {
+				return events, nil
+			}
+			// false alarm, keep waiting
+		case <-timeoutChan:
+			// timeout reached, return empty array
+			return []Event{}, nil
+		case <-ctx.Done():
+			// context cancelled
+			return nil, ctx.Err()
+		}
+	}
 }
 
 // getEventsAfter returns all events with sequence number greater than the specified value.

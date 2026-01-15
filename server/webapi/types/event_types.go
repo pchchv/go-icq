@@ -54,3 +54,14 @@ type BuddyListEvent struct {
 	Group  string      `json:"group,omitempty"`
 	Buddy  interface{} `json:"buddy"`
 }
+
+// PresenceEvent represents a presence change event.
+type PresenceEvent struct {
+	AimID      string `json:"aimId"`
+	State      string `json:"state"` // "online", "offline", "away", "idle"
+	StatusMsg  string `json:"statusMsg,omitempty"`
+	AwayMsg    string `json:"awayMsg,omitempty"`
+	IdleTime   int    `json:"idleTime,omitempty"`   // Minutes idle
+	OnlineTime int64  `json:"onlineTime,omitempty"` // Unix timestamp
+	UserType   string `json:"userType"`             // "aim", "icq", "admin"
+}

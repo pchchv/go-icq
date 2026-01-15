@@ -1,6 +1,10 @@
 package types
 
-import "sync"
+import (
+	"sync"
+	"sync/atomic"
+	"time"
+)
 
 const (
 	// Event types that can be subscribed to:
@@ -94,4 +98,49 @@ func NewEventQueue(maxSize int) *EventQueue {
 		maxSize:  maxSize,
 		waitChan: make(chan struct{}, 1),
 	}
+}
+
+// Push adds an event to the queue.
+func (q *EventQueue) Push(eventType EventType, data interface{}) {
+	q.closedMu.RLock()
+	if q.closed {
+		q.closedMu.RUnlock()
+		return
+	}
+	q.closedMu.RUnlock()
+
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	// increment sequence number atomically
+	seqNum := atomic.AddUint64(&q.seqNum, 1)
+	event := Event{
+		Type:      eventType,
+		SeqNum:    seqNum,
+		Timestamp: time.Now().Unix(),
+		Data:      data,
+	}
+
+	// add event to queue
+	q.events = append(q.events, event)
+
+	// if queue exceeds max size, remove oldest events
+	if len(q.events) > q.maxSize {
+		// keep only the most recent maxSize events
+		q.events = q.events[len(q.events)-q.maxSize:]
+	}
+
+	// signal any waiting fetchers
+	select {
+	case q.waitChan <- struct{}{}:
+	default:
+		// channel already has a signal
+	}
+}
+
+// Size returns the current number of events in the queue.
+func (q *EventQueue) Size() int {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+	return len(q.events)
 }

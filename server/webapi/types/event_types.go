@@ -22,6 +22,14 @@ type UserInfo struct {
 	OnlineTime float64 `json:"onlineTime,omitempty"` // float64 for AMF3 encoding
 }
 
+// Event represents an event to be delivered to a web client.
+type Event struct {
+	Type      EventType   `json:"type"`
+	Data      interface{} `json:"data"`
+	SeqNum    uint64      `json:"seqNum"`
+	Timestamp int64       `json:"timestamp"`
+}
+
 // EventType defines the type of WebAPI event.
 type EventType string
 

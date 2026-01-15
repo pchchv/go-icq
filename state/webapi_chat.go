@@ -63,3 +63,18 @@ type ChatTypingEventData struct {
 	ScreenName   string `json:"screenName"`
 	TypingStatus string `json:"typingStatus"`
 }
+
+// ChatParticipant represents a participant in a chat room.
+type ChatParticipant struct {
+	RoomID          string
+	ChatSID         string
+	JoinedAt        int64
+	ScreenName      string
+	TypingStatus    string
+	TypingUpdatedAt *int64
+}
+
+// ChatParticipantList represents a list of participants in the room.
+type ChatParticipantList struct {
+	Participants []string `json:"participants"`
+}

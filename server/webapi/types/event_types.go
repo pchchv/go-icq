@@ -24,3 +24,20 @@ type UserInfo struct {
 
 // EventType defines the type of WebAPI event.
 type EventType string
+
+// IMEvent represents an instant message event.
+type IMEvent struct {
+	From      string  `json:"from"`
+	Message   string  `json:"message"`
+	Timestamp float64 `json:"timestamp"` // float64 for AMF3 encoding
+	AutoResp  bool    `json:"autoResponse,omitempty"`
+}
+
+// SentIMEvent represents a sent instant message event.
+type SentIMEvent struct {
+	Sender    UserInfo `json:"sender"` // Sender user info
+	Dest      UserInfo `json:"dest"`   // Destination user info
+	Message   string   `json:"message"`
+	Timestamp float64  `json:"timestamp"` // float64 for AMF3 encoding
+	AutoResp  bool     `json:"autoResponse,omitempty"`
+}

@@ -1,5 +1,7 @@
 package types
 
+import "sync"
+
 const (
 	// Event types that can be subscribed to:
 	EventTypeBuddyList    EventType = "buddylist"
@@ -72,4 +74,24 @@ type PresenceEvent struct {
 	IdleTime   int    `json:"idleTime,omitempty"`   // Minutes idle
 	OnlineTime int64  `json:"onlineTime,omitempty"` // Unix timestamp
 	UserType   string `json:"userType"`             // "aim", "icq", "admin"
+}
+
+// EventQueue manages a queue of events for a WebAPI session.
+type EventQueue struct {
+	events   []Event
+	seqNum   uint64
+	maxSize  int
+	mu       sync.RWMutex
+	waitChan chan struct{}
+	closed   bool
+	closedMu sync.RWMutex
+}
+
+// NewEventQueue creates a new event queue with the specified maximum size.
+func NewEventQueue(maxSize int) *EventQueue {
+	return &EventQueue{
+		events:   make([]Event, 0),
+		maxSize:  maxSize,
+		waitChan: make(chan struct{}, 1),
+	}
 }

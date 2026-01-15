@@ -41,3 +41,16 @@ type SentIMEvent struct {
 	Timestamp float64  `json:"timestamp"` // float64 for AMF3 encoding
 	AutoResp  bool     `json:"autoResponse,omitempty"`
 }
+
+// TypingEvent represents a typing notification event.
+type TypingEvent struct {
+	From   string `json:"from"`
+	Typing bool   `json:"typing"`
+}
+
+// BuddyListEvent represents a buddy list change event.
+type BuddyListEvent struct {
+	Action string      `json:"action"` // "add", "remove", "update"
+	Group  string      `json:"group,omitempty"`
+	Buddy  interface{} `json:"buddy"`
+}

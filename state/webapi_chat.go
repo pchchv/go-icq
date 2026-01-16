@@ -114,7 +114,7 @@ type WebAPIChatManager struct {
 	typingTimers map[string]*time.Timer
 }
 
-// NewWebAPIChatManager creates a new WebAPIChatManager
+// NewWebAPIChatManager creates a new WebAPIChatManager.
 func (s *SQLiteUserStore) NewWebAPIChatManager(logger *slog.Logger, sessions *WebAPISessionManager) *WebAPIChatManager {
 	return &WebAPIChatManager{
 		store:        s,
@@ -282,4 +282,43 @@ func (m *WebAPIChatManager) getSessionByChatSID(ctx context.Context, chatsid str
 		return nil, err
 	}
 	return &session, nil
+}
+
+func (m *WebAPIChatManager) sendChatEventToUser(aimsid string, event ChatEventData) {
+	// get the user's Web API session using background context for async event sending
+	session, err := m.sessions.GetSession(context.Background(), aimsid)
+	if err != nil {
+		m.logger.Error("failed to get session for chat event", "error", err, "aimsid", aimsid)
+		return
+	}
+
+	// queue the chat event
+	session.EventQueue.Push("chat", event)
+}
+
+func (m *WebAPIChatManager) broadcastChatEvent(roomID string, event ChatEventData) {
+	// Get all active sessions in the room
+	rows, err := m.store.db.Query(`
+		SELECT aimsid, chat_sid FROM web_chat_sessions
+		WHERE room_id = ? AND left_at IS NULL`,
+		roomID)
+	if err != nil {
+		m.logger.Error("failed to get sessions for broadcast", "error", err, "roomID", roomID)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var aimsid, chatsid string
+		if err := rows.Scan(&aimsid, &chatsid); err != nil {
+			continue
+		}
+
+		// update event with the recipient's chat session ID if not set
+		if event.ChatSID == "" {
+			event.ChatSID = chatsid
+		}
+
+		m.sendChatEventToUser(aimsid, event)
+	}
 }

@@ -29,6 +29,21 @@ type WebAPISession struct {
 	logger          *slog.Logger      // Logger for debugging
 }
 
+// IsExpired checks if the session has expired.
+func (s *WebAPISession) IsExpired() bool {
+	return time.Now().After(s.ExpiresAt)
+}
+
+// IsSubscribedTo checks if the session is subscribed to a specific event type.
+func (s *WebAPISession) IsSubscribedTo(eventType string) bool {
+	for _, event := range s.Events {
+		if event == eventType {
+			return true
+		}
+	}
+	return false
+}
+
 // WebAPISessionManager manages Web API sessions with thread-safe operations.
 type WebAPISessionManager struct {
 	sessions      map[string]*WebAPISession          // Keyed by aimsid

@@ -125,6 +125,37 @@ func (s *SQLiteUserStore) NewWebAPIChatManager(logger *slog.Logger, sessions *We
 	}
 }
 
+// GetRecentMessages returns recent messages from a chat room (for history).
+func (m *WebAPIChatManager) GetRecentMessages(ctx context.Context, roomID string, limit int) ([]*ChatMessage, error) {
+	rows, err := m.store.db.QueryContext(ctx, `
+		SELECT id, room_id, screen_name, message, whisper_target, timestamp
+		FROM web_chat_messages
+		WHERE room_id = ?
+		ORDER BY timestamp DESC
+		LIMIT ?`,
+		roomID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []*ChatMessage
+	for rows.Next() {
+		var msg ChatMessage
+		err := rows.Scan(&msg.ID, &msg.RoomID, &msg.ScreenName, &msg.Message, &msg.WhisperTarget, &msg.Timestamp)
+		if err == nil {
+			messages = append(messages, &msg)
+		}
+	}
+
+	// reverse to get chronological order
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
+	}
+
+	return messages, nil
+}
+
 func (m *WebAPIChatManager) generateInstanceID() int {
 	return int(time.Now().Unix() % 1000000)
 }
@@ -236,4 +267,19 @@ func (m *WebAPIChatManager) getParticipantCount(ctx context.Context, roomID stri
 		SELECT COUNT(*) FROM web_chat_participants WHERE room_id = ?`,
 		roomID).Scan(&count)
 	return count, err
+}
+
+func (m *WebAPIChatManager) getSessionByChatSID(ctx context.Context, chatsid string) (*ChatSession, error) {
+	var session ChatSession
+	err := m.store.db.QueryRowContext(ctx, `
+		SELECT chat_sid, aimsid, room_id, screen_name, instance_id, joined_at, left_at
+		FROM web_chat_sessions
+		WHERE chat_sid = ?`,
+		chatsid).Scan(
+		&session.ChatSID, &session.AIMSid, &session.RoomID,
+		&session.ScreenName, &session.InstanceID, &session.JoinedAt, &session.LeftAt)
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
 }

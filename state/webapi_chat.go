@@ -1,6 +1,8 @@
 package state
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"log/slog"
 	"sync"
 	"time"
@@ -120,4 +122,20 @@ func (s *SQLiteUserStore) NewWebAPIChatManager(logger *slog.Logger, sessions *We
 		activeRooms:  make(map[string]*WebAPIChatRoom),
 		typingTimers: make(map[string]*time.Timer),
 	}
+}
+
+func (m *WebAPIChatManager) generateInstanceID() int {
+	return int(time.Now().Unix() % 1000000)
+}
+
+func (m *WebAPIChatManager) generateRoomID() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+func (m *WebAPIChatManager) generateChatSID() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
 }

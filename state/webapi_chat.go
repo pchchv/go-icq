@@ -208,3 +208,32 @@ func (m *WebAPIChatManager) getUserSessionInRoomByScreenName(ctx context.Context
 	}
 	return &session, nil
 }
+
+func (m *WebAPIChatManager) getParticipants(ctx context.Context, roomID string) ([]string, error) {
+	rows, err := m.store.db.QueryContext(ctx, `
+		SELECT screen_name FROM web_chat_participants WHERE room_id = ?`,
+		roomID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var participants []string
+	for rows.Next() {
+		var screenName string
+		if err := rows.Scan(&screenName); err != nil {
+			continue
+		}
+		participants = append(participants, screenName)
+	}
+
+	return participants, nil
+}
+
+func (m *WebAPIChatManager) getParticipantCount(ctx context.Context, roomID string) (int, error) {
+	var count int
+	err := m.store.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM web_chat_participants WHERE room_id = ?`,
+		roomID).Scan(&count)
+	return count, err
+}

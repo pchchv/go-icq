@@ -51,3 +51,15 @@ type ChatMessageEventData struct {
 	Timestamp     int64  `json:"timestamp"`
 	WhisperTarget string `json:"whisperTarget,omitempty"`
 }
+
+// ChatUserEventData represents user join/leave event data.
+type ChatUserEventData struct {
+	ScreenName string `json:"screenName"`
+	Timestamp  int64  `json:"timestamp"`
+}
+
+// ChatTypingEventData represents typing status event data.
+type ChatTypingEventData struct {
+	ScreenName   string `json:"screenName"`
+	TypingStatus string `json:"typingStatus"`
+}

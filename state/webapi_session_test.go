@@ -178,3 +178,43 @@ func TestWebAPISession_TempBuddiesIndependence(t *testing.T) {
 	assert.True(t, session1.TempBuddies["buddy3"])
 	assert.False(t, session2.TempBuddies["buddy3"])
 }
+
+func TestWebAPISession_WithTempBuddiesIntegration(t *testing.T) {
+	// test that temp buddies work correctly with a full session
+	session := &WebAPISession{
+		AimSID:       "integration-test",
+		ScreenName:   DisplayScreenName("testuser"),
+		EventQueue:   types.NewEventQueue(100),
+		TempBuddies:  nil,
+		CreatedAt:    time.Now(),
+		LastAccessed: time.Now(),
+		ExpiresAt:    time.Now().Add(time.Hour),
+		FetchTimeout: 30000,
+	}
+
+	// initialize TempBuddies
+	session.TempBuddies = make(map[string]bool)
+	// simulate adding temp buddies
+	buddies := []string{"alice", "bob", "charlie"}
+	for _, buddy := range buddies {
+		session.TempBuddies[buddy] = true
+	}
+
+	// verify all buddies are present
+	assert.Equal(t, 3, len(session.TempBuddies))
+	for _, buddy := range buddies {
+		assert.True(t, session.TempBuddies[buddy], "Buddy %s should be in TempBuddies", buddy)
+	}
+
+	// test that temp buddies persist with the session
+	assert.False(t, session.IsExpired())
+	assert.Equal(t, "testuser", string(session.ScreenName))
+	assert.NotNil(t, session.TempBuddies)
+
+	// simulate buddy removal
+	delete(session.TempBuddies, "bob")
+	assert.Equal(t, 2, len(session.TempBuddies))
+	assert.False(t, session.TempBuddies["bob"])
+	assert.True(t, session.TempBuddies["alice"])
+	assert.True(t, session.TempBuddies["charlie"])
+}

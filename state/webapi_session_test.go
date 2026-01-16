@@ -218,3 +218,39 @@ func TestWebAPISession_WithTempBuddiesIntegration(t *testing.T) {
 	assert.True(t, session.TempBuddies["alice"])
 	assert.True(t, session.TempBuddies["charlie"])
 }
+
+func TestWebAPISession_IsExpired(t *testing.T) {
+	tests := []struct {
+		name      string
+		expiresAt time.Time
+		isExpired bool
+	}{
+		{
+			name:      "Not_Expired",
+			expiresAt: time.Now().Add(time.Hour),
+			isExpired: false,
+		},
+		{
+			name:      "Already_Expired",
+			expiresAt: time.Now().Add(-time.Hour),
+			isExpired: true,
+		},
+		{
+			name:      "Just_Expired",
+			expiresAt: time.Now().Add(-time.Second),
+			isExpired: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			session := &WebAPISession{
+				AimSID:     "test-session",
+				ScreenName: DisplayScreenName("testuser"),
+				ExpiresAt:  tt.expiresAt,
+			}
+
+			assert.Equal(t, tt.isExpired, session.IsExpired())
+		})
+	}
+}

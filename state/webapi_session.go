@@ -2,6 +2,7 @@ package state
 
 import (
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/pchchv/go-icq/server/webapi/types"
@@ -25,4 +26,13 @@ type WebAPISession struct {
 	RemoteAddr      string            // Client IP address
 	TempBuddies     map[string]bool   // Temporary buddies for this session only
 	logger          *slog.Logger      // Logger for debugging
+}
+
+// WebAPISessionManager manages Web API sessions with thread-safe operations.
+type WebAPISessionManager struct {
+	sessions      map[string]*WebAPISession          // Keyed by aimsid
+	byUser        map[IdentScreenName]*WebAPISession // Keyed by screen name
+	mu            sync.RWMutex
+	cleanupTicker *time.Ticker
+	stopCleanup   chan struct{}
 }

@@ -1,6 +1,7 @@
 package state
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"log/slog"
@@ -138,4 +139,40 @@ func (m *WebAPIChatManager) generateChatSID() string {
 	b := make([]byte, 16)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+func (m *WebAPIChatManager) getRoomByID(ctx context.Context, roomID string) (*WebAPIChatRoom, error) {
+	var room WebAPIChatRoom
+	err := m.store.db.QueryRowContext(ctx, `
+		SELECT room_id, room_name, description, room_type, category_id,
+		       creator_screen_name, created_at, closed_at, max_participants
+		FROM web_chat_rooms
+		WHERE room_id = ? AND closed_at IS NULL`,
+		roomID).Scan(
+		&room.RoomID, &room.RoomName, &room.Description, &room.RoomType,
+		&room.CategoryID, &room.CreatorScreenName, &room.CreatedAt,
+		&room.ClosedAt, &room.MaxParticipants)
+	if err != nil {
+		return nil, err
+	}
+	room.InstanceID = m.generateInstanceID()
+	return &room, nil
+}
+
+func (m *WebAPIChatManager) getRoomByName(ctx context.Context, roomName string) (*WebAPIChatRoom, error) {
+	var room WebAPIChatRoom
+	err := m.store.db.QueryRowContext(ctx, `
+		SELECT room_id, room_name, description, room_type, category_id,
+		       creator_screen_name, created_at, closed_at, max_participants
+		FROM web_chat_rooms
+		WHERE room_name = ? AND closed_at IS NULL`,
+		roomName).Scan(
+		&room.RoomID, &room.RoomName, &room.Description, &room.RoomType,
+		&room.CategoryID, &room.CreatorScreenName, &room.CreatedAt,
+		&room.ClosedAt, &room.MaxParticipants)
+	if err != nil {
+		return nil, err
+	}
+	room.InstanceID = m.generateInstanceID()
+	return &room, nil
 }

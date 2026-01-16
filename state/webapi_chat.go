@@ -1,5 +1,11 @@
 package state
 
+import (
+	"log/slog"
+	"sync"
+	"time"
+)
+
 const (
 	ChatRoomTypeUserCreated ChatRoomType  = "userCreated"
 	ChatEventUserEntered    ChatEventType = "userEntered"
@@ -91,4 +97,27 @@ type WebAPIChatRoom struct {
 	ClosedAt          *int64       `json:"-"`
 	MaxParticipants   int          `json:"-"`
 	InstanceID        int          `json:"instanceId"`
+}
+
+// WebAPIChatManager manages Web API chat rooms.
+type WebAPIChatManager struct {
+	store    *SQLiteUserStore
+	logger   *slog.Logger
+	sessions *WebAPISessionManager
+	mu       sync.RWMutex
+	// In-memory cache for active rooms
+	activeRooms map[string]*WebAPIChatRoom
+	// Track typing timeouts
+	typingTimers map[string]*time.Timer
+}
+
+// NewWebAPIChatManager creates a new WebAPIChatManager
+func (s *SQLiteUserStore) NewWebAPIChatManager(logger *slog.Logger, sessions *WebAPISessionManager) *WebAPIChatManager {
+	return &WebAPIChatManager{
+		store:        s,
+		logger:       logger,
+		sessions:     sessions,
+		activeRooms:  make(map[string]*WebAPIChatRoom),
+		typingTimers: make(map[string]*time.Timer),
+	}
 }

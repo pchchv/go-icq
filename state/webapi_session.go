@@ -1,6 +1,7 @@
 package state
 
 import (
+	"context"
 	"log/slog"
 	"sync"
 	"time"
@@ -35,4 +36,54 @@ type WebAPISessionManager struct {
 	mu            sync.RWMutex
 	cleanupTicker *time.Ticker
 	stopCleanup   chan struct{}
+}
+
+// Shutdown stops the session manager and cleans up resources.
+func (m *WebAPISessionManager) Shutdown(ctx context.Context) {
+	close(m.stopCleanup)
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// close all event queues
+	for _, session := range m.sessions {
+		if session.EventQueue != nil {
+			session.EventQueue.Close()
+		}
+	}
+
+	// clear all sessions
+	m.sessions = make(map[string]*WebAPISession)
+	m.byUser = make(map[IdentScreenName]*WebAPISession)
+}
+
+// cleanupExpiredSessions periodically removes expired sessions.
+func (m *WebAPISessionManager) cleanupExpiredSessions() {
+	for {
+		select {
+		case <-m.cleanupTicker.C:
+			m.mu.Lock()
+			now := time.Now()
+			var toRemove []string
+
+			for aimsid, session := range m.sessions {
+				if now.After(session.ExpiresAt) {
+					toRemove = append(toRemove, aimsid)
+				}
+			}
+
+			for _, aimsid := range toRemove {
+				session := m.sessions[aimsid]
+				delete(m.sessions, aimsid)
+				delete(m.byUser, session.ScreenName.IdentScreenName())
+				if session.EventQueue != nil {
+					session.EventQueue.Close()
+				}
+			}
+			m.mu.Unlock()
+		case <-m.stopCleanup:
+			m.cleanupTicker.Stop()
+			return
+		}
+	}
 }

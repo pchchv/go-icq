@@ -155,6 +155,7 @@ func (m *WebAPIChatManager) getRoomByID(ctx context.Context, roomID string) (*We
 	if err != nil {
 		return nil, err
 	}
+
 	room.InstanceID = m.generateInstanceID()
 	return &room, nil
 }
@@ -173,6 +174,37 @@ func (m *WebAPIChatManager) getRoomByName(ctx context.Context, roomName string) 
 	if err != nil {
 		return nil, err
 	}
+
 	room.InstanceID = m.generateInstanceID()
 	return &room, nil
+}
+
+func (m *WebAPIChatManager) getUserSessionInRoom(ctx context.Context, aimsid, roomID string) (*ChatSession, error) {
+	var session ChatSession
+	err := m.store.db.QueryRowContext(ctx, `
+		SELECT chat_sid, aimsid, room_id, screen_name, instance_id, joined_at, left_at
+		FROM web_chat_sessions
+		WHERE aimsid = ? AND room_id = ? AND left_at IS NULL`,
+		aimsid, roomID).Scan(
+		&session.ChatSID, &session.AIMSid, &session.RoomID,
+		&session.ScreenName, &session.InstanceID, &session.JoinedAt, &session.LeftAt)
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (m *WebAPIChatManager) getUserSessionInRoomByScreenName(ctx context.Context, roomID, screenName string) (*ChatSession, error) {
+	var session ChatSession
+	err := m.store.db.QueryRowContext(ctx, `
+		SELECT chat_sid, aimsid, room_id, screen_name, instance_id, joined_at, left_at
+		FROM web_chat_sessions
+		WHERE room_id = ? AND screen_name = ? AND left_at IS NULL`,
+		roomID, screenName).Scan(
+		&session.ChatSID, &session.AIMSid, &session.RoomID,
+		&session.ScreenName, &session.InstanceID, &session.JoinedAt, &session.LeftAt)
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
 }

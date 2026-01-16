@@ -2,11 +2,19 @@ package state
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/pchchv/go-icq/server/webapi/types"
+)
+
+var (
+	// ErrNoWebAPISession is returned when a WebAPI session is not found.
+	ErrNoWebAPISession = errors.New("WebAPI session not found")
+	// ErrWebAPISessionExpired is returned when a WebAPI session has expired.
+	ErrWebAPISessionExpired = errors.New("WebAPI session expired")
 )
 
 // WebAPISession represents an active Web AIM API session.
@@ -85,6 +93,34 @@ func (m *WebAPISessionManager) Shutdown(ctx context.Context) {
 	// clear all sessions
 	m.sessions = make(map[string]*WebAPISession)
 	m.byUser = make(map[IdentScreenName]*WebAPISession)
+}
+
+// GetSession retrieves a session by aimsid.
+func (m *WebAPISessionManager) GetSession(ctx context.Context, aimsid string) (*WebAPISession, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if session, exists := m.sessions[aimsid]; !exists {
+		return nil, ErrNoWebAPISession
+	} else if session.IsExpired() {
+		return nil, ErrWebAPISessionExpired
+	} else {
+		return session, nil
+	}
+}
+
+// GetSessionByUser retrieves a session by screen name.
+func (m *WebAPISessionManager) GetSessionByUser(ctx context.Context, screenName IdentScreenName) (*WebAPISession, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if session, exists := m.byUser[screenName]; !exists {
+		return nil, ErrNoWebAPISession
+	} else if session.IsExpired() {
+		return nil, ErrWebAPISessionExpired
+	} else {
+		return session, nil
+	}
 }
 
 // cleanupExpiredSessions periodically removes expired sessions.

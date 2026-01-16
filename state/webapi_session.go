@@ -38,6 +38,21 @@ type WebAPISessionManager struct {
 	stopCleanup   chan struct{}
 }
 
+// NewWebAPISessionManager creates a new WebAPI session manager.
+func NewWebAPISessionManager() *WebAPISessionManager {
+	mgr := &WebAPISessionManager{
+		sessions:    make(map[string]*WebAPISession),
+		byUser:      make(map[IdentScreenName]*WebAPISession),
+		stopCleanup: make(chan struct{}),
+	}
+
+	// start cleanup goroutine to remove expired sessions
+	mgr.cleanupTicker = time.NewTicker(1 * time.Minute)
+	go mgr.cleanupExpiredSessions()
+
+	return mgr
+}
+
 // Shutdown stops the session manager and cleans up resources.
 func (m *WebAPISessionManager) Shutdown(ctx context.Context) {
 	close(m.stopCleanup)

@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -154,6 +156,68 @@ func (m *WebAPIChatManager) GetRecentMessages(ctx context.Context, roomID string
 	}
 
 	return messages, nil
+}
+
+// SendMessage sends a message to a chat room.
+func (m *WebAPIChatManager) SendMessage(ctx context.Context, chatsid, message, whisperTarget string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// get session
+	session, err := m.getSessionByChatSID(ctx, chatsid)
+	if err != nil {
+		return fmt.Errorf("invalid chat session: %w", err)
+	}
+
+	// verify user is still in room
+	if session.LeftAt != nil {
+		return errors.New("user has left the chat room")
+	}
+
+	// store message in database
+	timestamp := time.Now().Unix()
+	_, err = m.store.db.ExecContext(ctx, `
+		INSERT INTO web_chat_messages (room_id, screen_name, message, whisper_target, timestamp)
+		VALUES (?, ?, ?, ?, ?)`,
+		session.RoomID, session.ScreenName, message, whisperTarget, timestamp)
+	if err != nil {
+		return fmt.Errorf("failed to store message: %w", err)
+	}
+
+	// broadcast message event
+	eventData := ChatMessageEventData{
+		ScreenName:    session.ScreenName,
+		Message:       message,
+		Timestamp:     timestamp,
+		WhisperTarget: whisperTarget,
+	}
+
+	if whisperTarget != "" {
+		// for whispers, only send to sender and target
+		m.sendChatEventToUser(session.AIMSid, ChatEventData{
+			ChatSID:   chatsid,
+			EventType: ChatEventMessage,
+			EventData: eventData,
+		})
+		// find target's session and send to them
+		targetSession, _ := m.getUserSessionInRoomByScreenName(ctx, session.RoomID, whisperTarget)
+		if targetSession != nil {
+			m.sendChatEventToUser(targetSession.AIMSid, ChatEventData{
+				ChatSID:   targetSession.ChatSID,
+				EventType: ChatEventMessage,
+				EventData: eventData,
+			})
+		}
+	} else {
+		// broadcast to all participants
+		m.broadcastChatEvent(session.RoomID, ChatEventData{
+			ChatSID:   chatsid,
+			EventType: ChatEventMessage,
+			EventData: eventData,
+		})
+	}
+
+	return nil
 }
 
 func (m *WebAPIChatManager) generateInstanceID() int {

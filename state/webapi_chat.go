@@ -3,6 +3,7 @@ package state
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -392,6 +393,97 @@ func (m *WebAPIChatManager) CleanupInactiveSessions(ctx context.Context) {
 			},
 		})
 	}
+}
+
+// CreateAndJoinChat creates a new chat room or joins an existing one.
+func (m *WebAPIChatManager) CreateAndJoinChat(ctx context.Context, aimsid, roomID, roomName, screenName string) (*ChatSession, *WebAPIChatRoom, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var err error
+	var room *WebAPIChatRoom
+	// determine which identifier to use
+	if roomID != "" {
+		if room, err = m.getRoomByID(ctx, roomID); err != nil {
+			return nil, nil, fmt.Errorf("failed to get room by ID: %w", err)
+		}
+	} else if roomName != "" {
+		room, err = m.getRoomByName(ctx, roomName)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, nil, fmt.Errorf("failed to get room by name: %w", err)
+		}
+		// if room doesn't exist, create it
+		if room == nil {
+			room, err = m.createRoom(ctx, roomName, screenName)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create room: %w", err)
+			}
+		}
+	} else {
+		return nil, nil, errors.New("either roomId or roomName must be provided")
+	}
+
+	// check if user is already in the room
+	if existingSession, _ := m.getUserSessionInRoom(ctx, aimsid, room.RoomID); existingSession != nil {
+		return existingSession, room, nil
+	}
+
+	// check room capacity
+	if count, err := m.getParticipantCount(ctx, room.RoomID); err != nil {
+		return nil, nil, fmt.Errorf("failed to get participant count: %w", err)
+	} else if count >= room.MaxParticipants {
+		return nil, nil, errors.New("room is at maximum capacity")
+	}
+
+	// create chat session
+	session := &ChatSession{
+		ChatSID:    m.generateChatSID(),
+		AIMSid:     aimsid,
+		RoomID:     room.RoomID,
+		ScreenName: screenName,
+		InstanceID: room.InstanceID,
+		JoinedAt:   time.Now().Unix(),
+	}
+
+	// insert session into database
+	_, err = m.store.db.ExecContext(ctx, `
+		INSERT INTO web_chat_sessions (chat_sid, aimsid, room_id, screen_name, instance_id, joined_at)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		session.ChatSID, session.AIMSid, session.RoomID, session.ScreenName, session.InstanceID, session.JoinedAt)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create chat session: %w", err)
+	}
+
+	// add participant to room
+	_, err = m.store.db.ExecContext(ctx, `
+		INSERT INTO web_chat_participants (room_id, screen_name, chat_sid, joined_at, typing_status)
+		VALUES (?, ?, ?, ?, 'none')`,
+		room.RoomID, screenName, session.ChatSID, session.JoinedAt)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to add participant: %w", err)
+	}
+
+	// broadcast user joined event
+	// NOTE: Broadcasting doesn't need context as it's fire-and-forget
+	m.broadcastChatEvent(room.RoomID, ChatEventData{
+		ChatSID:   session.ChatSID,
+		EventType: ChatEventUserEntered,
+		EventData: ChatUserEventData{
+			ScreenName: screenName,
+			Timestamp:  session.JoinedAt,
+		},
+	})
+
+	// send current participant list to the new user
+	participants, _ := m.getParticipants(ctx, room.RoomID)
+	m.sendChatEventToUser(aimsid, ChatEventData{
+		ChatSID:   session.ChatSID,
+		EventType: ChatEventUserInRoom,
+		EventData: ChatParticipantList{
+			Participants: participants,
+		},
+	})
+	return session, room, nil
 }
 
 func (m *WebAPIChatManager) generateInstanceID() int {

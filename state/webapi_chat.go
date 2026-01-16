@@ -459,3 +459,46 @@ func (m *WebAPIChatManager) broadcastChatEvent(roomID string, event ChatEventDat
 		m.sendChatEventToUser(aimsid, event)
 	}
 }
+
+func (m *WebAPIChatManager) createRoom(ctx context.Context, roomName, creatorScreenName string) (*WebAPIChatRoom, error) {
+	room := &WebAPIChatRoom{
+		RoomID:            m.generateRoomID(),
+		RoomName:          roomName,
+		Description:       fmt.Sprintf("Chat room created by %s", creatorScreenName),
+		RoomType:          ChatRoomTypeUserCreated,
+		CreatorScreenName: creatorScreenName,
+		CreatedAt:         time.Now().Unix(),
+		MaxParticipants:   100,
+		InstanceID:        m.generateInstanceID(),
+	}
+
+	_, err := m.store.db.ExecContext(ctx, `
+		INSERT INTO web_chat_rooms (room_id, room_name, description, room_type,
+		                            category_id, creator_screen_name, created_at, max_participants)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		room.RoomID, room.RoomName, room.Description, room.RoomType,
+		room.CategoryID, room.CreatorScreenName, room.CreatedAt, room.MaxParticipants)
+	if err != nil {
+		return nil, err
+	}
+
+	// cache the room
+	m.activeRooms[room.RoomID] = room
+	return room, nil
+}
+
+func (m *WebAPIChatManager) closeRoom(ctx context.Context, roomID string) {
+	now := time.Now().Unix()
+	m.store.db.ExecContext(ctx, `
+		UPDATE web_chat_rooms SET closed_at = ? WHERE room_id = ?`,
+		now, roomID)
+
+	// remove from cache
+	delete(m.activeRooms, roomID)
+
+	// broadcast room closed event
+	// NOTE: Broadcasting doesn't need context as it's fire-and-forget
+	m.broadcastChatEvent(roomID, ChatEventData{
+		EventType: ChatEventClosed,
+	})
+}

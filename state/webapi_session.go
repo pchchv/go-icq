@@ -123,6 +123,39 @@ func (m *WebAPISessionManager) GetSessionByUser(ctx context.Context, screenName 
 	}
 }
 
+// GetAllSessions returns all active sessions (for monitoring/admin).
+func (m *WebAPISessionManager) GetAllSessions(ctx context.Context) []*WebAPISession {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	sessions := make([]*WebAPISession, 0, len(m.sessions))
+	for _, session := range m.sessions {
+		if !session.IsExpired() {
+			sessions = append(sessions, session)
+		}
+	}
+
+	return sessions
+}
+
+// GetSessionsByScreenName returns all sessions for a given screen name.
+func (m *WebAPISessionManager) GetSessionsByScreenName(ctx context.Context, screenName DisplayScreenName) []*WebAPISession {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var sessions []*WebAPISession
+	identScreenName := screenName.IdentScreenName()
+
+	// check both the byUser map and iterate through all sessions since a user might have multiple sessions
+	for _, session := range m.sessions {
+		if session.ScreenName.IdentScreenName() == identScreenName {
+			sessions = append(sessions, session)
+		}
+	}
+
+	return sessions
+}
+
 // cleanupExpiredSessions periodically removes expired sessions.
 func (m *WebAPISessionManager) cleanupExpiredSessions() {
 	for {

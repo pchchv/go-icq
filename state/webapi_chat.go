@@ -78,3 +78,17 @@ type ChatParticipant struct {
 type ChatParticipantList struct {
 	Participants []string `json:"participants"`
 }
+
+// WebAPIChatRoom represents a chat room for Web API.
+type WebAPIChatRoom struct {
+	RoomID            string       `json:"roomId"`
+	RoomName          string       `json:"roomName"`
+	Description       string       `json:"description,omitempty"`
+	RoomType          ChatRoomType `json:"roomType"`
+	CategoryID        string       `json:"categoryId,omitempty"`
+	CreatorScreenName string       `json:"-"` // Internal only
+	CreatedAt         int64        `json:"-"`
+	ClosedAt          *int64       `json:"-"`
+	MaxParticipants   int          `json:"-"`
+	InstanceID        int          `json:"instanceId"`
+}

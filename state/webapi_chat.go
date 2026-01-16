@@ -293,6 +293,107 @@ func (m *WebAPIChatManager) SetTyping(ctx context.Context, chatsid, typingStatus
 	return nil
 }
 
+// LeaveChat removes a user from a chat room.
+func (m *WebAPIChatManager) LeaveChat(ctx context.Context, chatsid string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// get session
+	session, err := m.getSessionByChatSID(ctx, chatsid)
+	if err != nil {
+		return fmt.Errorf("invalid chat session: %w", err)
+	}
+
+	// mark session as left
+	now := time.Now().Unix()
+	_, err = m.store.db.ExecContext(ctx, `
+		UPDATE web_chat_sessions
+		SET left_at = ?
+		WHERE chat_sid = ?`,
+		now, chatsid)
+	if err != nil {
+		return fmt.Errorf("failed to update session: %w", err)
+	}
+
+	// remove from participants
+	_, err = m.store.db.ExecContext(ctx, `
+		DELETE FROM web_chat_participants
+		WHERE room_id = ? AND screen_name = ?`,
+		session.RoomID, session.ScreenName)
+	if err != nil {
+		return fmt.Errorf("failed to remove participant: %w", err)
+	}
+
+	// cancel any typing timer
+	timerKey := fmt.Sprintf("%s:%s", session.RoomID, session.ScreenName)
+	if timer, exists := m.typingTimers[timerKey]; exists {
+		timer.Stop()
+		delete(m.typingTimers, timerKey)
+	}
+
+	// broadcast user left event
+	// NOTE: Broadcasting doesn't need context as it's fire-and-forget
+	m.broadcastChatEvent(session.RoomID, ChatEventData{
+		ChatSID:   chatsid,
+		EventType: ChatEventUserLeft,
+		EventData: ChatUserEventData{
+			ScreenName: session.ScreenName,
+			Timestamp:  now,
+		},
+	})
+
+	// check if room should be closed (no participants left)
+	count, _ := m.getParticipantCount(ctx, session.RoomID)
+	if count == 0 {
+		m.closeRoom(ctx, session.RoomID)
+	}
+
+	return nil
+}
+
+// CleanupInactiveSessions removes sessions that have been inactive for too long.
+func (m *WebAPIChatManager) CleanupInactiveSessions(ctx context.Context) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// mark sessions as left if they've been inactive for more than 30 minutes
+	cutoff := time.Now().Add(-30 * time.Minute).Unix()
+	rows, err := m.store.db.QueryContext(ctx, `
+		SELECT chat_sid, room_id, screen_name
+		FROM web_chat_sessions
+		WHERE left_at IS NULL AND joined_at < ?`,
+		cutoff)
+	if err != nil {
+		m.logger.Error("failed to get inactive sessions", "error", err)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var chatsid, roomID, screenName string
+		if err := rows.Scan(&chatsid, &roomID, &screenName); err != nil {
+			continue
+		}
+
+		// mark as left
+		now := time.Now().Unix()
+		m.store.db.ExecContext(ctx, `UPDATE web_chat_sessions SET left_at = ? WHERE chat_sid = ?`, now, chatsid)
+		m.store.db.ExecContext(ctx, `DELETE FROM web_chat_participants WHERE room_id = ? AND screen_name = ?`,
+			roomID, screenName)
+
+		// broadcast user left
+		// NOTE: Broadcasting doesn't need context as it's fire-and-forget
+		m.broadcastChatEvent(roomID, ChatEventData{
+			ChatSID:   chatsid,
+			EventType: ChatEventUserLeft,
+			EventData: ChatUserEventData{
+				ScreenName: screenName,
+				Timestamp:  now,
+			},
+		})
+	}
+}
+
 func (m *WebAPIChatManager) generateInstanceID() int {
 	return int(time.Now().Unix() % 1000000)
 }

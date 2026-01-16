@@ -220,6 +220,79 @@ func (m *WebAPIChatManager) SendMessage(ctx context.Context, chatsid, message, w
 	return nil
 }
 
+// SetTyping sets the typing status for a user in a chat room.
+func (m *WebAPIChatManager) SetTyping(ctx context.Context, chatsid, typingStatus string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// get session
+	session, err := m.getSessionByChatSID(ctx, chatsid)
+	if err != nil {
+		return fmt.Errorf("invalid chat session: %w", err)
+	}
+
+	// verify user is still in room
+	if session.LeftAt != nil {
+		return errors.New("user has left the chat room")
+	}
+
+	// update typing status
+	now := time.Now().Unix()
+	_, err = m.store.db.ExecContext(ctx, `
+		UPDATE web_chat_participants
+		SET typing_status = ?, typing_updated_at = ?
+		WHERE room_id = ? AND screen_name = ?`,
+		typingStatus, now, session.RoomID, session.ScreenName)
+	if err != nil {
+		return fmt.Errorf("failed to update typing status: %w", err)
+	}
+
+	// cancel existing typing timer for this user
+	timerKey := fmt.Sprintf("%s:%s", session.RoomID, session.ScreenName)
+	if timer, exists := m.typingTimers[timerKey]; exists {
+		timer.Stop()
+		delete(m.typingTimers, timerKey)
+	}
+
+	// if status is "typing" or "typed", set a timer to reset it
+	if typingStatus == "typing" || typingStatus == "typed" {
+		timer := time.AfterFunc(10*time.Second, func() {
+			m.mu.Lock()
+			defer m.mu.Unlock()
+			// reset typing status to none using background context here since this is
+			// an async timer callback and the original context may have expired
+			m.store.db.ExecContext(context.Background(), `
+				UPDATE web_chat_participants
+				SET typing_status = 'none', typing_updated_at = ?
+				WHERE room_id = ? AND screen_name = ?`,
+				time.Now().Unix(), session.RoomID, session.ScreenName)
+			// broadcast the reset
+			m.broadcastChatEvent(session.RoomID, ChatEventData{
+				ChatSID:   chatsid,
+				EventType: ChatEventTyping,
+				EventData: ChatTypingEventData{
+					ScreenName:   session.ScreenName,
+					TypingStatus: "none",
+				},
+			})
+			delete(m.typingTimers, timerKey)
+		})
+		m.typingTimers[timerKey] = timer
+	}
+
+	// broadcast typing event
+	m.broadcastChatEvent(session.RoomID, ChatEventData{
+		ChatSID:   chatsid,
+		EventType: ChatEventTyping,
+		EventData: ChatTypingEventData{
+			ScreenName:   session.ScreenName,
+			TypingStatus: typingStatus,
+		},
+	})
+
+	return nil
+}
+
 func (m *WebAPIChatManager) generateInstanceID() int {
 	return int(time.Now().Unix() % 1000000)
 }

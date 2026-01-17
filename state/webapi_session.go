@@ -372,6 +372,41 @@ func (m *WebAPISessionManager) CreateSession(ctx context.Context, screenName Dis
 	return session, nil
 }
 
+// TouchSession updates the last accessed time for a session.
+func (m *WebAPISessionManager) TouchSession(ctx context.Context, aimsid string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if session, exists := m.sessions[aimsid]; !exists {
+		return ErrNoWebAPISession
+	} else {
+		session.Touch()
+	}
+
+	return nil
+}
+
+// RemoveSession removes a session by aimsid.
+func (m *WebAPISessionManager) RemoveSession(ctx context.Context, aimsid string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	session, exists := m.sessions[aimsid]
+	if !exists {
+		return ErrNoWebAPISession
+	}
+
+	delete(m.sessions, aimsid)
+	delete(m.byUser, session.ScreenName.IdentScreenName())
+
+	// close the event queue to unblock any waiting fetches
+	if session.EventQueue != nil {
+		session.EventQueue.Close()
+	}
+
+	return nil
+}
+
 // cleanupExpiredSessions periodically removes expired sessions.
 func (m *WebAPISessionManager) cleanupExpiredSessions() {
 	for {

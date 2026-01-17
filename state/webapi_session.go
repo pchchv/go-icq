@@ -53,6 +53,43 @@ func (s *WebAPISession) IsSubscribedTo(eventType string) bool {
 	return false
 }
 
+// StartListeningToOSCARSession starts a goroutine that listens to the OSCAR session's
+// message channel and converts SNAC messages into WebAPI events.
+func (s *WebAPISession) StartListeningToOSCARSession() {
+	if s.OSCARSession == nil {
+		return
+	}
+
+	// start goroutine to listen for OSCAR messages
+	go func() {
+		msgCh := s.OSCARSession.ReceiveMessage()
+		for {
+			select {
+			case msg, ok := <-msgCh:
+				if !ok {
+					// channel closed
+					// OSCAR session ended
+					return
+				}
+				s.handleSNACMessage(msg)
+			case <-s.OSCARSession.Closed():
+				// OSCAR session closed
+				return
+			}
+		}
+	}()
+}
+
+// Touch updates the last accessed time and extends expiration if needed.
+func (s *WebAPISession) Touch() {
+	s.LastAccessed = time.Now()
+	// extend expiration by 60 minutes from last access
+	newExpiry := s.LastAccessed.Add(60 * time.Minute)
+	if newExpiry.After(s.ExpiresAt) {
+		s.ExpiresAt = newExpiry
+	}
+}
+
 // handleBuddyArrived handles when a buddy comes online.
 func (s *WebAPISession) handleBuddyArrived(msg wire.SNACMessage) {
 	if !s.IsSubscribedTo("presence") {

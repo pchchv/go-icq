@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pchchv/go-icq/server/webapi/types"
+	"github.com/pchchv/go-icq/wire"
 )
 
 var (
@@ -50,6 +51,46 @@ func (s *WebAPISession) IsSubscribedTo(eventType string) bool {
 		}
 	}
 	return false
+}
+
+// handleBuddyArrived handles when a buddy comes online.
+func (s *WebAPISession) handleBuddyArrived(msg wire.SNACMessage) {
+	if !s.IsSubscribedTo("presence") {
+		return
+	}
+
+	body, ok := msg.Body.(wire.SNAC_0x03_0x0B_BuddyArrived)
+	if !ok {
+		return
+	}
+
+	presenceEvent := types.PresenceEvent{
+		AimID:    body.ScreenName,
+		State:    "online",
+		UserType: "aim",
+	}
+
+	s.EventQueue.Push(types.EventTypePresence, presenceEvent)
+}
+
+// handleBuddyDeparted handles when a buddy goes offline.
+func (s *WebAPISession) handleBuddyDeparted(msg wire.SNACMessage) {
+	if !s.IsSubscribedTo("presence") {
+		return
+	}
+
+	body, ok := msg.Body.(wire.SNAC_0x03_0x0C_BuddyDeparted)
+	if !ok {
+		return
+	}
+
+	presenceEvent := types.PresenceEvent{
+		AimID:    body.ScreenName,
+		State:    "offline",
+		UserType: "aim",
+	}
+
+	s.EventQueue.Push(types.EventTypePresence, presenceEvent)
 }
 
 // WebAPISessionManager manages Web API sessions with thread-safe operations.

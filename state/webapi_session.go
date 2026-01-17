@@ -140,6 +140,30 @@ func (s *WebAPISession) handleIncomingIM(msg wire.SNACMessage) {
 	s.EventQueue.Push(types.EventTypeIM, imEvent)
 }
 
+// handleTypingNotification handles typing notifications.
+func (s *WebAPISession) handleTypingNotification(msg wire.SNACMessage) {
+	if !s.IsSubscribedTo("typing") {
+		return
+	}
+
+	body, ok := msg.Body.(wire.SNAC_0x04_0x14_ICBMClientEvent)
+	if !ok {
+		return
+	}
+
+	// event types:
+	//   0=stopped typing
+	//   1=text typed
+	//   2=typing
+	isTyping := body.Event == 1 || body.Event == 2
+	typingEvent := types.TypingEvent{
+		From:   body.ScreenName,
+		Typing: isTyping,
+	}
+
+	s.EventQueue.Push(types.EventTypeTyping, typingEvent)
+}
+
 // WebAPISessionManager manages Web API sessions with thread-safe operations.
 type WebAPISessionManager struct {
 	sessions      map[string]*WebAPISession          // Keyed by aimsid

@@ -330,6 +330,48 @@ func (m *WebAPISessionManager) GetSessionsByScreenName(ctx context.Context, scre
 	return sessions
 }
 
+// CreateSession creates a new WebAPI session.
+func (m *WebAPISessionManager) CreateSession(ctx context.Context, screenName DisplayScreenName, devID string, events []string, oscarSession *Session, logger *slog.Logger) (*WebAPISession, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// check if user already has an active session
+	identName := screenName.IdentScreenName()
+	if existing, exists := m.byUser[identName]; exists {
+		// remove the old session
+		delete(m.sessions, existing.AimSID)
+	}
+
+	// generate unique session ID
+	aimsid, err := generateSessionID()
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	session := &WebAPISession{
+		AimSID:          aimsid,
+		ScreenName:      screenName,
+		OSCARSession:    oscarSession,
+		Events:          events,
+		EventQueue:      types.NewEventQueue(1000), // max 1000 events per session
+		DevID:           devID,
+		CreatedAt:       now,
+		LastAccessed:    now,
+		ExpiresAt:       now.Add(60 * time.Minute), // 60 minute initial expiry
+		FetchTimeout:    60000,                     // 60 seconds default for better stability
+		TimeToNextFetch: 500,                       // 500ms suggested delay
+		logger:          logger,
+	}
+
+	m.sessions[aimsid] = session
+	m.byUser[identName] = session
+
+	// start listening to OSCAR session message channel
+	session.StartListeningToOSCARSession()
+	return session, nil
+}
+
 // cleanupExpiredSessions periodically removes expired sessions.
 func (m *WebAPISessionManager) cleanupExpiredSessions() {
 	for {

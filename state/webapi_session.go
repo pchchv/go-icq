@@ -164,6 +164,29 @@ func (s *WebAPISession) handleTypingNotification(msg wire.SNACMessage) {
 	s.EventQueue.Push(types.EventTypeTyping, typingEvent)
 }
 
+// handleSNACMessage converts a SNAC message into WebAPI events and pushes them to the event queue.
+func (s *WebAPISession) handleSNACMessage(msg wire.SNACMessage) {
+	if s.EventQueue != nil {
+		// convert SNAC message to WebAPI events based on food group and subgroup
+		switch msg.Frame.FoodGroup {
+		case wire.ICBM:
+			s.handleICBMMessage(msg)
+		case wire.Buddy:
+			s.handleBuddyMessage(msg)
+		}
+	}
+}
+
+// handleICBMMessage handles ICBM (instant messaging) SNAC messages.
+func (s *WebAPISession) handleICBMMessage(msg wire.SNACMessage) {
+	switch msg.Frame.SubGroup {
+	case wire.ICBMChannelMsgToClient:
+		s.handleIncomingIM(msg)
+	case wire.ICBMClientEvent:
+		s.handleTypingNotification(msg)
+	}
+}
+
 // WebAPISessionManager manages Web API sessions with thread-safe operations.
 type WebAPISessionManager struct {
 	sessions      map[string]*WebAPISession          // Keyed by aimsid

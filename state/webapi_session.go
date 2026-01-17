@@ -93,6 +93,53 @@ func (s *WebAPISession) handleBuddyDeparted(msg wire.SNACMessage) {
 	s.EventQueue.Push(types.EventTypePresence, presenceEvent)
 }
 
+// handleBuddyMessage handles buddy/presence SNAC messages.
+func (s *WebAPISession) handleBuddyMessage(msg wire.SNACMessage) {
+	switch msg.Frame.SubGroup {
+	case wire.BuddyArrived:
+		s.handleBuddyArrived(msg)
+	case wire.BuddyDeparted:
+		s.handleBuddyDeparted(msg)
+	}
+}
+
+// handleIncomingIM handles incoming instant messages.
+func (s *WebAPISession) handleIncomingIM(msg wire.SNACMessage) {
+	if !s.IsSubscribedTo("im") {
+		return
+	}
+
+	body, ok := msg.Body.(wire.SNAC_0x04_0x07_ICBMChannelMsgToClient)
+	if !ok {
+		return
+	}
+
+	// extract message text from TLV data
+	var messageText string
+	if msgData, hasMsg := body.TLVRestBlock.Bytes(wire.ICBMTLVAOLIMData); hasMsg {
+		if text, err := wire.UnmarshalICBMMessageText(msgData); err == nil {
+			messageText = text
+		}
+	}
+
+	if messageText == "" {
+		return
+	}
+
+	// check if it's an auto-response (channel 2)
+	autoResponse := body.ChannelID == 0x0002
+
+	// create IM event
+	imEvent := types.IMEvent{
+		From:      body.ScreenName,
+		Message:   messageText,
+		Timestamp: float64(time.Now().Unix()),
+		AutoResp:  autoResponse,
+	}
+
+	s.EventQueue.Push(types.EventTypeIM, imEvent)
+}
+
 // WebAPISessionManager manages Web API sessions with thread-safe operations.
 type WebAPISessionManager struct {
 	sessions      map[string]*WebAPISession          // Keyed by aimsid

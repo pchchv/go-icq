@@ -2,6 +2,8 @@ package state
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"log/slog"
 	"sync"
@@ -357,4 +359,13 @@ func (m *WebAPISessionManager) cleanupExpiredSessions() {
 			return
 		}
 	}
+}
+
+// generateSessionID creates a cryptographically secure session ID.
+func generateSessionID() (string, error) {
+	bytes := make([]byte, 32) // 256 bits
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
 }

@@ -43,6 +43,59 @@ func NewRateLimiter() *RateLimiter {
 	}
 }
 
+// Allow checks if a request from the given devID is allowed based on rate limits.
+func (r *RateLimiter) Allow(devID string, limit int) bool {
+	info := r.CheckRateLimit(devID, limit)
+	return info.Allowed
+}
+
+// CheckRateLimit checks if a
+// request from the given devID is allowed and returns rate limit info.
+func (r *RateLimiter) CheckRateLimit(devID string, limit int) RateLimitInfo {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	now := time.Now()
+	// get or create limiter entry for this devID
+	var entry *rateLimiterEntry
+	if val, found := r.limiters.Get(devID); found {
+		entry = val.(*rateLimiterEntry)
+		// check if limit has changed
+		if entry.limit != limit {
+			// recreate limiter with new limit
+			entry.limiter = rate.NewLimiter(rate.Every(r.windowSize/time.Duration(limit)), limit)
+			entry.limit = limit
+		}
+	} else {
+		// create new limiter with burst equal to limit (allows initial burst)
+		entry = &rateLimiterEntry{
+			limiter:    rate.NewLimiter(rate.Every(r.windowSize/time.Duration(limit)), limit),
+			limit:      limit,
+			windowSize: r.windowSize,
+			lastReset:  now,
+		}
+		r.limiters.Set(devID, entry, cache.DefaultExpiration)
+	}
+
+	// check if request is allowed
+	allowed := entry.limiter.Allow()
+	// calculate remaining requests (approximate based on tokens available)
+	tokens := entry.limiter.Tokens()
+	remaining := int(tokens)
+	if remaining < 0 {
+		remaining = 0
+	}
+
+	// calculate reset time (next window start)
+	resetTime := now.Add(r.windowSize).Unix()
+	return RateLimitInfo{
+		Limit:     limit,
+		Remaining: remaining,
+		Reset:     resetTime,
+		Allowed:   allowed,
+	}
+}
+
 // rateLimiterEntry tracks rate limiting data for a single devID.
 type rateLimiterEntry struct {
 	limiter    *rate.Limiter

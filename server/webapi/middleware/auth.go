@@ -17,6 +17,14 @@ type APIKeyValidator interface {
 	UpdateLastUsed(ctx context.Context, devKey string) error
 }
 
+// RateLimitInfo contains rate limit metadata for a request.
+type RateLimitInfo struct {
+	Limit     int   // Total requests allowed per window.
+	Remaining int   // Requests remaining in current window.
+	Reset     int64 // Unix timestamp when the window resets.
+	Allowed   bool  // Whether the request is allowed.
+}
+
 // RateLimiter manages per-devID rate limiting for the Web API.
 type RateLimiter struct {
 	limiters   *cache.Cache

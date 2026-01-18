@@ -125,3 +125,11 @@ func GetDevIDFromContext(ctx context.Context) (string, bool) {
 	devID, ok := ctx.Value(ContextKeyDevID).(string)
 	return devID, ok
 }
+
+// min returns the minimum of two integers.
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}

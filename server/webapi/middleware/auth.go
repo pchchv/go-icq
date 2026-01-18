@@ -7,6 +7,7 @@ import (
 
 	"github.com/patrickmn/go-cache"
 	"github.com/pchchv/go-icq/state"
+	"golang.org/x/time/rate"
 )
 
 // APIKeyValidator defines methods for validating Web API keys.
@@ -40,4 +41,12 @@ func NewRateLimiter() *RateLimiter {
 		limiters:   c,
 		windowSize: time.Minute, // default 1 minute window
 	}
+}
+
+// rateLimiterEntry tracks rate limiting data for a single devID.
+type rateLimiterEntry struct {
+	limiter    *rate.Limiter
+	limit      int
+	windowSize time.Duration
+	lastReset  time.Time
 }

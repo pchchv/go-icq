@@ -10,6 +10,13 @@ import (
 	"golang.org/x/time/rate"
 )
 
+const (
+	// ContextKeyAPIKey is the context key for storing the validated API key.
+	ContextKeyAPIKey contextKey = "api_key"
+	// ContextKeyDevID is the context key for storing the developer ID.
+	ContextKeyDevID contextKey = "dev_id"
+)
+
 // APIKeyValidator defines methods for validating Web API keys.
 type APIKeyValidator interface {
 	// GetAPIKeyByDevKey retrieves and validates an API key by its dev_key value.
@@ -95,6 +102,9 @@ func (r *RateLimiter) CheckRateLimit(devID string, limit int) RateLimitInfo {
 		Allowed:   allowed,
 	}
 }
+
+// contextKey is a custom type for context keys to avoid collisions.
+type contextKey string
 
 // rateLimiterEntry tracks rate limiting data for a single devID.
 type rateLimiterEntry struct {

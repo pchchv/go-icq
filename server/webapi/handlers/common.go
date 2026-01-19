@@ -8,7 +8,7 @@ type XMLToken struct {
 	ExpiresIn int    `xml:"expiresIn"`
 }
 
-// XMLData wraps the data for XML responses
+// XMLData wraps the data for XML responses.
 type XMLData struct {
 	// Auth response fields
 	Token          *XMLToken `xml:"token,omitempty"`
@@ -36,4 +36,12 @@ type ErrorResponse struct {
 	// For XML responses, flatten the structure
 	StatusCode int    `json:"-" xml:"statusCode"`
 	StatusText string `json:"-" xml:"statusText"`
+}
+
+// XMLMapResponse is a helper struct for converting map-based responses to XML.
+type XMLMapResponse struct {
+	XMLName    xml.Name `xml:"response"`
+	StatusCode int      `xml:"statusCode"`
+	StatusText string   `xml:"statusText"`
+	Data       XMLData  `xml:"data,omitempty"`
 }

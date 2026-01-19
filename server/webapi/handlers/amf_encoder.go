@@ -116,7 +116,7 @@ func (e *AMFEncoder) structToMap(v reflect.Value) map[string]interface{} {
 	return result
 }
 
-// convertToMap converts any data to a map structure for AMF3
+// convertToMap converts any data to a map structure for AMF3.
 func (e *AMFEncoder) convertToMap(data interface{}) interface{} {
 	if data == nil {
 		// for AMF3, return empty map instead of nil to avoid truncation
@@ -162,7 +162,7 @@ func (e *AMFEncoder) convertToMap(data interface{}) interface{} {
 	}
 }
 
-// responseBodyToMap converts ResponseBody to AMF3-compatible map
+// responseBodyToMap converts ResponseBody to AMF3-compatible map.
 func (e *AMFEncoder) responseBodyToMap(body ResponseBody) map[string]interface{} {
 	m := map[string]interface{}{
 		"statusCode": body.StatusCode,
@@ -175,4 +175,21 @@ func (e *AMFEncoder) responseBodyToMap(body ResponseBody) map[string]interface{}
 		m["data"] = map[string]interface{}{}
 	}
 	return m
+}
+
+// errorResponseToMap converts ErrorResponse to AMF3-compatible map.
+func (e *AMFEncoder) errorResponseToMap(err ErrorResponse) map[string]interface{} {
+	return map[string]interface{}{
+		"response": map[string]interface{}{
+			"statusCode": err.Response.StatusCode,
+			"statusText": err.Response.StatusText,
+		},
+	}
+}
+
+// baseResponseToMap converts BaseResponse to AMF3-compatible map.
+func (e *AMFEncoder) baseResponseToMap(resp BaseResponse) map[string]interface{} {
+	return map[string]interface{}{
+		"response": e.responseBodyToMap(resp.Response),
+	}
 }

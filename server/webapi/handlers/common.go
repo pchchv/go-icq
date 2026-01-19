@@ -31,6 +31,13 @@ type XMLData struct {
 	Raw string `xml:",chardata"`
 }
 
+// ResponseBody contains the status and data for API responses.
+type ResponseBody struct {
+	StatusCode int         `json:"statusCode" xml:"statusCode"`
+	StatusText string      `json:"statusText" xml:"statusText"`
+	Data       interface{} `json:"data,omitempty" xml:"data,omitempty"`
+}
+
 // ErrorResponse represents an error response with proper XML/JSON support.
 type ErrorResponse struct {
 	XMLName  xml.Name `xml:"response" json:"-"`

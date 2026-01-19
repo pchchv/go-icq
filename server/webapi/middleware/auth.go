@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -100,6 +101,22 @@ func (r *RateLimiter) CheckRateLimit(devID string, limit int) RateLimitInfo {
 		Remaining: remaining,
 		Reset:     resetTime,
 		Allowed:   allowed,
+	}
+}
+
+// AuthMiddleware provides authentication and rate limiting for Web API endpoints.
+type AuthMiddleware struct {
+	Logger      *slog.Logger
+	RateLimiter *RateLimiter
+	Validator   APIKeyValidator
+}
+
+// NewAuthMiddleware creates a new authentication middleware instance.
+func NewAuthMiddleware(validator APIKeyValidator, logger *slog.Logger) *AuthMiddleware {
+	return &AuthMiddleware{
+		Logger:      logger,
+		RateLimiter: NewRateLimiter(),
+		Validator:   validator,
 	}
 }
 

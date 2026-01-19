@@ -2,7 +2,10 @@ package middleware
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
+	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -118,6 +121,53 @@ func NewAuthMiddleware(validator APIKeyValidator, logger *slog.Logger) *AuthMidd
 		RateLimiter: NewRateLimiter(),
 		Validator:   validator,
 	}
+}
+
+// sendErrorResponse sends a JSON error response.
+func (m *AuthMiddleware) sendErrorResponse(w http.ResponseWriter, statusCode int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	response := map[string]interface{}{
+		"error": message,
+		"code":  statusCode,
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		m.Logger.Error("failed to encode error response", "err", err.Error())
+	}
+}
+
+// isOriginAllowed checks if an origin is in the allowed list.
+func (m *AuthMiddleware) isOriginAllowed(origin string, allowedOrigins []string) bool {
+	// if no origins specified, allow all (for backward compatibility/development)
+	if len(allowedOrigins) == 0 {
+		return true
+	}
+
+	origin = strings.ToLower(origin)
+	for _, allowed := range allowedOrigins {
+		allowed = strings.ToLower(allowed)
+		// exact match
+		if origin == allowed {
+			return true
+		}
+
+		// wildcard support (e.g., "*.example.com")
+		if strings.HasPrefix(allowed, "*.") {
+			domain := allowed[2:]
+			if strings.HasSuffix(origin, domain) {
+				return true
+			}
+		}
+
+		// allow all origins (development only)
+		if allowed == "*" {
+			m.Logger.Warn("wildcard origin (*) used - should not be used in production")
+			return true
+		}
+	}
+
+	return false
 }
 
 // contextKey is a custom type for context keys to avoid collisions.

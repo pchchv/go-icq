@@ -201,6 +201,118 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
+// AuthenticateFlexible is an HTTP middleware that supports multiple authentication methods:
+// 1. aimsid (session ID) - no k required
+// 2. a (AOL token) - no k required
+// 3. ts + sig_sha256 (signed request) - no k required
+// 4. k (API key) - fallback if no other auth provided
+// This follows the Web AIM API specification where k is not required when aimsid is present.
+func (m *AuthMiddleware) AuthenticateFlexible(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		// priority 1: check for session-based auth (aimsid)
+		// according to the spec, when aimsid is provided, k is not required
+		if aimsid := r.URL.Query().Get("aimsid"); aimsid != "" {
+			// the handler itself will validate the aimsid
+			// is needed to pass the request through without requiring k
+			m.Logger.DebugContext(ctx, "using aimsid authentication", "aimsid", aimsid[:min(16, len(aimsid))]+"...")
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// priority 2: check for AOL token auth
+		if token := r.URL.Query().Get("a"); token != "" {
+			// token auth is present, but we still need to validate the API key
+			// the token provides user authentication while the API key identifies the app
+			m.Logger.DebugContext(ctx, "token authentication detected, will validate API key as well")
+			// don't return here - continue to API key validation below
+		}
+
+		// priority 3: check for signed request auth
+		if ts := r.URL.Query().Get("ts"); ts != "" {
+			if sig := r.URL.Query().Get("sig_sha256"); sig != "" {
+				// for now, signed requests still require 'k' parameter for API key validation
+				// the signature provides additional security on top of the API key
+				// when full signature validation is implemented, this can be made optional
+				m.Logger.DebugContext(ctx, "signed request detected, falling through to API key validation")
+				// don't return here - continue to API key validation below
+			}
+		}
+
+		// priority 4: fall back to API key requirement
+		apiKey := r.URL.Query().Get("k")
+		if apiKey == "" {
+			// try form value for POST requests
+			apiKey = r.FormValue("k")
+			if apiKey == "" {
+				m.sendErrorResponse(w, http.StatusBadRequest, "authentication required: provide aimsid or k parameter")
+				return
+			}
+		}
+
+		// validate API key as before
+		key, err := m.Validator.GetAPIKeyByDevKey(ctx, apiKey)
+		if err != nil {
+			if err == state.ErrNoAPIKey {
+				m.Logger.DebugContext(ctx, "invalid API key attempted", "key", apiKey[:min(8, len(apiKey))]+"...")
+				m.sendErrorResponse(w, http.StatusForbidden, "invalid API key")
+				return
+			}
+
+			m.Logger.ErrorContext(ctx, "error validating API key", "err", err.Error())
+			m.sendErrorResponse(w, http.StatusInternalServerError, "internal server error")
+			return
+		}
+
+		// check if key is active
+		if !key.IsActive {
+			m.Logger.DebugContext(ctx, "inactive API key used", "dev_id", key.DevID)
+			m.sendErrorResponse(w, http.StatusForbidden, "API key is inactive")
+			return
+		}
+
+		// check rate limit
+		rateLimitInfo := m.RateLimiter.CheckRateLimit(key.DevID, key.RateLimit)
+
+		// always add rate limit headers
+		w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", rateLimitInfo.Limit))
+		w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", rateLimitInfo.Remaining))
+		w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", rateLimitInfo.Reset))
+		if !rateLimitInfo.Allowed {
+			m.Logger.WarnContext(ctx, "rate limit exceeded", "dev_id", key.DevID, "limit", key.RateLimit)
+			// add Retry-After header
+			retryAfter := rateLimitInfo.Reset - time.Now().Unix()
+			if retryAfter < 1 {
+				retryAfter = 1
+			}
+
+			w.Header().Set("Retry-After", fmt.Sprintf("%d", retryAfter))
+			m.sendErrorResponse(w, http.StatusTooManyRequests, "rate limit exceeded")
+			return
+		}
+
+		// update last used timestamp asynchronously
+		go func() {
+			if err := m.Validator.UpdateLastUsed(context.Background(), apiKey); err != nil {
+				m.Logger.Error("failed to update last_used timestamp", "err", err.Error())
+			}
+		}()
+
+		// add API key info to context for use in handlers
+		ctx = context.WithValue(ctx, ContextKeyAPIKey, key)
+		ctx = context.WithValue(ctx, ContextKeyDevID, key.DevID)
+		// log the API request
+		m.Logger.InfoContext(ctx, "API request authenticated via key",
+			"dev_id", key.DevID,
+			"app_name", key.AppName,
+			"method", r.Method,
+			"path", r.URL.Path,
+		)
+		// pass to next handler with enriched context
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 // sendErrorResponse sends a JSON error response.
 func (m *AuthMiddleware) sendErrorResponse(w http.ResponseWriter, statusCode int, message string) {
 	w.Header().Set("Content-Type", "application/json")

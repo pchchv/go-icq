@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"fmt"
 	"log/slog"
 	"reflect"
+	"strings"
 	"time"
 )
 
@@ -51,4 +53,65 @@ func (e *AMFEncoder) isZeroValue(v reflect.Value) bool {
 // toAMF3Compatible converts Go types to AMF3-compatible format for goAMF3.
 func (e *AMFEncoder) toAMF3Compatible(data interface{}) interface{} {
 	return map[string]interface{}{}
+}
+
+// mapToAMFMap converts a Go map to an AMF3-compatible map.
+func (e *AMFEncoder) mapToAMFMap(v reflect.Value) map[string]interface{} {
+	result := make(map[string]interface{})
+	for _, key := range v.MapKeys() {
+		// convert key to string (AMF only supports string keys)
+		keyStr := fmt.Sprintf("%v", key.Interface())
+		value := v.MapIndex(key)
+		if value.CanInterface() {
+			result[keyStr] = e.toAMF3Compatible(value.Interface())
+		}
+	}
+	return result
+}
+
+// structToMap converts a struct to a map using JSON tags for AMF3.
+func (e *AMFEncoder) structToMap(v reflect.Value) map[string]interface{} {
+	result := make(map[string]interface{})
+	t := v.Type()
+	for i := 0; i < v.NumField(); i++ {
+		field := t.Field(i)
+		fieldValue := v.Field(i)
+		// skip unexported fields
+		if !fieldValue.CanInterface() {
+			continue
+		}
+
+		// get JSON tag
+		jsonTag := field.Tag.Get("json")
+		if jsonTag == "-" {
+			continue
+		}
+
+		// parse JSON tag
+		tagParts := strings.Split(jsonTag, ",")
+		fieldName := tagParts[0]
+		if fieldName == "" {
+			fieldName = field.Name
+		}
+
+		// check for omitempty
+		omitEmpty := false
+		for _, part := range tagParts[1:] {
+			if part == "omitempty" {
+				omitEmpty = true
+				break
+			}
+		}
+
+		// skip if omitempty and value is zero
+		if omitEmpty && e.isZeroValue(fieldValue) {
+			continue
+		}
+
+		// get field value and convert recursively
+		fieldData := fieldValue.Interface()
+		result[fieldName] = e.toAMF3Compatible(fieldData)
+	}
+
+	return result
 }

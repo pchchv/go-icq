@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"log/slog"
+	"net/http"
 	"reflect"
 	"strings"
 	"time"
@@ -192,4 +193,44 @@ func (e *AMFEncoder) baseResponseToMap(resp BaseResponse) map[string]interface{}
 	return map[string]interface{}{
 		"response": e.responseBodyToMap(resp.Response),
 	}
+}
+
+// DetectAMFVersion determines which AMF version to use based on the request.
+func DetectAMFVersion(r *http.Request) AMFVersion {
+	if r == nil {
+		return AMF3
+	}
+
+	// check query parameter first (highest priority)
+	format := strings.ToLower(r.URL.Query().Get("f"))
+	switch format {
+	case "amf3":
+		return AMF3
+	case "amf":
+		// default to AMF3 for modern clients (Gromit expects AMF3)
+		return AMF3
+	}
+
+	// check Accept header for version hint
+	accept := r.Header.Get("Accept")
+	if strings.Contains(accept, "amf3") || strings.Contains(accept, "AMF3") {
+		return AMF3
+	}
+
+	if strings.Contains(accept, "amf") || strings.Contains(accept, "AMF") {
+		return AMF3 // Default to AMF3 for AMF requests
+	}
+
+	// check Content-Type header (for POST requests)
+	contentType := r.Header.Get("Content-Type")
+	if strings.Contains(contentType, "amf3") || strings.Contains(contentType, "AMF3") {
+		return AMF3
+	}
+
+	if strings.Contains(contentType, "amf") || strings.Contains(contentType, "AMF") {
+		return AMF3 // Default to AMF3 for AMF requests
+	}
+
+	// default to AMF3 for modern clients
+	return AMF3
 }

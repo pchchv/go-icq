@@ -195,6 +195,26 @@ func (e *AMFEncoder) baseResponseToMap(resp BaseResponse) map[string]interface{}
 	}
 }
 
+// sliceToArray converts a slice to an AMF3-compatible array.
+func (e *AMFEncoder) sliceToArray(v reflect.Value) []interface{} {
+	length := v.Len()
+	result := make([]interface{}, length)
+	for i := 0; i < length; i++ {
+		elem := v.Index(i)
+		if elem.CanInterface() {
+			result[i] = e.toAMF3Compatible(elem.Interface())
+		} else {
+			result[i] = nil
+		}
+	}
+	return result
+}
+
+// toAMFCompatible converts Go types to AMF3-compatible types.
+func (e *AMFEncoder) toAMFCompatible(data interface{}) interface{} {
+	return e.toAMF3Compatible(data)
+}
+
 // DetectAMFVersion determines which AMF version to use based on the request.
 func DetectAMFVersion(r *http.Request) AMFVersion {
 	if r == nil {

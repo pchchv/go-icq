@@ -115,3 +115,64 @@ func (e *AMFEncoder) structToMap(v reflect.Value) map[string]interface{} {
 
 	return result
 }
+
+// convertToMap converts any data to a map structure for AMF3
+func (e *AMFEncoder) convertToMap(data interface{}) interface{} {
+	if data == nil {
+		// for AMF3, return empty map instead of nil to avoid truncation
+		return map[string]interface{}{}
+	}
+
+	// if already a map, return as-is (even if empty)
+	if m, ok := data.(map[string]interface{}); ok {
+		if m == nil {
+			return map[string]interface{}{}
+		}
+		return m
+	}
+
+	v := reflect.ValueOf(data)
+	// handle pointers
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil
+		}
+		v = v.Elem()
+		data = v.Interface()
+	}
+
+	// handle different types
+	switch v.Kind() {
+	case reflect.Struct:
+		return e.structToMap(v)
+	case reflect.Map:
+		return e.mapToAMFMap(v)
+	case reflect.Slice, reflect.Array:
+		result := make([]interface{}, v.Len())
+		for i := 0; i < v.Len(); i++ {
+			elem := v.Index(i)
+			if elem.CanInterface() {
+				result[i] = e.convertToMap(elem.Interface())
+			}
+		}
+		return result
+	default:
+		// for basic types, return as-is
+		return data
+	}
+}
+
+// responseBodyToMap converts ResponseBody to AMF3-compatible map
+func (e *AMFEncoder) responseBodyToMap(body ResponseBody) map[string]interface{} {
+	m := map[string]interface{}{
+		"statusCode": body.StatusCode,
+		"statusText": body.StatusText,
+	}
+	if body.Data != nil {
+		m["data"] = e.toAMF3Compatible(body.Data)
+	} else {
+		// for AMF3, always include data field even if empty to prevent truncation
+		m["data"] = map[string]interface{}{}
+	}
+	return m
+}

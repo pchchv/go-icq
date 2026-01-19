@@ -38,6 +38,13 @@ type ResponseBody struct {
 	Data       interface{} `json:"data,omitempty" xml:"data,omitempty"`
 }
 
+// BaseResponse is the standard response envelope for all Web API responses.
+// It supports both JSON and XML marshaling.
+type BaseResponse struct {
+	XMLName  xml.Name     `xml:"response" json:"-"`
+	Response ResponseBody `json:"response"`
+}
+
 // ErrorResponse represents an error response with proper XML/JSON support.
 type ErrorResponse struct {
 	XMLName  xml.Name `xml:"response" json:"-"`

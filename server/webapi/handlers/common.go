@@ -3,8 +3,10 @@ package handlers
 import (
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 )
 
 // XMLToken represents the token structure in XML.
@@ -108,6 +110,53 @@ func SendJSONP(w http.ResponseWriter, callback string, data interface{}, logger 
 	w.Write([]byte("("))
 	w.Write(jsonData)
 	w.Write([]byte(");"))
+}
+
+// SendXML sends an XML response.
+func SendXML(w http.ResponseWriter, data interface{}, logger *slog.Logger) {
+	w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+	// convert BaseResponse with map data to a format XML can handle
+	if baseResp, ok := data.(BaseResponse); ok {
+		data = convertBaseResponseForXML(baseResp)
+	}
+
+	// marshal the data
+	xmlData, err := xml.Marshal(data)
+	if err != nil {
+		if logger != nil {
+			logger.Error("failed to marshal XML response", "err", err.Error())
+		}
+
+		SendXMLError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	// write XML declaration and data
+	xmlOutput := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>%s`, xmlData)
+	// set content length for proper response handling
+	w.Header().Set("Content-Length", strconv.Itoa(len(xmlOutput)))
+	w.Write([]byte(xmlOutput))
+}
+
+// SendXMLError sends an XML error response.
+func SendXMLError(w http.ResponseWriter, statusCode int, message string) {
+	resp := ErrorResponse{}
+	resp.StatusCode = statusCode
+	resp.StatusText = message
+
+	w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+	w.WriteHeader(statusCode)
+
+	// write XML declaration and marshal the response
+	xmlData, err := xml.Marshal(resp)
+	if err != nil {
+		// fall back to simple text response
+		http.Error(w, message, statusCode)
+		return
+	}
+
+	xmlOutput := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>%s`, xmlData)
+	w.Write([]byte(xmlOutput))
 }
 
 // IsValidCallback validates a JSONP callback name to prevent XSS.

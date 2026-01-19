@@ -7,11 +7,19 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+
+	"github.com/pchchv/go-icq/state"
 )
 
 // CommonHandler provides shared utilities for all Web API handlers.
 type CommonHandler struct {
 	Logger *slog.Logger
+}
+
+// SessionRetriever provides methods to retrieve OSCAR sessions.
+type SessionRetriever interface {
+	AllSessions() []*state.Session
+	RetrieveSession(screenName state.IdentScreenName) *state.Session
 }
 
 // XMLToken represents the token structure in XML.

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/pchchv/go-icq/state"
+	"github.com/pchchv/go-icq/wire"
 )
 
 // CommonHandler provides shared utilities for all Web API handlers.
@@ -20,6 +22,12 @@ type CommonHandler struct {
 type SessionRetriever interface {
 	AllSessions() []*state.Session
 	RetrieveSession(screenName state.IdentScreenName) *state.Session
+}
+
+// FeedbagRetriever provides methods to retrieve feedbag data.
+type FeedbagRetriever interface {
+	RetrieveFeedbag(ctx context.Context, screenName state.IdentScreenName) ([]wire.FeedbagItem, error)
+	RelationshipsByUser(ctx context.Context, screenName state.IdentScreenName) ([]state.IdentScreenName, error)
 }
 
 // XMLToken represents the token structure in XML.

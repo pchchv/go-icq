@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -121,6 +122,83 @@ func NewAuthMiddleware(validator APIKeyValidator, logger *slog.Logger) *AuthMidd
 		RateLimiter: NewRateLimiter(),
 		Validator:   validator,
 	}
+}
+
+// Authenticate is an HTTP middleware that validates API keys and enforces rate limits.
+func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// extract API key from 'k' parameter (query or form)
+		apiKey := r.URL.Query().Get("k")
+		if apiKey == "" {
+			// try form value for POST requests
+			apiKey = r.FormValue("k")
+			if apiKey == "" {
+				m.sendErrorResponse(w, http.StatusBadRequest, "required parameter 'k' is missing")
+				return
+			}
+		}
+
+		// validate API key
+		ctx := r.Context()
+		key, err := m.Validator.GetAPIKeyByDevKey(ctx, apiKey)
+		if err != nil {
+			if err == state.ErrNoAPIKey {
+				m.Logger.DebugContext(ctx, "invalid API key attempted", "key", apiKey[:min(8, len(apiKey))]+"...")
+				m.sendErrorResponse(w, http.StatusForbidden, "invalid API key")
+				return
+			}
+
+			m.Logger.ErrorContext(ctx, "error validating API key", "err", err.Error())
+			m.sendErrorResponse(w, http.StatusInternalServerError, "internal server error")
+			return
+		}
+
+		// check if key is active
+		if !key.IsActive {
+			m.Logger.DebugContext(ctx, "inactive API key used", "dev_id", key.DevID)
+			m.sendErrorResponse(w, http.StatusForbidden, "API key is inactive")
+			return
+		}
+
+		// check rate limit
+		rateLimitInfo := m.RateLimiter.CheckRateLimit(key.DevID, key.RateLimit)
+		// always add rate limit headers
+		w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", rateLimitInfo.Limit))
+		w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", rateLimitInfo.Remaining))
+		w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", rateLimitInfo.Reset))
+		if !rateLimitInfo.Allowed {
+			m.Logger.WarnContext(ctx, "rate limit exceeded", "dev_id", key.DevID, "limit", key.RateLimit)
+			// add Retry-After header
+			retryAfter := rateLimitInfo.Reset - time.Now().Unix()
+			if retryAfter < 1 {
+				retryAfter = 1
+			}
+
+			w.Header().Set("Retry-After", fmt.Sprintf("%d", retryAfter))
+			m.sendErrorResponse(w, http.StatusTooManyRequests, "rate limit exceeded")
+			return
+		}
+
+		// update last used timestamp asynchronously
+		go func() {
+			if err := m.Validator.UpdateLastUsed(context.Background(), apiKey); err != nil {
+				m.Logger.Error("failed to update last_used timestamp", "err", err.Error())
+			}
+		}()
+
+		// add API key info to context for use in handlers
+		ctx = context.WithValue(ctx, ContextKeyAPIKey, key)
+		ctx = context.WithValue(ctx, ContextKeyDevID, key.DevID)
+		// log the API request
+		m.Logger.InfoContext(ctx, "API request authenticated",
+			"dev_id", key.DevID,
+			"app_name", key.AppName,
+			"method", r.Method,
+			"path", r.URL.Path,
+		)
+		// pass to next handler with enriched context
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 // sendErrorResponse sends a JSON error response.

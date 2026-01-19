@@ -9,6 +9,11 @@ import (
 	"strconv"
 )
 
+// CommonHandler provides shared utilities for all Web API handlers.
+type CommonHandler struct {
+	Logger *slog.Logger
+}
+
 // XMLToken represents the token structure in XML.
 type XMLToken struct {
 	A         string `xml:"a"`

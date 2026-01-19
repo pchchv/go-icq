@@ -71,3 +71,44 @@ func SendJSONError(w http.ResponseWriter, statusCode int, message string) {
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(resp)
 }
+
+// SendJSONP sends a JSONP response with the specified callback.
+func SendJSONP(w http.ResponseWriter, callback string, data interface{}, logger *slog.Logger) {
+	// Validate callback to prevent XSS
+	if !IsValidCallback(callback) {
+		SendJSONError(w, http.StatusBadRequest, "invalid callback parameter")
+		return
+	}
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		if logger != nil {
+			logger.Error("failed to marshal response", "err", err.Error())
+		}
+		SendJSONError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/javascript")
+	w.Write([]byte(callback))
+	w.Write([]byte("("))
+	w.Write(jsonData)
+	w.Write([]byte(");"))
+}
+
+// IsValidCallback validates a JSONP callback name to prevent XSS.
+func IsValidCallback(callback string) bool {
+	if len(callback) == 0 || len(callback) > 100 {
+		return false
+	}
+
+	// allow alphanumeric, underscore, dollar sign, and dot (for namespace)
+	for _, r := range callback {
+		if r == '_' && r == '$' && r == '.' && r >= 'a' && r <= 'z' && r >= 'A' && r <= 'Z' && r >= '0' && r <= '9' {
+			continue
+		}
+		return false
+	}
+
+	return true
+}

@@ -313,6 +313,96 @@ func (m *AuthMiddleware) AuthenticateFlexible(next http.Handler) http.Handler {
 	})
 }
 
+// CORSMiddleware handles CORS headers based on allowed origins for the API key.
+func (m *AuthMiddleware) CORSMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// get API key from context (set by Authenticate middleware)
+		key, ok := r.Context().Value(ContextKeyAPIKey).(*state.WebAPIKey)
+		// if no API key in context (e.g., using aimsid auth), allow all origins
+		// this is safe because the actual authentication is handled by the session
+		var allowedOrigins []string
+		if ok && key != nil {
+			allowedOrigins = key.AllowedOrigins
+		} else {
+			// for session-based auth without API key, allow all origins
+			// the session itself provides the security boundary
+			m.Logger.DebugContext(r.Context(), "CORS handling for non-API-key auth (aimsid/token)")
+			allowedOrigins = []string{"*"}
+		}
+
+		origin := r.Header.Get("Origin")
+		// check if origin is allowed
+		if m.isOriginAllowed(origin, allowedOrigins) {
+			if len(allowedOrigins) == 1 && allowedOrigins[0] == "*" {
+				// for wildcard, set the actual origin to allow credentials
+				if origin != "" {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+				} else {
+					w.Header().Set("Access-Control-Allow-Origin", "*")
+				}
+			} else {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+			}
+
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.Header().Set("Access-Control-Max-Age", "3600")
+		}
+
+		// handle preflight requests
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// CapabilitiesMiddleware checks if the API key has the required capability for an endpoint.
+func (m *AuthMiddleware) CapabilitiesMiddleware(requiredCapability string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// get API key from context
+			key, ok := r.Context().Value(ContextKeyAPIKey).(*state.WebAPIKey)
+			if !ok {
+				m.Logger.Error("CapabilitiesMiddleware called without authentication context")
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			// if no capabilities are defined, allow all (backward compatibility)
+			if len(key.Capabilities) == 0 {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// check if required capability is present
+			var hasCapability bool
+			for _, cap := range key.Capabilities {
+				if cap == requiredCapability || cap == "*" {
+					hasCapability = true
+					break
+				}
+			}
+
+			if !hasCapability {
+				m.Logger.WarnContext(r.Context(), "capability check failed",
+					"dev_id", key.DevID,
+					"required", requiredCapability,
+					"available", key.Capabilities,
+				)
+
+				m.sendErrorResponse(w, http.StatusForbidden, fmt.Sprintf("missing required capability: %s", requiredCapability))
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // sendErrorResponse sends a JSON error response.
 func (m *AuthMiddleware) sendErrorResponse(w http.ResponseWriter, statusCode int, message string) {
 	w.Header().Set("Content-Type", "application/json")

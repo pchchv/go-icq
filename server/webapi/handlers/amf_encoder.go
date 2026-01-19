@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/pchchv/go-icq/server/webapi/types"
 )
 
 const AMF3 AMFVersion = 3
@@ -213,6 +215,94 @@ func (e *AMFEncoder) sliceToArray(v reflect.Value) []interface{} {
 // toAMFCompatible converts Go types to AMF3-compatible types.
 func (e *AMFEncoder) toAMFCompatible(data interface{}) interface{} {
 	return e.toAMF3Compatible(data)
+}
+
+// sanitizeForAMF3 recursively removes nil values from
+// the data structure because goAMF3 panics when encountering nil values in maps.
+func (e *AMFEncoder) sanitizeForAMF3(data interface{}) interface{} {
+	if data == nil {
+		return map[string]interface{}{}
+	}
+
+	switch v := data.(type) {
+	case uint64:
+		// goAMF3 can't handle uint64, convert to int
+		return int(v)
+	case uint32:
+		// convert all unsigned to signed for safety
+		return int(v)
+	case uint16:
+		return int(v)
+	case uint8:
+		return int(v)
+	case uint:
+		return int(v)
+	case map[string]interface{}:
+		result := make(map[string]interface{})
+		for key, val := range v {
+			if val == nil {
+				// for fields like 'data', replace with empty map
+				// for other fields, skip them
+				if key == "data" {
+					result[key] = map[string]interface{}{}
+				}
+				continue
+			}
+			result[key] = e.sanitizeForAMF3(val)
+		}
+		return result
+	case []interface{}:
+		result := make([]interface{}, len(v))
+		for i, item := range v {
+			result[i] = e.sanitizeForAMF3(item)
+		}
+		return result
+	case []types.Event:
+		// handle WebAPIEvent arrays specially
+		result := make([]interface{}, len(v))
+		for i, event := range v {
+			// AMF3 has a 29-bit limit for integers
+			// keep seqNum small by using modulo
+			seqNum := int(event.SeqNum % (1 << 29))
+			// convert timestamp to seconds ago to keep it small
+			timestampSec := int(time.Now().Unix() - event.Timestamp)
+			if timestampSec < 0 {
+				timestampSec = 0
+			}
+
+			result[i] = map[string]interface{}{
+				"type":      event.Type,
+				"seqNum":    seqNum,
+				"timestamp": timestampSec,
+				"data":      e.sanitizeForAMF3(event.Data),
+			}
+		}
+		return result
+	case types.Event:
+		// handle single WebAPIEvent
+		// AMF3 has a 29-bit limit for integers
+		seqNum := int(v.SeqNum % (1 << 29))
+		// convert timestamp to seconds ago to keep it small
+		timestampSec := int(time.Now().Unix() - v.Timestamp)
+		if timestampSec < 0 {
+			timestampSec = 0
+		}
+
+		return map[string]interface{}{
+			"type":      v.Type,
+			"seqNum":    seqNum,
+			"timestamp": timestampSec,
+			"data":      e.sanitizeForAMF3(v.Data),
+		}
+	default:
+		// for other types,
+		// use reflection to check if it's a struct and convert to map
+		rv := reflect.ValueOf(data)
+		if rv.Kind() == reflect.Struct {
+			return e.structToMap(rv)
+		}
+		return data
+	}
 }
 
 // DetectAMFVersion determines which AMF version to use based on the request.

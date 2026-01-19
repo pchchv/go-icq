@@ -2,6 +2,12 @@ package handlers
 
 import "encoding/xml"
 
+// XMLToken represents the token structure in XML.
+type XMLToken struct {
+	A         string `xml:"a"`
+	ExpiresIn int    `xml:"expiresIn"`
+}
+
 // ErrorResponse represents an error response with proper XML/JSON support.
 type ErrorResponse struct {
 	XMLName  xml.Name `xml:"response" json:"-"`

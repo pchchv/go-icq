@@ -1,6 +1,11 @@
 package handlers
 
-import "encoding/xml"
+import (
+	"encoding/json"
+	"encoding/xml"
+	"log/slog"
+	"net/http"
+)
 
 // XMLToken represents the token structure in XML.
 type XMLToken struct {
@@ -44,4 +49,25 @@ type XMLMapResponse struct {
 	StatusCode int      `xml:"statusCode"`
 	StatusText string   `xml:"statusText"`
 	Data       XMLData  `xml:"data,omitempty"`
+}
+
+// SendJSON sends a JSON response.
+func SendJSON(w http.ResponseWriter, data interface{}, logger *slog.Logger) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		if logger != nil {
+			logger.Error("failed to encode JSON response", "err", err.Error())
+		}
+	}
+}
+
+// SendJSONError sends a JSON error response.
+func SendJSONError(w http.ResponseWriter, statusCode int, message string) {
+	resp := ErrorResponse{}
+	resp.Response.StatusCode = statusCode
+	resp.Response.StatusText = message
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(resp)
 }

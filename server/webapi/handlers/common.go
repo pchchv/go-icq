@@ -126,3 +126,69 @@ func IsValidCallback(callback string) bool {
 
 	return true
 }
+
+// convertBaseResponseForXML converts a BaseResponse with map data to XMLMapResponse.
+func convertBaseResponseForXML(resp BaseResponse) XMLMapResponse {
+	xmlResp := XMLMapResponse{
+		StatusCode: resp.Response.StatusCode,
+		StatusText: resp.Response.StatusText,
+	}
+
+	// convert map data to XMLData struct
+	if dataMap, ok := resp.Response.Data.(map[string]interface{}); ok {
+		xmlData := XMLData{}
+		// handle auth response fields
+		if tokenData, ok := dataMap["token"].(map[string]interface{}); ok {
+			xmlData.Token = &XMLToken{}
+			if a, ok := tokenData["a"].(string); ok {
+				xmlData.Token.A = a
+			}
+
+			if expiresIn, ok := tokenData["expiresIn"].(int); ok {
+				xmlData.Token.ExpiresIn = expiresIn
+			}
+		}
+
+		if loginId, ok := dataMap["loginId"].(string); ok {
+			xmlData.LoginID = loginId
+		}
+
+		if screenName, ok := dataMap["screenName"].(string); ok {
+			xmlData.ScreenName = screenName
+		}
+
+		if sessionSecret, ok := dataMap["sessionSecret"].(string); ok {
+			xmlData.SessionSecret = sessionSecret
+		}
+
+		if hostTime, ok := dataMap["hostTime"].(int64); ok {
+			xmlData.HostTime = hostTime
+		}
+
+		if tokenExpiresIn, ok := dataMap["tokenExpiresIn"].(int); ok {
+			xmlData.TokenExpiresIn = tokenExpiresIn
+		}
+
+		// handle session response fields
+		if aimsid, ok := dataMap["aimsid"].(string); ok {
+			xmlData.AimSID = aimsid
+		}
+
+		if fetchUrl, ok := dataMap["fetchUrl"].(string); ok {
+			xmlData.FetchURL = fetchUrl
+		}
+
+		// handle message response fields
+		if msgId, ok := dataMap["msgId"].(string); ok {
+			xmlData.MsgID = msgId
+		}
+
+		if state, ok := dataMap["state"].(string); ok {
+			xmlData.State = state
+		}
+
+		xmlResp.Data = xmlData
+	}
+
+	return xmlResp
+}

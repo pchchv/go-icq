@@ -17,6 +17,12 @@ type Buddy struct {
 	StatusMsg string `json:"statusMsg,omitempty"`
 }
 
+// BuddyGroup represents a group of buddies.
+type BuddyGroup struct {
+	Name    string  `json:"name"`
+	Buddies []Buddy `json:"buddies"`
+}
+
 // AuthService defines methods needed for authentication.
 type AuthService interface {
 	BUCPChallenge(ctx context.Context, bodyIn wire.SNAC_0x17_0x06_BUCPChallengeRequest, newUUID func() uuid.UUID) (wire.SNACMessage, error)
@@ -26,7 +32,7 @@ type AuthService interface {
 
 // SessionManager defines methods for OSCAR session management.
 type SessionManager interface {
-	AddSession(ctx context.Context, screenName state.DisplayScreenName) (*state.SessionInstance, error)
+	AddSession(ctx context.Context, screenName state.DisplayScreenName) (*state.Session, error)
 	RemoveSession(instance *state.Session)
 	RelayToScreenName(ctx context.Context, screenName state.IdentScreenName, msg wire.SNACMessage)
 }

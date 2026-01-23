@@ -23,6 +23,11 @@ type BuddyGroup struct {
 	Buddies []Buddy `json:"buddies"`
 }
 
+// BuddyListService defines methods for buddy list operations.
+type BuddyListService interface {
+	GetBuddyList(ctx context.Context, screenName state.IdentScreenName) ([]BuddyGroup, error)
+}
+
 // AuthService defines methods needed for authentication.
 type AuthService interface {
 	BUCPChallenge(ctx context.Context, bodyIn wire.SNAC_0x17_0x06_BUCPChallengeRequest, newUUID func() uuid.UUID) (wire.SNACMessage, error)

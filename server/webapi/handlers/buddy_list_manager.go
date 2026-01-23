@@ -19,6 +19,14 @@ type WebAPIBuddyInfo struct {
 	MemberSince  int64    `json:"memberSince,omitempty"`
 }
 
+// WebAPIBuddyGroup represents a group in the WebAPI buddy list format.
+type WebAPIBuddyGroup struct {
+	Name    string            `json:"name"`
+	Buddies []WebAPIBuddyInfo `json:"buddies"`
+	Recent  bool              `json:"recent,omitempty"`
+	Smart   interface{}       `json:"smart,omitempty"` // Can be null or number
+}
+
 // BuddyListManager handles the conversion of OSCAR feedbag data
 // to WebAPI buddy list format for web clients.
 type BuddyListManager struct {

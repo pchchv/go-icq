@@ -47,3 +47,11 @@ type SessionManager interface {
 	RemoveSession(instance *state.Session)
 	RelayToScreenName(ctx context.Context, screenName state.IdentScreenName, msg wire.SNACMessage)
 }
+
+// EndSessionResponse represents the response for endSession endpoint.
+type EndSessionResponse struct {
+	Response struct {
+		StatusCode int    `json:"statusCode"`
+		StatusText string `json:"statusText"`
+	} `json:"response"`
+}

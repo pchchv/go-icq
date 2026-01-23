@@ -14,3 +14,10 @@ type AuthService interface {
 	BUCPLogin(ctx context.Context, bodyIn wire.SNAC_0x17_0x02_BUCPLoginRequest, newUserFn func(screenName state.DisplayScreenName) (state.User, error), advertisedHost string) (wire.SNACMessage, error)
 	RegisterBOSSession(ctx context.Context, authCookie state.ServerCookie) (*state.Session, error)
 }
+
+// SessionManager defines methods for OSCAR session management.
+type SessionManager interface {
+	AddSession(ctx context.Context, screenName state.DisplayScreenName) (*state.SessionInstance, error)
+	RemoveSession(instance *state.Session)
+	RelayToScreenName(ctx context.Context, screenName state.IdentScreenName, msg wire.SNACMessage)
+}

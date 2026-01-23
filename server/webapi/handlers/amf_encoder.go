@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	goAMF3 "github.com/pchchv/amf"
 	"github.com/pchchv/go-icq/server/webapi/types"
 )
 
@@ -24,6 +25,16 @@ type AMFEncoder struct {
 // NewAMFEncoder creates a new AMF encoder instance.
 func NewAMFEncoder(logger *slog.Logger) *AMFEncoder {
 	return &AMFEncoder{logger: logger}
+}
+
+// EncodeAMF encodes data to AMF3 format (only supported version).
+func (e *AMFEncoder) EncodeAMF(data interface{}, version AMFVersion) ([]byte, error) {
+	// convert to a regular map structure (no ECMAArray needed)
+	amfData := e.toAMF3Compatible(data)
+	// goAMF3 panics on nil values, ensure we sanitize
+	sanitized := e.sanitizeForAMF3(amfData)
+	encoded := goAMF3.EncodeAMF3(sanitized)
+	return encoded, nil
 }
 
 // isZeroValue checks if a reflect.Value is a zero value.

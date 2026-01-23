@@ -395,3 +395,28 @@ func TestIsAMFRequest(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkAMFEncoding(b *testing.B) {
+	encoder := NewAMFEncoder(nil)
+	data := BaseResponse{
+		Response: ResponseBody{
+			StatusCode: 200,
+			StatusText: "OK",
+			Data: map[string]interface{}{
+				"users": []interface{}{
+					map[string]interface{}{"name": "user1", "online": true},
+					map[string]interface{}{"name": "user2", "online": false},
+					map[string]interface{}{"name": "user3", "online": true},
+				},
+				"timestamp": time.Now().Unix(),
+				"server":    "open-oscar-server",
+			},
+		},
+	}
+
+	b.Run("AMF3", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, _ = encoder.EncodeAMF(data, AMF3)
+		}
+	})
+}

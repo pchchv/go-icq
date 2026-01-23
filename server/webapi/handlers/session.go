@@ -8,6 +8,15 @@ import (
 	"github.com/pchchv/go-icq/wire"
 )
 
+// Buddy represents a buddy in the buddy list.
+type Buddy struct {
+	AimID     string `json:"aimId"`
+	State     string `json:"state"`
+	AwayMsg   string `json:"awayMsg,omitempty"`
+	UserType  string `json:"userType"`
+	StatusMsg string `json:"statusMsg,omitempty"`
+}
+
 // AuthService defines methods needed for authentication.
 type AuthService interface {
 	BUCPChallenge(ctx context.Context, bodyIn wire.SNAC_0x17_0x06_BUCPChallengeRequest, newUUID func() uuid.UUID) (wire.SNACMessage, error)

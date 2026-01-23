@@ -344,3 +344,24 @@ func DetectAMFVersion(r *http.Request) AMFVersion {
 	// default to AMF3 for modern clients
 	return AMF3
 }
+
+// IsAMFRequest checks if the request is asking for AMF format.
+func IsAMFRequest(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+
+	// check query parameter
+	format := strings.ToLower(r.URL.Query().Get("f"))
+	if format == "amf" || format == "amf0" || format == "amf3" {
+		return true
+	}
+
+	// check accept header
+	accept := strings.ToLower(r.Header.Get("Accept"))
+	if strings.Contains(accept, "application/x-amf") || strings.Contains(accept, "application/amf") {
+		return true
+	}
+
+	return false
+}

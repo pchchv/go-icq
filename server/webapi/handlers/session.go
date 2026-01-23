@@ -28,6 +28,12 @@ type BuddyListService interface {
 	GetBuddyList(ctx context.Context, screenName state.IdentScreenName) ([]BuddyGroup, error)
 }
 
+// BuddyListRegistry defines methods for buddy list management.
+type BuddyListRegistry interface {
+	RegisterBuddyList(ctx context.Context, screenName state.IdentScreenName) error
+	UnregisterBuddyList(ctx context.Context, screenName state.IdentScreenName) error
+}
+
 // AuthService defines methods needed for authentication.
 type AuthService interface {
 	BUCPChallenge(ctx context.Context, bodyIn wire.SNAC_0x17_0x06_BUCPChallengeRequest, newUUID func() uuid.UUID) (wire.SNACMessage, error)

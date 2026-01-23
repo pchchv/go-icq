@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -283,5 +285,113 @@ func TestZeroValueDetection(t *testing.T) {
 		} else if actual != expected {
 			t.Errorf("Field %s: expected %v, got %v", field, expected, actual)
 		}
+	}
+}
+
+func TestDetectAMFVersion(t *testing.T) {
+	tests := []struct {
+		name     string
+		request  *http.Request
+		expected AMFVersion
+	}{
+		{
+			name:     "Query parameter amf3",
+			request:  httptest.NewRequest("GET", "/?f=amf3", nil),
+			expected: AMF3,
+		},
+		{
+			name:     "Query parameter amf",
+			request:  httptest.NewRequest("GET", "/?f=amf", nil),
+			expected: AMF3,
+		},
+		{
+			name: "Accept header AMF3",
+			request: func() *http.Request {
+				req := httptest.NewRequest("GET", "/", nil)
+				req.Header.Set("Accept", "application/x-amf3")
+				return req
+			}(),
+			expected: AMF3,
+		},
+		{
+			name: "Accept header AMF",
+			request: func() *http.Request {
+				req := httptest.NewRequest("GET", "/", nil)
+				req.Header.Set("Accept", "application/x-amf")
+				return req
+			}(),
+			expected: AMF3,
+		},
+		{
+			name:     "No AMF indication",
+			request:  httptest.NewRequest("GET", "/", nil),
+			expected: AMF3,
+		},
+		{
+			name:     "Nil request",
+			request:  nil,
+			expected: AMF3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			version := DetectAMFVersion(tt.request)
+			if version != tt.expected {
+				t.Errorf("DetectAMFVersion() = %v, want %v", version, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsAMFRequest(t *testing.T) {
+	tests := []struct {
+		name     string
+		request  *http.Request
+		expected bool
+	}{
+		{
+			name:     "Query parameter amf",
+			request:  httptest.NewRequest("GET", "/?f=amf", nil),
+			expected: true,
+		},
+		{
+			name:     "Query parameter amf3",
+			request:  httptest.NewRequest("GET", "/?f=amf3", nil),
+			expected: true,
+		},
+		{
+			name: "Accept header",
+			request: func() *http.Request {
+				req := httptest.NewRequest("GET", "/", nil)
+				req.Header.Set("Accept", "application/x-amf")
+				return req
+			}(),
+			expected: true,
+		},
+		{
+			name:     "JSON format",
+			request:  httptest.NewRequest("GET", "/?f=json", nil),
+			expected: false,
+		},
+		{
+			name:     "No format",
+			request:  httptest.NewRequest("GET", "/", nil),
+			expected: false,
+		},
+		{
+			name:     "Nil request",
+			request:  nil,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsAMFRequest(tt.request)
+			if result != tt.expected {
+				t.Errorf("IsAMFRequest() = %v, want %v", result, tt.expected)
+			}
+		})
 	}
 }

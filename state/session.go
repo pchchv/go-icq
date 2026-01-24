@@ -125,13 +125,6 @@ func NewSession() *Session {
 	}
 }
 
-// SetRemoteAddr sets the user's remote IP address
-func (s *Session) SetRemoteAddr(remoteAddr *netip.AddrPort) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.remoteAddr = remoteAddr
-}
-
 
 // SetChatRoomCookie sets the chatRoomCookie for the chat room the user is currently in.
 func (s *Session) SetChatRoomCookie(cookie string) {
@@ -177,14 +170,6 @@ func (s *Session) SetRateClasses(now time.Time, classes wire.RateLimitClasses) {
 
 	s.rateLimitStates = newStates
 	s.rateLimitStatesOriginal = newStates
-}
-
-// SetUserInfoFlag sets a flag to and returns UserInfoBitmask
-func (s *Session) SetUserInfoFlag(flag uint16) (flags uint16) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.userInfoBitmask |= flag
-	return s.userInfoBitmask
 }
 
 // SetOfflineMsgCount sets the offline message count.
@@ -915,6 +900,26 @@ func (s *SessionInstance) SetCaps(caps [][16]byte) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.capabilities = caps
+}
+
+// SetRemoteAddr sets the instance's remote IP address.
+func (s *SessionInstance) SetRemoteAddr(remoteAddr *netip.AddrPort) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.remoteAddr = remoteAddr
+}
+
+// SetUserInfoFlag sets a flag in the user info bitmask.
+func (s *SessionInstance) SetUserInfoFlag(flag uint16) (flags uint16) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if flag == wire.OServiceUserFlagUnavailable {
+		s.awayTime = s.session.nowFn()
+	}
+
+	s.userInfoBitmask |= flag
+	return s.userInfoBitmask
 }
 
 // away checks if the instance is away based on bitmask flags.

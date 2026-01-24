@@ -626,11 +626,6 @@ func (s *Session) Close() {
 	s.close()
 }
 
-// Closed blocks until the session is closed.
-func (s *Session) Closed() <-chan struct{} {
-	return s.stopCh
-}
-
 // ReceiveMessage returns a channel of messages relayed via this session.
 // It may only be read by one consumer.
 // The channel never closes.
@@ -867,4 +862,19 @@ func (s *SessionInstance) Warning() uint16 {
 // WarningCh returns the warning notification channel.
 func (s *SessionInstance) WarningCh() chan uint16 {
 	return s.session.WarningCh()
+}
+
+// Closed blocks until the instance is closed.
+func (s *SessionInstance) Closed() <-chan struct{} {
+	return s.stopCh
+}
+
+// OnClose registers a function to be called when the instance closes,
+// but only if other instances remain in the session.
+// If this is the last instance to close,
+// OnSessionClose will be called instead.
+func (s *SessionInstance) OnClose(fn func()) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.onInstanceCloseFn = fn
 }

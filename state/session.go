@@ -132,12 +132,6 @@ func (s *Session) SetRemoteAddr(remoteAddr *netip.AddrPort) {
 	s.remoteAddr = remoteAddr
 }
 
-// SetAwayMessage sets the user's away message.
-func (s *Session) SetAwayMessage(awayMessage string) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.awayMessage = awayMessage
-}
 
 // SetChatRoomCookie sets the chatRoomCookie for the chat room the user is currently in.
 func (s *Session) SetChatRoomCookie(cookie string) {
@@ -256,15 +250,6 @@ func (s *Session) SetWarning(warning uint16) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.warning = warning
-}
-
-// SetCaps sets capability UUIDs that represent the
-// features the client supports.
-// If set, capability metadata appears in the user info TLV list.
-func (s *Session) SetCaps(caps [][16]byte) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.caps = caps
 }
 
 // SetDisplayScreenName sets the user's screen name.
@@ -916,6 +901,20 @@ func (s *SessionInstance) SetUserStatusBitmask(bitmask uint32) {
 	}
 
 	s.userStatusBitmask = bitmask
+}
+
+// SetAwayMessage sets the instance's away message.
+func (s *SessionInstance) SetAwayMessage(awayMessage string) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.awayMsg = awayMessage
+}
+
+// SetCaps sets capability UUIDs for the instance.
+func (s *SessionInstance) SetCaps(caps [][16]byte) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.capabilities = caps
 }
 
 // away checks if the instance is away based on bitmask flags.

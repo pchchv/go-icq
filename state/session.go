@@ -885,3 +885,13 @@ func (s *SessionInstance) UserStatusBitmask() uint32 {
 	defer s.mutex.RUnlock()
 	return s.userStatusBitmask
 }
+
+// SignonTime returns the session's sign-on time.
+func (s *SessionInstance) SignonTime() time.Time {
+	return s.session.SignonTime()
+}
+
+// TypingEventsEnabled indicates whether the session wants to send and receive typing events.
+func (s *SessionInstance) TypingEventsEnabled() bool {
+	return s.session.TypingEventsEnabled()
+}

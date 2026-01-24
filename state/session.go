@@ -179,13 +179,6 @@ func (s *Session) SetOfflineMsgCount(count int) {
 	s.offlineMsgCount = count
 }
 
-// SetProfile sets the user's profile information.
-func (s *Session) SetProfile(profile UserProfile) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.profile = profile
-}
-
 // SetTypingEventsEnabled sets whether the client wants to send and receive
 // typing events.
 func (s *Session) SetTypingEventsEnabled(enabled bool) {
@@ -216,14 +209,7 @@ func (s *Session) SetIdentScreenName(screenName IdentScreenName) {
 	s.identScreenName = screenName
 }
 
-// SetMultiConnFlag sets the multi-connection flag for this session.
-func (s *Session) SetMultiConnFlag(flag wire.MultiConnFlag) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.multiConnFlag = flag
-}
-
-// SetSignonTime sets the user's sign-ontime.
+// SetSignonTime sets the user's sign-on time.
 func (s *Session) SetSignonTime(t time.Time) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -922,6 +908,22 @@ func (s *SessionInstance) SetClientID(clientID string) {
 	defer s.mutex.Unlock()
 
 	s.clientID = clientID
+}
+
+// SetProfile sets the user's profile information.
+func (s *SessionInstance) SetProfile(profile UserProfile) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.profile = profile
+}
+
+// SetMultiConnFlag sets the multi-connection flag for this instance.
+func (s *SessionInstance) SetMultiConnFlag(flag wire.MultiConnFlag) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.multiConnFlag = flag
 }
 
 // away checks if the instance is away based on bitmask flags.

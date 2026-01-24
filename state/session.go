@@ -82,9 +82,7 @@ type Session struct {
 }
 
 // NewSession returns a new instance of Session.
-// By default, the user may have up to 1000 pending messages before blocking.
 func NewSession() *Session {
-	now := time.Now()
 	return &Session{
 		msgCh:             make(chan wire.SNACMessage, 1000),
 		nowFn:             time.Now,
@@ -125,8 +123,7 @@ func NewSession() *Session {
 	}
 }
 
-
-// SetChatRoomCookie sets the chatRoomCookie for the chat room the user is currently in.
+// SetChatRoomCookie sets the chat room cookie.
 func (s *Session) SetChatRoomCookie(cookie string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -140,6 +137,7 @@ func (s *Session) SetUIN(uin uint32) {
 	s.uin = uin
 }
 
+// SetRateClasses sets the rate limit classes (shared across all sessions).
 func (s *Session) SetRateClasses(now time.Time, classes wire.RateLimitClasses) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -172,22 +170,21 @@ func (s *Session) SetOfflineMsgCount(count int) {
 	s.offlineMsgCount = count
 }
 
-// SetTypingEventsEnabled sets whether the client wants to send and receive
-// typing events.
+// SetTypingEventsEnabled sets whether the session wants to send and receive typing events.
 func (s *Session) SetTypingEventsEnabled(enabled bool) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.typingEventsEnabled = enabled
 }
 
-// SetIdentScreenName sets the user's screen name.
+// SetIdentScreenName sets the user's identity screen name (shared across all sessions).
 func (s *Session) SetIdentScreenName(screenName IdentScreenName) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.identScreenName = screenName
 }
 
-// SetSignonTime sets the user's sign-on time.
+// SetSignonTime sets the session's sign-on time.
 func (s *Session) SetSignonTime(t time.Time) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -229,7 +226,7 @@ func (s *Session) AwayMessage() string {
 	return s.awayMessage
 }
 
-// ChatRoomCookie gets the chatRoomCookie for the chat room the user is currently in.
+// ChatRoomCookie returns the chat room cookie.
 func (s *Session) ChatRoomCookie() string {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
@@ -257,7 +254,7 @@ func (s *Session) Profile() UserProfile {
 	return s.profile
 }
 
-// TypingEventsEnabled indicates whether the client wants to
+// TypingEventsEnabled indicates whether the session wants to
 // send and receive typing events.
 func (s *Session) TypingEventsEnabled() bool {
 	s.mutex.RLock()
@@ -265,24 +262,21 @@ func (s *Session) TypingEventsEnabled() bool {
 	return s.typingEventsEnabled
 }
 
-// IdentScreenName returns the user's screen name.
+// IdentScreenName returns the user's identity screen name.
 func (s *Session) IdentScreenName() IdentScreenName {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	return s.identScreenName
 }
 
-// SignonTime reports when the user signed on
+// SignonTime returns the session's sign-on time.
 func (s *Session) SignonTime() time.Time {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	return s.signonTime
 }
 
-// Warning returns the user's current warning level as a percentage.
-// The warning level is stored as an integer representation of a percentage
-// where 30 = 3.0%, 100 = 10.0%, 1000 = 100.0%, etc.
-// This is how the OSCAR protocol represents warning percentages.
+// Warning returns the user's current warning level.
 func (s *Session) Warning() uint16 {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
@@ -290,7 +284,6 @@ func (s *Session) Warning() uint16 {
 }
 
 // WarningCh returns the warning notification channel.
-// Listeners can receive from this channel to be notified when warnings occur.
 func (s *Session) WarningCh() chan uint16 {
 	return s.warningCh
 }
@@ -302,7 +295,7 @@ func (s *Session) Caps() [][16]byte {
 	return s.caps
 }
 
-// DisplayScreenName returns the user's screen name.
+// DisplayScreenName returns the user's display screen name.
 func (s *Session) DisplayScreenName() DisplayScreenName {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
@@ -340,10 +333,7 @@ func (s *Session) MemberSince() time.Time {
 	return s.memberSince
 }
 
-// ScaleWarningAndRateLimit increments the user's warning level and scales a rate limit accordingly.
-// The incr parameter is the warning increment (negative to decrease),
-// and classID specifies which rate limit class to scale.
-// The incr param is a percentage represented as an integer where 30 = 3.0%, 100 = 10.0%, etc.
+// ScaleWarningAndRateLimit increments the user's warning level and scales rate limits.
 func (s *Session) ScaleWarningAndRateLimit(incr int16, classID wire.RateLimitClassID) (bool, uint16) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -359,8 +349,10 @@ func (s *Session) ScaleWarningAndRateLimit(incr int16, classID wire.RateLimitCla
 	}
 
 	pct := float32(incr) / 1000.0
+	// create reference variables for better readability
 	rateClass := &s.rateLimitStates[classID-1]
 	originalRateClass := &s.rateLimitStatesOriginal[classID-1]
+	// clamp function to constrain values between min and max
 	clamp := func(value, min, max int32) int32 {
 		if value < min {
 			return min
@@ -391,14 +383,14 @@ func (s *Session) ScaleWarningAndRateLimit(incr int16, classID wire.RateLimitCla
 	return true, s.warning
 }
 
-// RateLimitStates returns the current session rate limits.
+// RateLimitStates returns the current rate limit states (shared across all sessions).
 func (s *Session) RateLimitStates() [5]RateClassState {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
 	return s.rateLimitStates
 }
 
-// SubscribeRateLimits subscribes the Session to
-// updates for the specified rate limit classes.
-// Future calls to ObserveRateChanges will report changes for these classes.
+// SubscribeRateLimits subscribes to rate limit updates.
 func (s *Session) SubscribeRateLimits(classes []wire.RateLimitClassID) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -434,8 +426,7 @@ func (s *Session) EvaluateRateLimit(now time.Time, rateClassID wire.RateLimitCla
 	return status
 }
 
-// ObserveRateChanges updates rate limit states forall known classes and
-// returns any classes and class states that have changed since the previous observation.
+// ObserveRateChanges updates rate limit states and returns changes.
 func (s *Session) ObserveRateChanges(now time.Time) (classDelta []RateClassState, stateDelta []RateClassState) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -503,15 +494,11 @@ func (s *Session) RelayMessage(msg wire.SNACMessage) SessSendStatus {
 	}
 }
 
-// TLVUserInfo returns a TLV list containing session information required by
-// multiple SNAC message types that convey user information.
+// TLVUserInfo returns a TLV list containing session information aggregated from all instances.
 func (s *Session) TLVUserInfo() wire.TLVUserInfo {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
 	return wire.TLVUserInfo{
-		ScreenName:   string(s.displayScreenName),
-		WarningLevel: uint16(s.warning),
+		ScreenName:   s.DisplayScreenName().String(),
+		WarningLevel: s.Warning(),
 		TLVBlock: wire.TLVBlock{
 			TLVList: s.userInfo(),
 		},

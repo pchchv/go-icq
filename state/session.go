@@ -846,6 +846,11 @@ func (s *SessionInstance) RelayMessageToInstance(msg wire.SNACMessage) SessSendS
 	}
 }
 
+// OfflineMsgCount returns the offline message count.
+func (s *SessionInstance) OfflineMsgCount() int {
+	return s.session.OfflineMsgCount()
+}
+
 // SetUserStatusBitmask sets the user status bitmask.
 func (s *SessionInstance) SetUserStatusBitmask(bitmask uint32) {
 	s.mutex.Lock()
@@ -931,4 +936,11 @@ func (s *SessionInstance) SetMultiConnFlag(flag wire.MultiConnFlag) {
 func (s *SessionInstance) away() bool {
 	return s.userInfoBitmask&wire.OServiceUserFlagUnavailable != 0 ||
 		s.userStatusBitmask&wire.OServiceUserStatusAway != 0
+}
+
+// caps retrieves instance capabilities.
+func (s *SessionInstance) caps() [][16]byte {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.capabilities
 }

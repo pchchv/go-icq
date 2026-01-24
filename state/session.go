@@ -310,13 +310,6 @@ func (s *Session) SetMemberSince(t time.Time) {
 	s.memberSince = t
 }
 
-// RemoteAddrs returns user's remote IP address
-func (s *Session) RemoteAddr() (remoteAddr *netip.AddrPort) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	return s.remoteAddr
-}
-
 // AwayMessage returns the user's away message.
 func (s *Session) AwayMessage() string {
 	s.mutex.RLock()
@@ -372,13 +365,6 @@ func (s *Session) IdentScreenName() IdentScreenName {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	return s.identScreenName
-}
-
-// MultiConnFlag retrieves the multi-connection flag for this session.
-func (s *Session) MultiConnFlag() wire.MultiConnFlag {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	return s.multiConnFlag
 }
 
 // SignonTime reports when the user signed on
@@ -884,4 +870,18 @@ func (s *SessionInstance) FoodGroupVersions() [wire.MDir + 1]uint16 {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	return s.foodGroupVersions
+}
+
+// RemoteAddr returns the instance's remote IP address.
+func (s *SessionInstance) RemoteAddr() (remoteAddr *netip.AddrPort) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.remoteAddr
+}
+
+// MultiConnFlag retrieves the multi-connection flag for this instance.
+func (s *SessionInstance) MultiConnFlag() wire.MultiConnFlag {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.multiConnFlag
 }

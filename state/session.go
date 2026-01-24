@@ -187,21 +187,6 @@ func (s *Session) SetTypingEventsEnabled(enabled bool) {
 	s.typingEventsEnabled = enabled
 }
 
-// SetKerberosAuth sets whether Kerberos authentication was used for this session.
-func (s *Session) SetKerberosAuth(enabled bool) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.kerberosAuth = enabled
-}
-
-// SetFoodGroupVersions sets the client's supported food group versions
-func (s *Session) SetFoodGroupVersions(versions [wire.MDir + 1]uint16) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.foodGroupVersions = versions
-}
-
-
 // SetIdentScreenName sets the user's screen name.
 func (s *Session) SetIdentScreenName(screenName IdentScreenName) {
 	s.mutex.Lock()
@@ -929,6 +914,20 @@ func (s *SessionInstance) SetMultiConnFlag(flag wire.MultiConnFlag) {
 	defer s.mutex.Unlock()
 
 	s.multiConnFlag = flag
+}
+
+// SetKerberosAuth sets whether Kerberos authentication was used for this instance.
+func (s *SessionInstance) SetKerberosAuth(enabled bool) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.kerberosAuth = enabled
+}
+
+// SetFoodGroupVersions sets the instance's supported food group versions.
+func (s *SessionInstance) SetFoodGroupVersions(versions [wire.MDir + 1]uint16) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.foodGroupVersions = versions
 }
 
 // away checks if the instance is away based on bitmask flags.

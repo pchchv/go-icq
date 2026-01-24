@@ -832,3 +832,17 @@ func (s *SessionInstance) AwayMessage() (string, time.Time) {
 	defer s.mutex.RUnlock()
 	return s.awayMsg, s.awayTime
 }
+
+// Idle reports the instance's idle state.
+func (s *SessionInstance) Idle() bool {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.idle
+}
+
+// IdleTime reports when the instance went idle.
+func (s *SessionInstance) IdleTime() time.Time {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.idleTime
+}

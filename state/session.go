@@ -808,3 +808,13 @@ func (s *SessionInstance) UIN() uint32 {
 func (s *SessionInstance) Num() uint8 {
 	return s.instanceNum
 }
+
+// DisplayScreenName returns the user's display screen name.
+func (s *SessionInstance) DisplayScreenName() DisplayScreenName {
+	return s.session.DisplayScreenName()
+}
+
+// IdentScreenName returns the user's identity screen name.
+func (s *SessionInstance) IdentScreenName() IdentScreenName {
+	return s.session.IdentScreenName()
+}

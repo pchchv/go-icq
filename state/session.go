@@ -229,12 +229,6 @@ func (s *Session) SetFoodGroupVersions(versions [wire.MDir + 1]uint16) {
 	s.foodGroupVersions = versions
 }
 
-// SetUserStatusBitmask sets the user status bitmask from the client.
-func (s *Session) SetUserStatusBitmask(bitmask uint32) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.userStatusBitmask = bitmask
-}
 
 // SetIdentScreenName sets the user's screen name.
 func (s *Session) SetIdentScreenName(screenName IdentScreenName) {
@@ -910,4 +904,23 @@ func (s *SessionInstance) RelayMessageToInstance(msg wire.SNACMessage) SessSendS
 	default:
 		return SessQueueFull
 	}
+}
+
+// SetUserStatusBitmask sets the user status bitmask.
+func (s *SessionInstance) SetUserStatusBitmask(bitmask uint32) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if (bitmask&wire.OServiceUserStatusAway == wire.OServiceUserStatusAway) && !s.away() {
+		s.awayTime = s.session.nowFn()
+	}
+
+	s.userStatusBitmask = bitmask
+}
+
+// away checks if the instance is away based on bitmask flags.
+// This method must be called while holding the mutex lock.
+func (s *SessionInstance) away() bool {
+	return s.userInfoBitmask&wire.OServiceUserFlagUnavailable != 0 ||
+		s.userStatusBitmask&wire.OServiceUserStatusAway != 0
 }

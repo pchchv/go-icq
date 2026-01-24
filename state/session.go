@@ -338,13 +338,6 @@ func (s *Session) UIN() uint32 {
 	return s.uin
 }
 
-// SignonComplete indicates whether the client has completed the sign-on sequence.
-func (s *Session) SignonComplete() bool {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	return s.signonComplete
-}
-
 // OfflineMsgCount returns the offline message count.
 func (s *Session) OfflineMsgCount() int {
 	s.mutex.RLock()
@@ -864,4 +857,14 @@ func (s *SessionInstance) SignonComplete() bool {
 // RateLimitStates returns the current rate limit states.
 func (s *SessionInstance) RateLimitStates() [5]RateClassState {
 	return s.session.RateLimitStates()
+}
+
+// Warning returns the user's current warning level.
+func (s *SessionInstance) Warning() uint16 {
+	return s.session.Warning()
+}
+
+// WarningCh returns the warning notification channel.
+func (s *SessionInstance) WarningCh() chan uint16 {
+	return s.session.WarningCh()
 }

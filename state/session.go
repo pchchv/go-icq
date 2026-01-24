@@ -360,13 +360,6 @@ func (s *Session) TypingEventsEnabled() bool {
 	return s.typingEventsEnabled
 }
 
-// KerberosAuth indicates whether Kerberos authentication was used for this session.
-func (s *Session) KerberosAuth() bool {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	return s.kerberosAuth
-}
-
 // FoodGroupVersions retrieves the client's supported food group versions.
 func (s *Session) FoodGroupVersions() [wire.MDir + 1]uint16 {
 	s.mutex.RLock()
@@ -474,14 +467,6 @@ func (s *Session) MemberSince() time.Time {
 func (s *Session) UserInfoBitmask() (flags uint16) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	return s.userInfoBitmask
-}
-
-// ClearUserInfoFlag clear a flag from and returns UserInfoBitmask.
-func (s *Session) ClearUserInfoFlag(flag uint16) (flags uint16) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.userInfoBitmask &^= flag
 	return s.userInfoBitmask
 }
 
@@ -877,4 +862,19 @@ func (s *SessionInstance) OnClose(fn func()) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.onInstanceCloseFn = fn
+}
+
+// ClearUserInfoFlag clears a flag from the user info bitmask.
+func (s *SessionInstance) ClearUserInfoFlag(flag uint16) (flags uint16) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.userInfoBitmask &^= flag
+	return s.userInfoBitmask
+}
+
+// KerberosAuth indicates whether Kerberos authentication was used for this instance.
+func (s *SessionInstance) KerberosAuth() bool {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.kerberosAuth
 }

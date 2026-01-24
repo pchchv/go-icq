@@ -945,5 +945,27 @@ func (s *SessionInstance) away() bool {
 func (s *SessionInstance) caps() [][16]byte {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
+
 	return s.capabilities
+}
+
+// active returns true if the instance is active.
+// An instance is considered active if:
+// - it is not closed
+// - it has completed the sign-on sequence
+// - it is not idle
+// - it is not away
+func (s *SessionInstance) active() bool {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	return !s.closed && s.signonComplete && !s.idle && !s.away()
+}
+
+// live returns whether the instance is ready to receive messages.
+func (s *SessionInstance) live() bool {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	return !s.closed && s.signonComplete
 }

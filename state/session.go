@@ -470,13 +470,6 @@ func (s *Session) BuddyIcon() (wire.BARTID, bool) {
 	return icon, icon.Type != 0
 }
 
-// ClientID retrieves the client ID.
-func (s *Session) ClientID() string {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	return s.clientID
-}
-
 // MemberSince reports when the user became a member.
 func (s *Session) MemberSince() time.Time {
 	s.mutex.RLock()
@@ -792,4 +785,16 @@ type SessionInstance struct {
 // Session returns the parent Session for this instance.
 func (s *SessionInstance) Session() *Session {
 	return s.session
+}
+
+// ClientID retrieves the instance's client ID.
+func (s *SessionInstance) ClientID() string {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.clientID
+}
+
+// ChatRoomCookie returns the chat room cookie from the parent session.
+func (s *SessionInstance) ChatRoomCookie() string {
+	return s.session.ChatRoomCookie()
 }

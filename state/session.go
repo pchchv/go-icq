@@ -244,27 +244,11 @@ func (s *Session) SetDisplayScreenName(displayScreenName DisplayScreenName) {
 	s.displayScreenName = displayScreenName
 }
 
-// SetIdle sets the user's idle state.
-func (s *Session) SetIdle(dur time.Duration) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.idle = true
-	// set the time the user became idle
-	s.idleTime = s.nowFn().Add(-dur)
-}
-
 // SetBuddyIcon stores the session's buddy icon metadata.
 func (s *Session) SetBuddyIcon(icon wire.BARTID) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.buddyIcon = icon
-}
-
-// SetClientID sets the client ID.
-func (s *Session) SetClientID(clientID string) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.clientID = clientID
 }
 
 // SetMemberSince sets the member since timestamp.
@@ -920,6 +904,24 @@ func (s *SessionInstance) SetUserInfoFlag(flag uint16) (flags uint16) {
 
 	s.userInfoBitmask |= flag
 	return s.userInfoBitmask
+}
+
+// SetIdle sets the instance's idle state.
+func (s *SessionInstance) SetIdle(dur time.Duration) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.idle = true
+	// set the time the instance became idle
+	s.idleTime = s.session.nowFn().Add(-dur)
+}
+
+// SetClientID sets the instance's client ID.
+func (s *SessionInstance) SetClientID(clientID string) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.clientID = clientID
 }
 
 // away checks if the instance is away based on bitmask flags.

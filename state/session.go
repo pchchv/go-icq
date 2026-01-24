@@ -798,3 +798,13 @@ func (s *SessionInstance) ClientID() string {
 func (s *SessionInstance) ChatRoomCookie() string {
 	return s.session.ChatRoomCookie()
 }
+
+// UIN returns the user's ICQ number.
+func (s *SessionInstance) UIN() uint32 {
+	return s.session.UIN()
+}
+
+// Num returns the unique instance identifier.
+func (s *SessionInstance) Num() uint8 {
+	return s.instanceNum
+}

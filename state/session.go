@@ -746,3 +746,45 @@ func (s *Session) userInfo() wire.TLVList {
 	tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoMySubscriptions, uint32(0)))
 	return tlvs
 }
+
+// SessionInstance represents a single client connection instance
+// within a user's session.
+// Multiple SessionInstance objects can belong to the same Session,
+// allowing a user to maintain concurrent connections from
+// different clients or devices.
+//
+// SessionInstance stores connection-specific state such as the remote address,
+// sign-on completion status, client capabilities, idle state,
+// and per-connection profile data.
+// It holds a reference to its parent Session to access shared
+// user-level data like identity, warning levels, and rate limiting state.
+//
+// All methods on SessionInstance are safe for concurrent use.
+type SessionInstance struct {
+	session *Session
+	mutex   sync.RWMutex
+	// Unique instance identifier
+	instanceNum uint8
+	// Per-session connection state
+	remoteAddr     *netip.AddrPort
+	signonComplete bool
+	closed         bool
+	stopCh         chan struct{}
+	msgCh          chan wire.SNACMessage
+	kerberosAuth   bool
+	// Per-session client information
+	clientID          string
+	capabilities      [][16]byte
+	foodGroupVersions [wire.MDir + 1]uint16
+	multiConnFlag     wire.MultiConnFlag
+	// Per-session state
+	idle              bool
+	idleTime          time.Time
+	awayMsg           string
+	userInfoBitmask   uint16
+	userStatusBitmask uint32
+	// Per-session profile
+	profile           UserProfile
+	awayTime          time.Time
+	onInstanceCloseFn func()
+}

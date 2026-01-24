@@ -788,3 +788,8 @@ type SessionInstance struct {
 	awayTime          time.Time
 	onInstanceCloseFn func()
 }
+
+// Session returns the parent Session for this instance.
+func (s *SessionInstance) Session() *Session {
+	return s.session
+}

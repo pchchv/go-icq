@@ -846,3 +846,22 @@ func (s *SessionInstance) IdleTime() time.Time {
 	defer s.mutex.RUnlock()
 	return s.idleTime
 }
+
+// Invisible returns true if the user is invisible.
+func (s *SessionInstance) Invisible() bool {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.userStatusBitmask&wire.OServiceUserStatusInvisible == wire.OServiceUserStatusInvisible
+}
+
+// SignonComplete indicates whether the instance has completed the sign-on sequence.
+func (s *SessionInstance) SignonComplete() bool {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.signonComplete
+}
+
+// RateLimitStates returns the current rate limit states.
+func (s *SessionInstance) RateLimitStates() [5]RateClassState {
+	return s.session.RateLimitStates()
+}

@@ -818,3 +818,17 @@ func (s *SessionInstance) DisplayScreenName() DisplayScreenName {
 func (s *SessionInstance) IdentScreenName() IdentScreenName {
 	return s.session.IdentScreenName()
 }
+
+// Away returns true if the instance is away.
+func (s *SessionInstance) Away() bool {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.away()
+}
+
+// AwayMessage returns the instance's away message and the time it was set.
+func (s *SessionInstance) AwayMessage() (string, time.Time) {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.awayMsg, s.awayTime
+}

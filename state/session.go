@@ -360,13 +360,6 @@ func (s *Session) TypingEventsEnabled() bool {
 	return s.typingEventsEnabled
 }
 
-// FoodGroupVersions retrieves the client's supported food group versions.
-func (s *Session) FoodGroupVersions() [wire.MDir + 1]uint16 {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	return s.foodGroupVersions
-}
-
 // UserStatusBitmask returns the user status bitmask.
 func (s *Session) UserStatusBitmask() uint32 {
 	s.mutex.RLock()
@@ -877,4 +870,18 @@ func (s *SessionInstance) KerberosAuth() bool {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	return s.kerberosAuth
+}
+
+// Profile returns the user's profile information.
+func (s *SessionInstance) Profile() UserProfile {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.profile
+}
+
+// FoodGroupVersions retrieves the instance's supported food group versions.
+func (s *SessionInstance) FoodGroupVersions() [wire.MDir + 1]uint16 {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.foodGroupVersions
 }

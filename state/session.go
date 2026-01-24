@@ -353,13 +353,6 @@ func (s *Session) TypingEventsEnabled() bool {
 	return s.typingEventsEnabled
 }
 
-// UserStatusBitmask returns the user status bitmask.
-func (s *Session) UserStatusBitmask() uint32 {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	return s.userStatusBitmask
-}
-
 // IdentScreenName returns the user's screen name.
 func (s *Session) IdentScreenName() IdentScreenName {
 	s.mutex.RLock()
@@ -440,13 +433,6 @@ func (s *Session) MemberSince() time.Time {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	return s.memberSince
-}
-
-// UserInfoBitmask returns UserInfoBitmask.
-func (s *Session) UserInfoBitmask() (flags uint16) {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	return s.userInfoBitmask
 }
 
 // ScaleWarningAndRateLimit increments the user's warning level and scales a rate limit accordingly.
@@ -884,4 +870,18 @@ func (s *SessionInstance) MultiConnFlag() wire.MultiConnFlag {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	return s.multiConnFlag
+}
+
+// UserInfoBitmask returns the user info bitmask.
+func (s *SessionInstance) UserInfoBitmask() uint16 {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.userInfoBitmask
+}
+
+// UserStatusBitmask returns the user status bitmask.
+func (s *SessionInstance) UserStatusBitmask() uint32 {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return s.userStatusBitmask
 }

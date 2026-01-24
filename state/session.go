@@ -140,13 +140,6 @@ func (s *Session) SetUIN(uin uint32) {
 	s.uin = uin
 }
 
-// SetSignonComplete indicates that the client has completed the sign-on sequence.
-func (s *Session) SetSignonComplete() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.signonComplete = true
-}
-
 func (s *Session) SetRateClasses(now time.Time, classes wire.RateLimitClasses) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -330,16 +323,9 @@ func (s *Session) IdleTime() time.Time {
 	return s.idleTime
 }
 
-// UnsetIdle removes the user's idle state.
-func (s *Session) UnsetIdle() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.idle = false
-}
 
 // BuddyIcon returns the session's buddy icon metadata and
 // reports whether it has been set.
-// The icon is considered set if its type is non-zero.
 func (s *Session) BuddyIcon() (wire.BARTID, bool) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
@@ -920,6 +906,7 @@ func (s *SessionInstance) SetMultiConnFlag(flag wire.MultiConnFlag) {
 func (s *SessionInstance) SetKerberosAuth(enabled bool) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
 	s.kerberosAuth = enabled
 }
 
@@ -927,7 +914,24 @@ func (s *SessionInstance) SetKerberosAuth(enabled bool) {
 func (s *SessionInstance) SetFoodGroupVersions(versions [wire.MDir + 1]uint16) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
 	s.foodGroupVersions = versions
+}
+
+// SetSignonComplete indicates that the instance has completed the sign-on sequence.
+func (s *SessionInstance) SetSignonComplete() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	
+	s.signonComplete = true
+}
+
+// UnsetIdle removes the instance's idle state.
+func (s *SessionInstance) UnsetIdle() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.idle = false
 }
 
 // away checks if the instance is away based on bitmask flags.

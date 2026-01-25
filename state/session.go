@@ -550,17 +550,6 @@ func (s *Session) ObserveRateChanges(now time.Time) (classDelta []RateClassState
 	return classDelta, stateDelta
 }
 
-// Close shuts down the session's ability to relay messages.
-// Once invoked, RelayMessage returns SessQueueFull and Closed returns a closed channel.
-// It is not possible to re-open message relaying once closed.
-// It is safe to call from multiple go routines.
-func (s *Session) Close() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	s.close()
-}
-
 // TLVUserInfo returns a TLV list containing session information aggregated from all instances.
 func (s *Session) TLVUserInfo() wire.TLVUserInfo {
 	return wire.TLVUserInfo{
@@ -790,6 +779,32 @@ func (s *SessionInstance) OnClose(fn func()) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.onInstanceCloseFn = fn
+}
+
+// CloseInstance shuts down the instance's ability to relay messages and removes it from the session.
+func (s *SessionInstance) CloseInstance() {
+	s.mutex.Lock()
+
+	if s.closed {
+		s.mutex.Unlock()
+		return
+	}
+
+	close(s.stopCh)
+	s.closed = true
+	onInstanceCloseFn := s.onInstanceCloseFn
+	s.mutex.Unlock()
+
+	s.session.RemoveInstance(s)
+	count := s.session.InstanceCount()
+	if count == 0 {
+		s.session.mutex.RLock()
+		onSessCloseFn := s.session.onSessCloseFn
+		s.session.mutex.RUnlock()
+		onSessCloseFn()
+	} else {
+		onInstanceCloseFn()
+	}
 }
 
 // ClearUserInfoFlag clears a flag from the user info bitmask.
@@ -1034,6 +1049,28 @@ func (s *SessionInstance) live() bool {
 	defer s.mutex.RUnlock()
 
 	return !s.closed && s.signonComplete
+}
+
+// closeOnly shuts down the instance's ability to relay messages.
+func (s *SessionInstance) closeOnly() {
+	s.mutex.Lock()
+
+	if s.closed {
+		s.mutex.Unlock()
+		return
+	}
+
+	close(s.stopCh)
+	s.closed = true
+	s.mutex.Unlock()
+
+	s.session.RemoveInstance(s)
+	if s.session.InstanceCount() == 0 {
+		s.session.mutex.RLock()
+		onSessCloseFn := s.session.onSessCloseFn
+		s.session.mutex.RUnlock()
+		onSessCloseFn()
+	}
 }
 
 // defaultFoodGroupVersions returns default version numbers for all food groups.

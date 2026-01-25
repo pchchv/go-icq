@@ -11,6 +11,10 @@ import (
 	"github.com/pchchv/go-icq/wire"
 )
 
+// DefaultMaxConcurrentSessions is the default maximum number of concurrent
+// sessions allowed when multi-session is enabled.
+const DefaultMaxConcurrentSessions = 5
+
 var errSessConflict = errors.New("session conflict: another session was created concurrently for this user")
 
 type sessionSlot struct {
@@ -127,12 +131,11 @@ func (s *InMemorySessionManager) AddSession(ctx context.Context, screenName Disp
 }
 
 // RemoveSession takes a session out of the session pool.
-func (s *InMemorySessionManager) RemoveSession(sess *Session) {
+func (s *InMemorySessionManager) RemoveSession(instance *SessionInstance) {
 	s.mapMutex.Lock()
 	defer s.mapMutex.Unlock()
-
-	if rec, ok := s.store[sess.IdentScreenName()]; ok && rec.sess == sess {
-		delete(s.store, sess.IdentScreenName())
+	if rec, ok := s.store[instance.IdentScreenName()]; ok && rec.session == instance.Session() {
+		delete(s.store, instance.IdentScreenName())
 		close(rec.removed)
 	}
 }
@@ -143,10 +146,10 @@ func (s *InMemorySessionManager) AllSessions() (sessions []*Session) {
 	defer s.mapMutex.RUnlock()
 
 	for _, rec := range s.store {
-		if !rec.sess.SignonComplete() {
+		if !rec.session.HasLiveInstances() {
 			continue
 		}
-		sessions = append(sessions, rec.sess)
+		sessions = append(sessions, rec.session)
 	}
 
 	return
@@ -167,15 +170,6 @@ func (s *InMemorySessionManager) maybeRelayMessage(ctx context.Context, msg wire
 		s.logger.WarnContext(ctx, "can't send notification because queue is full", "recipient", sess.IdentScreenName(), "message", msg)
 		sess.Close()
 	}
-}
-
-func (s *InMemorySessionManager) findRec(identScreenName IdentScreenName) *sessionSlot {
-	for _, rec := range s.store {
-		if identScreenName == rec.sess.IdentScreenName() {
-			return rec
-		}
-	}
-	return nil
 }
 
 // InMemoryChatSessionManager manages chat sessions for
@@ -326,4 +320,13 @@ func (s *InMemorySessionManager) retrieveByScreenNames(screenNames []IdentScreen
 	}
 
 	return ret
+}
+
+func (s *InMemorySessionManager) findRec(identScreenName IdentScreenName) *sessionSlot {
+	for _, rec := range s.store {
+		if identScreenName == rec.session.IdentScreenName() {
+			return rec
+		}
+	}
+	return nil
 }

@@ -201,6 +201,36 @@ func (s *InMemorySessionManager) maybeRelayMessage(ctx context.Context, msg wire
 	}
 }
 
+func (s *InMemorySessionManager) lockUser(sn IdentScreenName) {
+	s.userLocksMutex.Lock()
+	lock, ok := s.userLocks[sn]
+	if !ok {
+		lock = &userLock{}
+		s.userLocks[sn] = lock
+	}
+
+	lock.refCount++
+	s.userLocksMutex.Unlock()
+	lock.Lock()
+}
+
+func (s *InMemorySessionManager) unlockUser(sn IdentScreenName) {
+	s.userLocksMutex.Lock()
+	defer s.userLocksMutex.Unlock()
+
+	lock, ok := s.userLocks[sn]
+	if !ok {
+		return
+	}
+
+	lock.Unlock()
+	lock.refCount--
+
+	if lock.refCount == 0 {
+		delete(s.userLocks, sn)
+	}
+}
+
 // InMemoryChatSessionManager manages chat sessions for
 // multiple chat rooms stored in memory.
 // It provides thread-safe operations to add,

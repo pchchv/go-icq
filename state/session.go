@@ -308,11 +308,17 @@ func (s *Session) OfflineMsgCount() int {
 	return s.offlineMsgCount
 }
 
-// Profile returns the user's profile information.
+// Profile returns the most recently updated non-empty profile from all instances.
 func (s *Session) Profile() UserProfile {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	return s.profile
+	var latest UserProfile
+	for _, instance := range s.Instances() {
+		profile := instance.Profile()
+		if !profile.IsEmpty() && (latest.IsEmpty() || profile.UpdateTime.After(latest.UpdateTime)) {
+			latest = profile
+		}
+	}
+
+	return latest
 }
 
 // TypingEventsEnabled indicates whether the session wants to
@@ -376,11 +382,20 @@ func (s *Session) DisplayScreenName() DisplayScreenName {
 	return s.displayScreenName
 }
 
-// Idle reports the user's idle state.
+// Idle returns true if all instances are idle.
 func (s *Session) Idle() bool {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	return s.idle
+	instances := s.Instances()
+	if len(instances) == 0 {
+		return false
+	}
+
+	for _, instance := range instances {
+		if !instance.Idle() {
+			return false
+		}
+	}
+
+	return true
 }
 
 // IdleTime reports when the user went idle

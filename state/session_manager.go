@@ -19,6 +19,11 @@ type sessionSlot struct {
 	multiSession bool
 }
 
+type userLock struct {
+	sync.Mutex
+	refCount int
+}
+
 // InMemorySessionManager handles the lifecycle of a user session and
 // provides synchronized message relay between sessions in the session pool.
 // An InMemorySessionManager is safe for concurrent use by multiple goroutines.

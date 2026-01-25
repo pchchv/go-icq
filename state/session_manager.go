@@ -231,6 +231,36 @@ func (s *InMemorySessionManager) unlockUser(sn IdentScreenName) {
 	}
 }
 
+func (s *InMemorySessionManager) maybeRelayMessageActiveOnly(ctx context.Context, msg wire.SNACMessage, sess *Session) {
+	for _, instance := range sess.Instances() {
+		if instance.active() {
+			switch instance.RelayMessageToInstance(msg) {
+			case SessSendClosed:
+				s.logger.WarnContext(ctx, "can't send notification because the user's session is closed", "recipient", sess.IdentScreenName(), "message", msg)
+			case SessQueueFull:
+				s.logger.WarnContext(ctx, "can't send notification because queue is full", "recipient", sess.IdentScreenName(), "message", msg)
+				instance.CloseInstance()
+			}
+		}
+	}
+}
+
+func (s *InMemorySessionManager) newSession(screenName DisplayScreenName, doMultiSess bool) (*SessionInstance, error) {
+	sess := NewSession()
+	sess.SetIdentScreenName(screenName.IdentScreenName())
+	sess.SetDisplayScreenName(screenName)
+	// create a new instance within the session group
+	instance := sess.AddInstance()
+	s.mapMutex.Lock()
+	s.store[instance.IdentScreenName()] = &sessionSlot{
+		session:      sess,
+		removed:      make(chan bool),
+		multiSession: doMultiSess,
+	}
+	s.mapMutex.Unlock()
+	return instance, nil
+}
+
 // InMemoryChatSessionManager manages chat sessions for
 // multiple chat rooms stored in memory.
 // It provides thread-safe operations to add,

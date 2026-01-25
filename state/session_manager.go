@@ -15,7 +15,9 @@ import (
 // sessions allowed when multi-session is enabled.
 const DefaultMaxConcurrentSessions = 5
 
-var errSessConflict = errors.New("session conflict: another session was created concurrently for this user")
+// ErrMaxConcurrentSessionsReached is returned when attempting to add a
+// new session instance but the maximum number of concurrent sessions has been reached.
+var ErrMaxConcurrentSessionsReached = errors.New("maximum number of concurrent sessions reached")
 
 type sessionSlot struct {
 	session      *Session
@@ -90,44 +92,40 @@ func (s *InMemorySessionManager) RelayToScreenNames(ctx context.Context, screenN
 	}
 }
 
-func (s *InMemorySessionManager) AddSession(ctx context.Context, screenName DisplayScreenName) (*Session, error) {
+func (s *InMemorySessionManager) AddSession(ctx context.Context, screenName DisplayScreenName, doMultiSess bool) (*SessionInstance, error) {
+	s.lockUser(screenName.IdentScreenName())
+	defer s.unlockUser(screenName.IdentScreenName())
+
 	s.mapMutex.Lock()
 	active := s.findRec(screenName.IdentScreenName())
+	s.mapMutex.Unlock()
+
 	if active != nil {
-		// there's an active session that needs to be removed
-		// don't hold the lock while we wait
-		s.mapMutex.Unlock()
+		if doMultiSess {
+			if !active.multiSession {
+				active.session.CloseSession()
+				return s.newSession(screenName, doMultiSess)
+			}
 
-		// signal to callers that this session has to go
-		active.sess.Close()
+			// check if we've reached the maximum number of concurrent sessions
+			if active.session.InstanceCount() >= s.maxConcurrentSessions {
+				return nil, ErrMaxConcurrentSessionsReached
+			}
 
-		select {
-		// wait for RemoveSession to be called
-		case <-active.removed:
-		case <-ctx.Done():
-			return nil, fmt.Errorf("waiting for previous session to terminate: %w", ctx.Err())
+			return active.session.AddInstance(), nil
+		} else {
+			// signal to callers that this session group has to go
+			active.session.CloseSession()
+
+			select {
+			case <-active.removed: // wait for RemoveSession to be called
+			case <-ctx.Done():
+				return nil, fmt.Errorf("waiting for previous session to terminate: %w", ctx.Err())
+			}
 		}
-
-		// the session has been removed, let's try to replace it
-		s.mapMutex.Lock()
 	}
 
-	defer s.mapMutex.Unlock()
-
-	// make sure a concurrent call didn't already add a session
-	if active != nil && s.findRec(screenName.IdentScreenName()) != nil {
-		return nil, errSessConflict
-	}
-
-	sess := NewSession()
-	sess.SetIdentScreenName(screenName.IdentScreenName())
-	sess.SetDisplayScreenName(screenName)
-	s.store[sess.IdentScreenName()] = &sessionSlot{
-		sess:    sess,
-		removed: make(chan bool),
-	}
-
-	return sess, nil
+	return s.newSession(screenName, doMultiSess)
 }
 
 // RemoveSession takes a session out of the session pool.

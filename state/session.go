@@ -469,28 +469,6 @@ func (s *Session) Close() {
 	s.close()
 }
 
-// RelayMessage receives a SNAC message from a user and passes it on
-// asynchronously to the consumer of this session's messages.
-// It returns SessSendStatus to indicate whether the message was successfully sent or not.
-// This method is non-blocking.
-func (s *Session) RelayMessage(msg wire.SNACMessage) SessSendStatus {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	if s.closed {
-		return SessSendClosed
-	}
-
-	select {
-	case s.msgCh <- msg:
-		return SessSendOK
-	case <-s.stopCh:
-		return SessSendClosed
-	default:
-		return SessQueueFull
-	}
-}
-
 // TLVUserInfo returns a TLV list containing session information aggregated from all instances.
 func (s *Session) TLVUserInfo() wire.TLVUserInfo {
 	return wire.TLVUserInfo{
@@ -502,20 +480,18 @@ func (s *Session) TLVUserInfo() wire.TLVUserInfo {
 	}
 }
 
-// Invisible returns true if the user is idle.
+// Invisible returns true if all instances are invisible.
 func (s *Session) Invisible() bool {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	return s.userStatusBitmask&wire.OServiceUserStatusInvisible == wire.OServiceUserStatusInvisible
-}
 
-func (s *Session) close() {
-	if s.closed {
-		return
+	for _, instance := range s.instances {
+		if !instance.Invisible() {
+			return false
+		}
 	}
 
-	close(s.stopCh)
-	s.closed = true
+	return true
 }
 
 func (s *Session) userInfo() wire.TLVList {

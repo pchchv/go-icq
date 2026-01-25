@@ -187,6 +187,34 @@ func (s *Session) OnSessionClose(fn func()) {
 	s.onSessCloseFn = fn
 }
 
+// Inactive returns true if all instances are not active.
+func (s *Session) Inactive() bool {
+	for _, instance := range s.Instances() {
+		if instance.active() {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Away returns true if all instances are away.
+func (s *Session) Away() bool {
+	instances := s.Instances()
+	if len(instances) == 0 {
+		return false
+	}
+
+	for _, instance := range instances {
+		if instance.UserInfoBitmask()&wire.OServiceUserFlagUnavailable == 0 &&
+			instance.UserStatusBitmask()&wire.OServiceUserStatusAway == 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
 // SetChatRoomCookie sets the chat room cookie.
 func (s *Session) SetChatRoomCookie(cookie string) {
 	s.mutex.Lock()

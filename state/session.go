@@ -235,6 +235,26 @@ func (s *Session) AllUserStatusBitmask(flag uint32) bool {
 	return true
 }
 
+// RunOnce executes the given function once across all invocations.
+// Used to run arbitrary code that must only run once when the
+// first session instance connects.
+// The function must not block.
+func (s *Session) RunOnce(fn func() error) (err error) {
+	s.initOnce.Do(func() {
+		err = fn()
+	})
+	return
+}
+
+// SetNowFn sets the function used to get the current time.
+// This is useful for testing.
+func (s *Session) SetNowFn(fn func() time.Time) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.nowFn = fn
+}
+
 // SetChatRoomCookie sets the chat room cookie.
 func (s *Session) SetChatRoomCookie(cookie string) {
 	s.mutex.Lock()

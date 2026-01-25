@@ -162,6 +162,45 @@ func (s *InMemorySessionManager) Empty() bool {
 	return len(s.store) == 0
 }
 
+func (s *InMemorySessionManager) retrieveByScreenNames(screenNames []IdentScreenName) []*Session {
+	s.mapMutex.RLock()
+	defer s.mapMutex.RUnlock()
+	var ret []*Session
+	for _, sn := range screenNames {
+		for _, rec := range s.store {
+			if sn == rec.session.IdentScreenName() {
+				ret = append(ret, rec.session)
+				break
+			}
+		}
+	}
+
+	return ret
+}
+
+func (s *InMemorySessionManager) findRec(identScreenName IdentScreenName) *sessionSlot {
+	for _, rec := range s.store {
+		if identScreenName == rec.session.IdentScreenName() {
+			return rec
+		}
+	}
+	return nil
+}
+
+func (s *InMemorySessionManager) maybeRelayMessage(ctx context.Context, msg wire.SNACMessage, sess *Session) {
+	for _, instance := range sess.Instances() {
+		if instance.live() {
+			switch instance.RelayMessageToInstance(msg) {
+			case SessSendClosed:
+				s.logger.WarnContext(ctx, "can't send notification because the user's session is closed", "recipient", sess.IdentScreenName(), "message", msg)
+			case SessQueueFull:
+				s.logger.WarnContext(ctx, "can't send notification because queue is full", "recipient", sess.IdentScreenName(), "message", msg)
+				instance.CloseInstance()
+			}
+		}
+	}
+}
+
 // InMemoryChatSessionManager manages chat sessions for
 // multiple chat rooms stored in memory.
 // It provides thread-safe operations to add,
@@ -259,7 +298,6 @@ func (s *InMemoryChatSessionManager) RelayToAllExcept(ctx context.Context, cooki
 
 	if sessionManager, ok := s.store[cookie]; !ok {
 		s.logger.Error("trying to relay message to all for non-existent room", "cookie", cookie)
-		return
 	} else {
 		for _, sess := range sessionManager.AllSessions() {
 			if sess.IdentScreenName() != except {
@@ -277,7 +315,6 @@ func (s *InMemoryChatSessionManager) RelayToScreenName(ctx context.Context, cook
 
 	if sessionManager, ok := s.store[cookie]; !ok {
 		s.logger.Error("trying to relay message to screen name for non-existent room", "cookie", cookie)
-		return
 	} else {
 		sessionManager.RelayToScreenName(ctx, recipient, msg)
 	}
@@ -290,47 +327,7 @@ func (s *InMemoryChatSessionManager) RemoveUserFromAllChats(user IdentScreenName
 
 	for _, sessionManager := range s.store {
 		if userSess := sessionManager.RetrieveSession(user); userSess != nil {
-			userSess.Close()
-			sessionManager.RemoveSession(userSess)
-		}
-	}
-}
-
-func (s *InMemorySessionManager) retrieveByScreenNames(screenNames []IdentScreenName) []*Session {
-	s.mapMutex.RLock()
-	defer s.mapMutex.RUnlock()
-	var ret []*Session
-	for _, sn := range screenNames {
-		for _, rec := range s.store {
-			if sn == rec.session.IdentScreenName() {
-				ret = append(ret, rec.session)
-				break
-			}
-		}
-	}
-
-	return ret
-}
-
-func (s *InMemorySessionManager) findRec(identScreenName IdentScreenName) *sessionSlot {
-	for _, rec := range s.store {
-		if identScreenName == rec.session.IdentScreenName() {
-			return rec
-		}
-	}
-	return nil
-}
-
-func (s *InMemorySessionManager) maybeRelayMessage(ctx context.Context, msg wire.SNACMessage, sess *Session) {
-	for _, instance := range sess.Instances() {
-		if instance.live() {
-			switch instance.RelayMessageToInstance(msg) {
-			case SessSendClosed:
-				s.logger.WarnContext(ctx, "can't send notification because the user's session is closed", "recipient", sess.IdentScreenName(), "message", msg)
-			case SessQueueFull:
-				s.logger.WarnContext(ctx, "can't send notification because queue is full", "recipient", sess.IdentScreenName(), "message", msg)
-				instance.CloseInstance()
-			}
+			userSess.CloseSession()
 		}
 	}
 }

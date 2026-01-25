@@ -162,16 +162,6 @@ func (s *InMemorySessionManager) Empty() bool {
 	return len(s.store) == 0
 }
 
-func (s *InMemorySessionManager) maybeRelayMessage(ctx context.Context, msg wire.SNACMessage, sess *Session) {
-	switch sess.RelayMessage(msg) {
-	case SessSendClosed:
-		s.logger.WarnContext(ctx, "can't send notification because the user's session is closed", "recipient", sess.IdentScreenName(), "message", msg)
-	case SessQueueFull:
-		s.logger.WarnContext(ctx, "can't send notification because queue is full", "recipient", sess.IdentScreenName(), "message", msg)
-		sess.Close()
-	}
-}
-
 // InMemoryChatSessionManager manages chat sessions for
 // multiple chat rooms stored in memory.
 // It provides thread-safe operations to add,
@@ -192,7 +182,7 @@ func NewInMemoryChatSessionManager(logger *slog.Logger) *InMemoryChatSessionMana
 
 // AddSession adds a user to a chat room.
 // If screenName already exists, the old session is replaced by a new one.
-func (s *InMemoryChatSessionManager) AddSession(ctx context.Context, chatCookie string, screenName DisplayScreenName) (*Session, error) {
+func (s *InMemoryChatSessionManager) AddSession(ctx context.Context, chatCookie string, screenName DisplayScreenName) (*SessionInstance, error) {
 	s.mapMutex.Lock()
 	if _, ok := s.store[chatCookie]; !ok {
 		s.store[chatCookie] = NewInMemorySessionManager(s.logger)
@@ -203,12 +193,12 @@ func (s *InMemoryChatSessionManager) AddSession(ctx context.Context, chatCookie 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
-	sess, err := sessionManager.AddSession(ctx, screenName)
+	sess, err := sessionManager.AddSession(ctx, screenName, false)
 	if err != nil {
 		return nil, fmt.Errorf("AddSession: %w", err)
 	}
 
-	sess.SetChatRoomCookie(chatCookie)
+	sess.Session().SetChatRoomCookie(chatCookie)
 
 	s.mapMutex.Lock()
 	defer s.mapMutex.Unlock()
@@ -231,18 +221,18 @@ func (s *InMemoryChatSessionManager) AddSession(ctx context.Context, chatCookie 
 
 // RemoveSession removes a user session from a chat room.
 // It panics if you attempt to remove the session twice.
-func (s *InMemoryChatSessionManager) RemoveSession(sess *Session) {
+func (s *InMemoryChatSessionManager) RemoveSession(instance *SessionInstance) {
 	s.mapMutex.Lock()
 	defer s.mapMutex.Unlock()
 
-	sessionManager, ok := s.store[sess.ChatRoomCookie()]
+	sessionManager, ok := s.store[instance.ChatRoomCookie()]
 	if !ok {
 		panic("attempting to remove a session after its room has been deleted")
 	}
-	sessionManager.RemoveSession(sess)
+	sessionManager.RemoveSession(instance)
 
 	if sessionManager.Empty() {
-		delete(s.store, sess.ChatRoomCookie())
+		delete(s.store, instance.ChatRoomCookie())
 	}
 }
 
@@ -329,4 +319,18 @@ func (s *InMemorySessionManager) findRec(identScreenName IdentScreenName) *sessi
 		}
 	}
 	return nil
+}
+
+func (s *InMemorySessionManager) maybeRelayMessage(ctx context.Context, msg wire.SNACMessage, sess *Session) {
+	for _, instance := range sess.Instances() {
+		if instance.live() {
+			switch instance.RelayMessageToInstance(msg) {
+			case SessSendClosed:
+				s.logger.WarnContext(ctx, "can't send notification because the user's session is closed", "recipient", sess.IdentScreenName(), "message", msg)
+			case SessQueueFull:
+				s.logger.WarnContext(ctx, "can't send notification because queue is full", "recipient", sess.IdentScreenName(), "message", msg)
+				instance.CloseInstance()
+			}
+		}
+	}
 }

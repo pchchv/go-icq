@@ -468,13 +468,15 @@ func (s *Session) Idle() bool {
 	return true
 }
 
-// IdleTime reports when the user went idle
+// IdleTime returns the latest idle time if all instances are idle.
+// If not all instances are idle,
+// it returns a zero time.
 func (s *Session) IdleTime() time.Time {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	return s.idleTime
+	if !s.Idle() {
+		return time.Time{}
+	}
+	return s.mostRecentIdleTime()
 }
-
 
 // BuddyIcon returns the session's buddy icon metadata and
 // reports whether it has been set.
@@ -644,37 +646,60 @@ func (s *Session) userInfo() wire.TLVList {
 	tlvs := wire.TLVList{}
 
 	// sign-in timestamp
-	tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoSignonTOD, uint32(s.signonTime.Unix())))
+	tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoSignonTOD, uint32(s.SignonTime().Unix())))
+	instances := s.Instances()
 
-	// user info flags
-	uFlags := s.userInfoBitmask
-	if s.awayMessage != "" {
-		uFlags |= wire.OServiceUserFlagUnavailable
+	// Use the first instance as a template for user flags.
+	// Most flags are static and should be consistent across all instances;
+	// only the "away" flag may vary.
+	// If instances differ in protocol type (ICQ vs AIM),
+	// that indicates an error.
+	var baseUserFlags uint16
+	if len(instances) > 0 {
+		baseUserFlags = instances[0].UserInfoBitmask()
 	}
-	tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoUserFlags, uFlags))
+
+	if s.Away() {
+		baseUserFlags |= wire.OServiceUserFlagUnavailable
+	} else {
+		baseUserFlags &^= wire.OServiceUserFlagUnavailable
+	}
+
+	tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoUserFlags, baseUserFlags))
 
 	// user status flags
-	tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoStatus, s.userStatusBitmask))
+	// user-level (shared)
+	var statusBitmask uint32
+	if len(instances) > 0 {
+		statusBitmask = instances[0].UserStatusBitmask()
+		for _, instance := range instances {
+			statusBitmask &= instance.UserStatusBitmask()
+		}
+	}
+
+	tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoStatus, statusBitmask))
 
 	// idle status
-	if s.idle {
-		tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoIdleTime, uint16(s.nowFn().Sub(s.idleTime).Minutes())))
+	// use most recent idle time if all instances are idle
+	if s.Idle() {
+		mostRecentIdleTime := s.mostRecentIdleTime()
+		tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoIdleTime, uint16(s.nowFn().Sub(mostRecentIdleTime).Minutes())))
 	}
 
 	// set buddy icon metadata, if user has buddy icon
-	if bartID, hasIcon := s.BuddyIcon(); hasIcon {
-		tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoBARTInfo, bartID))
+	if icon, hasIcon := s.BuddyIcon(); hasIcon {
+		tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoBARTInfo, icon))
 	}
 
 	// ICQ direct-connect info. The TLV is required for buddy arrival events to
 	// work in ICQ, even if the values are set to default.
-	if s.userInfoBitmask&wire.OServiceUserFlagICQ == wire.OServiceUserFlagICQ {
+	if baseUserFlags&wire.OServiceUserFlagICQ == wire.OServiceUserFlagICQ {
 		tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoICQDC, wire.ICQDCInfo{}))
 	}
 
-	// capabilities (buddy icon, chat, etc...)
-	if len(s.caps) > 0 {
-		tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoOscarCaps, s.caps))
+	caps := s.Caps()
+	if len(caps) > 0 {
+		tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoOscarCaps, caps))
 	}
 
 	tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoMySubscriptions, uint32(0)))

@@ -42,84 +42,49 @@ type RateClassState struct {
 	LimitedNow bool
 }
 
-// Session represents a user's current session.
-// Unless stated otherwise,
-// all methods may be safely accessed by multiple goroutines.
+// Session represents shared user-level state that persists across all concurrent
+// connections for a single user account.
+//
+// Session maintains client identity information, preferences, rate limiting state,
+// and other shared data that should be consistent across all of a user's active
+// connections. Individual connection-specific state (like remote address, sign-on
+// status, or per-connection capabilities) is stored in SessionInstance instead.
+//
+// All methods on Session are safe for concurrent use.
 type Session struct {
-	awayMessage             string
-	buddyIcon               wire.BARTID
-	caps                    [][16]byte
-	chatRoomCookie          string
-	clientID                string
-	closed                  bool
-	displayScreenName       DisplayScreenName
-	foodGroupVersions       [wire.MDir + 1]uint16
-	identScreenName         IdentScreenName
-	idle                    bool
-	idleTime                time.Time
-	lastObservedStates      [5]RateClassState
-	msgCh                   chan wire.SNACMessage
-	multiConnFlag           wire.MultiConnFlag
-	kerberosAuth            bool
-	mutex                   sync.RWMutex
+	mutex sync.RWMutex
+	// Rate limiting (shared across all sessions per user)
 	nowFn                   func() time.Time
 	rateLimitStates         [5]RateClassState
 	rateLimitStatesOriginal [5]RateClassState
-	remoteAddr              *netip.AddrPort
-	signonComplete          bool
-	signonTime              time.Time
-	stopCh                  chan struct{}
-	typingEventsEnabled     bool
-	uin                     uint32
-	userInfoBitmask         uint16
-	userStatusBitmask       uint32
-	warning                 uint16
-	warningCh               chan uint16
-	lastWarnUpdate          time.Time
-	profile                 UserProfile
-	memberSince             time.Time
-	offlineMsgCount         int
+	lastObservedStates      [5]RateClassState
+	instancesOrdered        []*SessionInstance
+	onSessCloseFn           func()
+	instances               map[uint8]*SessionInstance
+	initOnce                sync.Once
+	// User-level settings and profile (shared)
+	warning             uint16
+	warningCh           chan uint16
+	buddyIcon           wire.BARTID
+	chatRoomCookie      string
+	offlineMsgCount     int
+	typingEventsEnabled bool
+	// User identity (shared across all sessions)
+	displayScreenName DisplayScreenName
+	identScreenName   IdentScreenName
+	memberSince       time.Time
+	signonTime        time.Time
+	uin               uint32
 }
 
 // NewSession returns a new instance of Session.
 func NewSession() *Session {
 	return &Session{
-		msgCh:             make(chan wire.SNACMessage, 1000),
-		nowFn:             time.Now,
-		stopCh:            make(chan struct{}),
-		signonTime:        now,
-		caps:              make([][16]byte, 0),
-		userInfoBitmask:   wire.OServiceUserFlagOSCARFree,
-		userStatusBitmask: wire.OServiceUserStatusAvailable,
-		foodGroupVersions: func() [wire.MDir + 1]uint16 {
-			// initialize default food groups versions to 1.0
-			vals := [wire.MDir + 1]uint16{}
-			vals[wire.OService] = 1
-			vals[wire.Locate] = 1
-			vals[wire.Buddy] = 1
-			vals[wire.ICBM] = 1
-			vals[wire.Advert] = 1
-			vals[wire.Invite] = 1
-			vals[wire.Admin] = 1
-			vals[wire.Popup] = 1
-			vals[wire.PermitDeny] = 1
-			vals[wire.UserLookup] = 1
-			vals[wire.Stats] = 1
-			vals[wire.Translate] = 1
-			vals[wire.ChatNav] = 1
-			vals[wire.Chat] = 1
-			vals[wire.ODir] = 1
-			vals[wire.BART] = 1
-			vals[wire.Feedbag] = 1
-			vals[wire.ICQ] = 1
-			vals[wire.BUCP] = 1
-			vals[wire.Alert] = 1
-			vals[wire.Plugin] = 1
-			vals[wire.UnnamedFG24] = 1
-			vals[wire.MDir] = 1
-			return vals
-		}(),
-		warningCh: make(chan uint16, 1),
+		warningCh:        make(chan uint16, 1),
+		instances:        make(map[uint8]*SessionInstance),
+		instancesOrdered: make([]*SessionInstance, 0),
+		onSessCloseFn:    func() {},
+		nowFn:            time.Now,
 	}
 }
 

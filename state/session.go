@@ -695,6 +695,16 @@ func (s *Session) generateInstanceNum() uint8 {
 	panic("all instance numbers are taken (max 255 instances per session)")
 }
 
+// mostRecentIdleTime returns the most recent idle time from all instances.
+func (s *Session) mostRecentIdleTime() (mostRecent time.Time) {
+	for _, instance := range s.Instances() {
+		if mostRecent.IsZero() || (instance.Idle() && instance.IdleTime().After(mostRecent)) {
+			mostRecent = instance.IdleTime()
+		}
+	}
+	return
+}
+
 // SessionInstance represents a single client connection instance
 // within a user's session.
 // Multiple SessionInstance objects can belong to the same Session,

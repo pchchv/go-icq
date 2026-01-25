@@ -215,6 +215,26 @@ func (s *Session) Away() bool {
 	return true
 }
 
+// AllUserInfoBitmask returns whether all instances have user info flag set.
+func (s *Session) AllUserInfoBitmask(flag uint16) bool {
+	for _, instance := range s.Instances() {
+		if instance.UserInfoBitmask()&flag != flag {
+			return false
+		}
+	}
+	return true
+}
+
+// AllUserStatusBitmask returns whether all instances have user status flag set.
+func (s *Session) AllUserStatusBitmask(flag uint32) bool {
+	for _, instance := range s.Instances() {
+		if instance.UserStatusBitmask()&flag != flag {
+			return false
+		}
+	}
+	return true
+}
+
 // SetChatRoomCookie sets the chat room cookie.
 func (s *Session) SetChatRoomCookie(cookie string) {
 	s.mutex.Lock()

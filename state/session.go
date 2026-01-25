@@ -184,11 +184,30 @@ func (s *Session) SetMemberSince(t time.Time) {
 	s.memberSince = t
 }
 
-// AwayMessage returns the user's away message.
+// AwayMessage returns the away message from the last instance to set an away message.
 func (s *Session) AwayMessage() string {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	return s.awayMessage
+
+	var latestTime time.Time
+	var latest *SessionInstance
+	for _, instance := range s.instances {
+		// only consider instances that are away
+		if instance.Away() {
+			_, awayTime := instance.AwayMessage()
+			if latest == nil || awayTime.After(latestTime) {
+				latest = instance
+				latestTime = awayTime
+			}
+		}
+	}
+
+	if latest == nil {
+		return ""
+	}
+
+	awayMsg, _ := latest.AwayMessage()
+	return awayMsg
 }
 
 // ChatRoomCookie returns the chat room cookie.
@@ -253,11 +272,24 @@ func (s *Session) WarningCh() chan uint16 {
 	return s.warningCh
 }
 
-// Caps retrieves user capabilities.
+// Caps returns the union of all capability UUIDs from all instances in the session.
 func (s *Session) Caps() [][16]byte {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	return s.caps
+
+	caps := make(map[[16]byte]bool)
+	for _, instance := range s.instances {
+		for _, c := range instance.caps() {
+			caps[c] = true
+		}
+	}
+
+	ret := make([][16]byte, 0, len(caps))
+	for c := range caps {
+		ret = append(ret, c)
+	}
+
+	return ret
 }
 
 // DisplayScreenName returns the user's display screen name.

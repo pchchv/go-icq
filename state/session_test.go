@@ -22,15 +22,15 @@ func TestSession_SetAndGetAwayMessage(t *testing.T) {
 }
 
 func TestSession_IncrementAndGetWarning(t *testing.T) {
-	s := NewSession()
+	s := NewSession().AddInstance()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		s.ScaleWarningAndRateLimit(1, 1)
-		s.ScaleWarningAndRateLimit(2, 1)
-		s.ScaleWarningAndRateLimit(3, 1)
+		s.Session().ScaleWarningAndRateLimit(1, 1)
+		s.Session().ScaleWarningAndRateLimit(2, 1)
+		s.Session().ScaleWarningAndRateLimit(3, 1)
 	}()
 
 	assert.Equal(t, uint16(1), <-s.WarningCh())
@@ -41,38 +41,38 @@ func TestSession_IncrementAndGetWarning(t *testing.T) {
 }
 
 func TestSession_SetAndGetInvisible(t *testing.T) {
-	s := NewSession()
+	s := NewSession().AddInstance()
 	assert.False(t, s.Invisible())
 	s.SetUserStatusBitmask(wire.OServiceUserStatusInvisible)
 	assert.True(t, s.Invisible())
 }
 
 func TestSession_SetAndGetScreenName(t *testing.T) {
-	s := NewSession()
+	s := NewSession().AddInstance()
 	assert.Empty(t, s.IdentScreenName())
 	sn := NewIdentScreenName("user-screen-name")
-	s.SetIdentScreenName(sn)
+	s.Session().SetIdentScreenName(sn)
 	assert.Equal(t, sn, s.IdentScreenName())
 }
 
 func TestSession_SetAndGetChatRoomCookie(t *testing.T) {
-	s := NewSession()
+	s := NewSession().AddInstance()
 	assert.Empty(t, s.ChatRoomCookie())
 	sn := "the-chat-cookie"
-	s.SetChatRoomCookie(sn)
+	s.Session().SetChatRoomCookie(sn)
 	assert.Equal(t, sn, s.ChatRoomCookie())
 }
 
 func TestSession_SetAndGetUIN(t *testing.T) {
-	s := NewSession()
+	s := NewSession().AddInstance()
 	assert.Empty(t, s.UIN())
 	uin := uint32(100003)
-	s.SetUIN(uin)
+	s.Session().SetUIN(uin)
 	assert.Equal(t, uin, s.UIN())
 }
 
 func TestSession_SetAndGetClientID(t *testing.T) {
-	s := NewSession()
+	s := NewSession().AddInstance()
 	assert.Empty(t, s.ClientID())
 	clientID := "AIM Client ID"
 	s.SetClientID(clientID)
@@ -80,7 +80,7 @@ func TestSession_SetAndGetClientID(t *testing.T) {
 }
 
 func TestSession_SetAndGetKerberosAuth(t *testing.T) {
-	s := NewSession()
+	s := NewSession().AddInstance()
 	assert.False(t, s.KerberosAuth())
 
 	s.SetKerberosAuth(true)
@@ -91,7 +91,7 @@ func TestSession_SetAndGetKerberosAuth(t *testing.T) {
 }
 
 func TestSession_SetAndGetRemoteAddr(t *testing.T) {
-	s := NewSession()
+	s := NewSession().AddInstance()
 	assert.Empty(t, s.RemoteAddr())
 	remoteAddr, _ := netip.ParseAddrPort("1.2.3.4:1234")
 	s.SetRemoteAddr(&remoteAddr)
@@ -101,17 +101,17 @@ func TestSession_SetAndGetRemoteAddr(t *testing.T) {
 func TestSession_TLVUserInfo(t *testing.T) {
 	tests := []struct {
 		name           string
-		givenSessionFn func() *Session
+		givenSessionFn func() *SessionInstance
 		want           wire.TLVUserInfo
 	}{
 		{
 			name: "user is active and visible",
-			givenSessionFn: func() *Session {
-				s := NewSession()
-				s.SetSignonTime(time.Unix(1, 0))
-				s.SetIdentScreenName(NewIdentScreenName("xXAIMUSERXx"))
-				s.SetDisplayScreenName("xXAIMUSERXx")
-				s.ScaleWarningAndRateLimit(10, 1)
+			givenSessionFn: func() *SessionInstance {
+				s := NewSession().AddInstance()
+				s.Session().SetSignonTime(time.Unix(1, 0))
+				s.Session().SetIdentScreenName(NewIdentScreenName("xXAIMUSERXx"))
+				s.Session().SetDisplayScreenName("xXAIMUSERXx")
+				s.Session().ScaleWarningAndRateLimit(10, 1)
 				s.SetUserInfoFlag(wire.OServiceUserFlagOSCARFree)
 				return s
 			},
@@ -130,11 +130,11 @@ func TestSession_TLVUserInfo(t *testing.T) {
 		},
 		{
 			name: "user is on ICQ",
-			givenSessionFn: func() *Session {
-				s := NewSession()
-				s.SetSignonTime(time.Unix(1, 0))
-				s.SetIdentScreenName(NewIdentScreenName("1000003"))
-				s.SetDisplayScreenName("1000003")
+			givenSessionFn: func() *SessionInstance {
+				s := NewSession().AddInstance()
+				s.Session().SetSignonTime(time.Unix(1, 0))
+				s.Session().SetIdentScreenName(NewIdentScreenName("1000003"))
+				s.Session().SetDisplayScreenName("1000003")
 				s.SetUserInfoFlag(wire.OServiceUserFlagICQ)
 
 				return s
@@ -153,11 +153,15 @@ func TestSession_TLVUserInfo(t *testing.T) {
 			},
 		},
 		{
-			name: "user has away message set",
-			givenSessionFn: func() *Session {
-				s := NewSession()
-				s.SetSignonTime(time.Unix(1, 0))
-				s.SetAwayMessage("here's my away message")
+			name: "user has away message set - all instances away",
+			givenSessionFn: func() *SessionInstance {
+				sg := NewSession()
+				s := sg.AddInstance()
+				s.Session().SetSignonTime(time.Unix(1, 0))
+				s.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				// add a second instance that is also away
+				s2 := sg.AddInstance()
+				s2.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
 				return s
 			},
 			want: wire.TLVUserInfo{
@@ -172,10 +176,62 @@ func TestSession_TLVUserInfo(t *testing.T) {
 			},
 		},
 		{
+			name: "user has one instance away, one not away - away flag not set",
+			givenSessionFn: func() *SessionInstance {
+				sg := NewSession()
+				// Create the NOT away instance first so it's used as the base
+				s2 := sg.AddInstance()
+				s2.Session().SetSignonTime(time.Unix(1, 0))
+				// s2 is NOT away - it has default flags only (OServiceUserFlagOSCARFree)
+				// Now create the away instance
+				s := sg.AddInstance()
+				s.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				// Since s2 is the first instance and is not away, and allAway() returns false,
+				// the unavailable flag should not be set
+				return s
+			},
+			want: wire.TLVUserInfo{
+				TLVBlock: wire.TLVBlock{
+					TLVList: wire.TLVList{
+						wire.NewTLVBE(wire.OServiceUserInfoSignonTOD, uint32(1)),
+						wire.NewTLVBE(wire.OServiceUserInfoUserFlags, uint16(0x10)),
+						wire.NewTLVBE(wire.OServiceUserInfoStatus, uint32(0x0000)),
+						wire.NewTLVBE(wire.OServiceUserInfoMySubscriptions, uint32(0)),
+					},
+				},
+			},
+		},
+		{
+			name: "user has two instances away, second goes off away - away flag not set",
+			givenSessionFn: func() *SessionInstance {
+				sg := NewSession()
+				sg.SetSignonTime(time.Unix(1, 0))
+				// Set the first instance as away
+				s1 := sg.AddInstance()
+				s1.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				// Set the second instance as away
+				s2 := sg.AddInstance()
+				s2.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				// Make the second instance as not away
+				s2.ClearUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				return s1
+			},
+			want: wire.TLVUserInfo{
+				TLVBlock: wire.TLVBlock{
+					TLVList: wire.TLVList{
+						wire.NewTLVBE(wire.OServiceUserInfoSignonTOD, uint32(1)),
+						wire.NewTLVBE(wire.OServiceUserInfoUserFlags, uint16(0x10)),
+						wire.NewTLVBE(wire.OServiceUserInfoStatus, uint32(0x0000)),
+						wire.NewTLVBE(wire.OServiceUserInfoMySubscriptions, uint32(0)),
+					},
+				},
+			},
+		},
+		{
 			name: "user is invisible",
-			givenSessionFn: func() *Session {
-				s := NewSession()
-				s.SetSignonTime(time.Unix(1, 0))
+			givenSessionFn: func() *SessionInstance {
+				s := NewSession().AddInstance()
+				s.Session().SetSignonTime(time.Unix(1, 0))
 				s.SetUserStatusBitmask(wire.OServiceUserStatusInvisible)
 				return s
 			},
@@ -192,18 +248,18 @@ func TestSession_TLVUserInfo(t *testing.T) {
 		},
 		{
 			name: "user is idle",
-			givenSessionFn: func() *Session {
-				s := NewSession()
+			givenSessionFn: func() *SessionInstance {
+				s := NewSession().AddInstance()
 				// sign on at t=0m
 				timeBegin := time.Unix(0, 0)
-				s.SetSignonTime(timeBegin)
+				s.Session().SetSignonTime(timeBegin)
 				// set idle for 1m at t=+5m (ergo user idled @ t=+4m)
 				timeIdle := timeBegin.Add(5 * time.Minute)
-				s.nowFn = func() time.Time { return timeIdle }
+				s.Session().SetNowFn(func() time.Time { return timeIdle })
 				s.SetIdle(1 * time.Minute)
 				// now it's t=+10m, ergo idle time should be t10-t4=6m
 				timeNow := timeBegin.Add(10 * time.Minute)
-				s.nowFn = func() time.Time { return timeNow }
+				s.Session().SetNowFn(func() time.Time { return timeNow })
 				return s
 			},
 			want: wire.TLVUserInfo{
@@ -220,9 +276,9 @@ func TestSession_TLVUserInfo(t *testing.T) {
 		},
 		{
 			name: "user goes idle then returns",
-			givenSessionFn: func() *Session {
-				s := NewSession()
-				s.SetSignonTime(time.Unix(1, 0))
+			givenSessionFn: func() *SessionInstance {
+				s := NewSession().AddInstance()
+				s.Session().SetSignonTime(time.Unix(1, 0))
 				s.SetIdle(1 * time.Second)
 				s.UnsetIdle()
 				return s
@@ -240,9 +296,9 @@ func TestSession_TLVUserInfo(t *testing.T) {
 		},
 		{
 			name: "user has capabilities",
-			givenSessionFn: func() *Session {
-				s := NewSession()
-				s.SetSignonTime(time.Unix(1, 0))
+			givenSessionFn: func() *SessionInstance {
+				s := NewSession().AddInstance()
+				s.Session().SetSignonTime(time.Unix(1, 0))
 				s.SetCaps([][16]byte{
 					{
 						// chat: "748F2420-6287-11D1-8222-444553540000"
@@ -278,9 +334,9 @@ func TestSession_TLVUserInfo(t *testing.T) {
 		},
 		{
 			name: "user has buddy icon",
-			givenSessionFn: func() *Session {
-				s := NewSession()
-				s.SetSignonTime(time.Unix(1, 0))
+			givenSessionFn: func() *SessionInstance {
+				s := NewSession().AddInstance()
+				s.Session().SetSignonTime(time.Unix(1, 0))
 				return s
 			},
 			want: wire.TLVUserInfo{
@@ -299,13 +355,14 @@ func TestSession_TLVUserInfo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := tt.givenSessionFn()
-			assert.Equal(t, tt.want, s.TLVUserInfo())
+			assert.Equal(t, tt.want, s.Session().TLVUserInfo())
 		})
 	}
 }
 
 func TestSession_SendAndRecvMessage_ExpectSessSendOK(t *testing.T) {
-	s := NewSession()
+	s := NewSession().AddInstance()
+	s.SetSignonComplete()
 
 	msg := wire.SNACMessage{
 		Frame: wire.SNACFrame{
@@ -317,8 +374,8 @@ func TestSession_SendAndRecvMessage_ExpectSessSendOK(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		defer s.Close()
-		status := s.RelayMessage(msg)
+		defer s.CloseInstance()
+		status := s.RelayMessageToInstance(msg)
 		assert.Equal(t, SessSendOK, status)
 	}()
 
@@ -336,36 +393,30 @@ loop:
 }
 
 func TestSession_SendMessage_SessSendClosed(t *testing.T) {
-	s := Session{
-		msgCh:  make(chan wire.SNACMessage, 1),
-		stopCh: make(chan struct{}),
-	}
-	s.Close()
-	if res := s.RelayMessage(wire.SNACMessage{}); res != SessSendClosed {
+	s := NewSession().AddInstance()
+	s.CloseInstance()
+	if res := s.RelayMessageToInstance(wire.SNACMessage{}); res != SessSendClosed {
 		t.Fatalf("expected SessSendClosed, got %+v", res)
 	}
 }
 
 func TestSession_SendMessage_SessQueueFull(t *testing.T) {
-	bufSize := 10
-	s := Session{
-		msgCh:  make(chan wire.SNACMessage, bufSize),
-		stopCh: make(chan struct{}),
+	s := NewSession().AddInstance()
+	s.SetSignonComplete()
+	// Fill up the message channel (default buffer size is 1000)
+	for i := 0; i < 1000; i++ {
+		assert.Equal(t, SessSendOK, s.RelayMessageToInstance(wire.SNACMessage{}))
 	}
-	for i := 0; i < bufSize; i++ {
-		assert.Equal(t, SessSendOK, s.RelayMessage(wire.SNACMessage{}))
-	}
-	assert.Equal(t, SessQueueFull, s.RelayMessage(wire.SNACMessage{}))
+	assert.Equal(t, SessQueueFull, s.RelayMessageToInstance(wire.SNACMessage{}))
 }
 
 func TestSession_Close_Twice(t *testing.T) {
-	s := Session{
-		stopCh: make(chan struct{}),
-	}
-	s.Close()
-	s.Close() // make sure close is idempotent
-	if !s.closed {
-		t.Fatal("expected session to be closed")
+	s := NewSession().AddInstance()
+	s.CloseInstance()
+	s.CloseInstance() // make sure close is idempotent
+	// check that the session is closed by trying to relay a message
+	if res := s.RelayMessageToInstance(wire.SNACMessage{}); res != SessSendClosed {
+		t.Fatalf("expected SessSendClosed, got %+v", res)
 	}
 	select {
 	case <-s.Closed():
@@ -374,15 +425,16 @@ func TestSession_Close_Twice(t *testing.T) {
 	}
 }
 
-func TestSession_Close(t *testing.T) {
-	s := NewSession()
+func TestSession_Closed(t *testing.T) {
+	s := NewSession().AddInstance()
 	select {
 	case <-s.Closed():
 		assert.Fail(t, "channel is closed")
 	default:
 		// channel is open by default
 	}
-	s.Close()
+
+	s.Session().CloseSession()
 	<-s.Closed()
 }
 
@@ -439,15 +491,15 @@ func TestSession_EvaluateRateLimit_ObserveRateChanges(t *testing.T) {
 	t.Run("we can action every 5 seconds indefinitely without getting rate limited", func(t *testing.T) {
 		now := time.Now()
 
-		sess := NewSession()
-		sess.SetRateClasses(now, rateClasses)
+		instance := NewSession().AddInstance()
+		instance.Session().SetRateClasses(now, rateClasses)
 
 		rateClass := rateClasses.Get(3)
-		sess.SubscribeRateLimits([]wire.RateLimitClassID{rateClass.ID})
+		instance.Session().SubscribeRateLimits([]wire.RateLimitClassID{rateClass.ID})
 
 		for i := 0; i < 100; i++ {
 			now = now.Add(5 * time.Second)
-			have := sess.EvaluateRateLimit(now, rateClass.ID)
+			have := instance.Session().EvaluateRateLimit(now, rateClass.ID)
 			assert.Equal(t, wire.RateLimitStatusClear, have)
 		}
 	})
@@ -457,6 +509,9 @@ func TestSession_EvaluateRateLimit_ObserveRateChanges(t *testing.T) {
 
 		sess := NewSession()
 		sess.SetRateClasses(now, rateClasses)
+		sess.AddInstance()
+		sess.AddInstance()
+		sess.AddInstance()
 
 		rateClass := rateClasses.Get(3)
 		sess.SubscribeRateLimits([]wire.RateLimitClassID{rateClass.ID})
@@ -488,21 +543,23 @@ func TestSession_EvaluateRateLimit_ObserveRateChanges(t *testing.T) {
 			assert.Equal(t, want[i], have)
 		}
 
-		select {
-		case <-sess.Closed():
-		default:
-			t.Error("expected session to be closed")
+		for _, instance := range sess.Instances() {
+			select {
+			case <-instance.Closed():
+			default:
+				t.Error("expected session to be closed")
+			}
 		}
 	})
 
 	t.Run("reach rate limit threshold, wait for clear threshold", func(t *testing.T) {
 		now := time.Now()
 
-		sess := NewSession()
-		sess.SetRateClasses(now, rateClasses)
+		instance := NewSession().AddInstance()
+		instance.Session().SetRateClasses(now, rateClasses)
 
 		rateClass := rateClasses.Get(3)
-		sess.SubscribeRateLimits([]wire.RateLimitClassID{rateClass.ID})
+		instance.Session().SubscribeRateLimits([]wire.RateLimitClassID{rateClass.ID})
 
 		// first reach the rate limit threshold
 		want := []wire.RateLimitStatus{
@@ -519,11 +576,11 @@ func TestSession_EvaluateRateLimit_ObserveRateChanges(t *testing.T) {
 		}
 		for i := 0; i < len(want); i++ {
 			now = now.Add(1 * time.Second)
-			have := sess.EvaluateRateLimit(now, rateClass.ID)
+			have := instance.Session().EvaluateRateLimit(now, rateClass.ID)
 			assert.Equal(t, want[i], have)
 
 			if i > 0 && want[i-1] != want[i] {
-				classChanges, rateChanges := sess.ObserveRateChanges(now)
+				classChanges, rateChanges := instance.Session().ObserveRateChanges(now)
 				assert.Empty(t, classChanges)
 				if assert.NotEmpty(t, rateChanges) {
 					rateDelta := rateChanges[0]
@@ -539,7 +596,8 @@ func TestSession_EvaluateRateLimit_ObserveRateChanges(t *testing.T) {
 
 		// this is a rearranged moving average formula that determines how many
 		// milliseconds it will take to reach the clear threshold
-		timeToRecover := int(math.Ceil((time.Duration(rateClass.ClearLevel*rateClass.WindowSize-sess.rateLimitStates[rateClass.ID-1].CurrentLevel*(rateClass.WindowSize-1)) * time.Millisecond).Seconds()))
+		rateLimitStates := instance.RateLimitStates()
+		timeToRecover := int(math.Ceil((time.Duration(rateClass.ClearLevel*rateClass.WindowSize-rateLimitStates[rateClass.ID-1].CurrentLevel*(rateClass.WindowSize-1)) * time.Millisecond).Seconds()))
 		assert.True(t, timeToRecover > 0)
 
 		// indicate the time rate limiting kicked in
@@ -547,7 +605,7 @@ func TestSession_EvaluateRateLimit_ObserveRateChanges(t *testing.T) {
 
 		for i := 0; i < timeToRecover; i++ {
 			now = now.Add(1 * time.Second)
-			classDelta, stateDelta := sess.ObserveRateChanges(now)
+			classDelta, stateDelta := instance.Session().ObserveRateChanges(now)
 			assert.Empty(t, classDelta)
 
 			if i == timeToRecover-1 {
@@ -571,14 +629,14 @@ func TestSession_EvaluateRateLimit_ObserveRateChanges(t *testing.T) {
 	t.Run("observe a rate class change", func(t *testing.T) {
 		now := time.Now()
 
-		sess := NewSession()
-		sess.SetRateClasses(now, rateClasses)
+		instance := NewSession().AddInstance()
+		instance.Session().SetRateClasses(now, rateClasses)
 
 		rateClass := rateClasses.Get(3)
-		sess.SubscribeRateLimits([]wire.RateLimitClassID{rateClass.ID})
+		instance.Session().SubscribeRateLimits([]wire.RateLimitClassID{rateClass.ID})
 
 		now = now.Add(1 * time.Second)
-		classDelta, stateDelta := sess.ObserveRateChanges(now)
+		classDelta, stateDelta := instance.Session().ObserveRateChanges(now)
 		assert.Empty(t, classDelta)
 		assert.Empty(t, stateDelta)
 
@@ -588,10 +646,10 @@ func TestSession_EvaluateRateLimit_ObserveRateChanges(t *testing.T) {
 		newRateClasses := wire.NewRateLimitClasses(paramsCopy)
 
 		now = now.Add(1 * time.Second)
-		sess.SetRateClasses(now, newRateClasses)
+		instance.Session().SetRateClasses(now, newRateClasses)
 
 		now = now.Add(1 * time.Second)
-		classDelta, stateDelta = sess.ObserveRateChanges(now)
+		classDelta, stateDelta = instance.Session().ObserveRateChanges(now)
 		assert.Equal(t, classDelta[0].RateClass, newRateClasses.Get(rateClass.ID))
 		assert.Empty(t, stateDelta)
 	})
@@ -599,13 +657,13 @@ func TestSession_EvaluateRateLimit_ObserveRateChanges(t *testing.T) {
 	t.Run("as a bot, I can action every second indefinitely without getting rate limited", func(t *testing.T) {
 		now := time.Now()
 
-		sess := NewSession()
-		sess.SetUserInfoFlag(wire.OServiceUserFlagBot)
-		sess.SetRateClasses(now, rateClasses)
+		instance := NewSession().AddInstance()
+		instance.SetUserInfoFlag(wire.OServiceUserFlagBot)
+		instance.Session().SetRateClasses(now, rateClasses)
 
 		for i := 0; i < 100; i++ {
 			now = now.Add(1 * time.Second)
-			have := sess.EvaluateRateLimit(now, wire.RateLimitClassID(1))
+			have := instance.Session().EvaluateRateLimit(now, wire.RateLimitClassID(1))
 			assert.Equal(t, wire.RateLimitStatusClear, have)
 		}
 	})
@@ -616,23 +674,23 @@ func TestSession_SetAndGetFoodGroupVersions(t *testing.T) {
 	versions[wire.Feedbag] = 1
 	versions[wire.OService] = 2
 
-	s := NewSession()
+	s := NewSession().AddInstance()
 	s.SetFoodGroupVersions(versions)
 
 	assert.Equal(t, versions, s.FoodGroupVersions())
 }
 
 func TestSession_SetAndGetTypingEventsEnabled(t *testing.T) {
-	s := NewSession()
+	s := NewSession().AddInstance()
 	assert.False(t, s.TypingEventsEnabled())
-	s.SetTypingEventsEnabled(true)
+	s.Session().SetTypingEventsEnabled(true)
 	assert.True(t, s.TypingEventsEnabled())
-	s.SetTypingEventsEnabled(false)
+	s.Session().SetTypingEventsEnabled(false)
 	assert.False(t, s.TypingEventsEnabled())
 }
 
 func TestSession_SetAndGetMultiConnFlag(t *testing.T) {
-	s := NewSession()
+	s := NewSession().AddInstance()
 	assert.Zero(t, s.MultiConnFlag())
 
 	s.SetMultiConnFlag(wire.MultiConnFlagsOldClient)
@@ -646,17 +704,17 @@ func TestSession_SetAndGetMultiConnFlag(t *testing.T) {
 }
 
 func TestSession_SetAndGetLastWarnLevel(t *testing.T) {
-	s := NewSession()
+	s := NewSession().AddInstance()
 	assert.Zero(t, s.Warning())
 
 	level := uint16(500)
-	s.SetWarning(level)
+	s.Session().SetWarning(level)
 	assert.Equal(t, level, s.Warning())
 }
 
 func TestSession_SetAndGetProfile(t *testing.T) {
-	s := NewSession()
-	profile := s.Profile()
+	s := NewSession().AddInstance()
+	profile := s.Session().Profile()
 	assert.Empty(t, profile.ProfileText)
 	assert.Empty(t, profile.MIMEType)
 	assert.True(t, profile.UpdateTime.IsZero())
@@ -668,7 +726,7 @@ func TestSession_SetAndGetProfile(t *testing.T) {
 		UpdateTime:  profileTime,
 	}
 	s.SetProfile(newProfile)
-	retrievedProfile := s.Profile()
+	retrievedProfile := s.Session().Profile()
 	assert.Equal(t, newProfile, retrievedProfile)
 	assert.Equal(t, "My profile text", retrievedProfile.ProfileText)
 	assert.Equal(t, "text/plain", retrievedProfile.MIMEType)
@@ -676,24 +734,24 @@ func TestSession_SetAndGetProfile(t *testing.T) {
 }
 
 func TestSession_SetAndGetMemberSince(t *testing.T) {
-	s := NewSession()
-	assert.True(t, s.MemberSince().IsZero())
+	s := NewSession().AddInstance()
+	assert.True(t, s.Session().MemberSince().IsZero())
 
 	memberTime := time.Unix(1234567890, 0)
-	s.SetMemberSince(memberTime)
-	assert.Equal(t, memberTime, s.MemberSince())
+	s.Session().SetMemberSince(memberTime)
+	assert.Equal(t, memberTime, s.Session().MemberSince())
 }
 
 func TestSession_SetAndGetOfflineMsgCount(t *testing.T) {
-	s := NewSession()
+	s := NewSession().AddInstance()
 	assert.Zero(t, s.OfflineMsgCount())
 
 	count := 5
-	s.SetOfflineMsgCount(count)
+	s.Session().SetOfflineMsgCount(count)
 	assert.Equal(t, count, s.OfflineMsgCount())
 
 	count = 10
-	s.SetOfflineMsgCount(count)
+	s.Session().SetOfflineMsgCount(count)
 	assert.Equal(t, count, s.OfflineMsgCount())
 }
 
@@ -718,8 +776,8 @@ func TestSession_ScaleWarningAndRateLimit(t *testing.T) {
 
 		now := time.Now()
 
-		sess := NewSession()
-		sess.SetRateClasses(now, rateClasses)
+		instance := NewSession().AddInstance()
+		instance.Session().SetRateClasses(now, rateClasses)
 
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -731,69 +789,81 @@ func TestSession_ScaleWarningAndRateLimit(t *testing.T) {
 				select {
 				case <-ctx.Done():
 					return
-				case <-sess.WarningCh():
+				case <-instance.WarningCh():
 				}
 			}
 		}()
 
-		assert.Equal(t, int32(5000), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5100), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(4000), sess.rateLimitStates[2].LimitLevel)
+		rateLimitStates := instance.RateLimitStates()
+		assert.Equal(t, int32(5000), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5100), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(4000), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(100, 3)
-		assert.Equal(t, int32(5085), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5175), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(4185), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5085), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5175), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(4185), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(100, 3)
-		assert.Equal(t, int32(5170), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5250), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(4370), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5170), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5250), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(4370), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(100, 3)
-		assert.Equal(t, int32(5255), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5325), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(4555), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5255), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5325), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(4555), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(100, 3)
-		assert.Equal(t, int32(5340), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5400), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(4740), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5340), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5400), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(4740), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(100, 3)
-		assert.Equal(t, int32(5425), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5475), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(4925), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5425), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5475), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(4925), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(100, 3)
-		assert.Equal(t, int32(5510), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5550), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(5110), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5510), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5550), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(5110), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(100, 3)
-		assert.Equal(t, int32(5595), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5625), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(5295), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5595), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5625), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(5295), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(100, 3)
-		assert.Equal(t, int32(5680), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5700), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(5480), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5680), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5700), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(5480), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(100, 3)
-		assert.Equal(t, int32(5765), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5775), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(5665), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5765), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5775), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(5665), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(100, 3)
-		assert.Equal(t, int32(5850), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5850), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(5850), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5850), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5850), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(5850), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(100, 3)
-		assert.Equal(t, int32(5850), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5850), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(5850), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5850), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5850), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(5850), rateLimitStates[2].LimitLevel)
 
 		cancel()
 		wg.Wait()
@@ -819,8 +889,8 @@ func TestSession_ScaleWarningAndRateLimit(t *testing.T) {
 
 		now := time.Now()
 
-		sess := NewSession()
-		sess.SetRateClasses(now, rateClasses)
+		instance := NewSession().AddInstance()
+		instance.Session().SetRateClasses(now, rateClasses)
 
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -832,73 +902,85 @@ func TestSession_ScaleWarningAndRateLimit(t *testing.T) {
 				select {
 				case <-ctx.Done():
 					return
-				case <-sess.WarningCh():
+				case <-instance.WarningCh():
 				}
 			}
 		}()
 
 		for i := 0; i < 10; i++ {
-			sess.ScaleWarningAndRateLimit(100, 3)
+			instance.Session().ScaleWarningAndRateLimit(100, 3)
 		}
 
-		assert.Equal(t, int32(5850), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5850), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(5850), sess.rateLimitStates[2].LimitLevel)
+		rateLimitStates := instance.RateLimitStates()
+		assert.Equal(t, int32(5850), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5850), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(5850), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(-100, 3)
-		assert.Equal(t, int32(5765), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5775), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(5665), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(-100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5765), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5775), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(5665), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(-100, 3)
-		assert.Equal(t, int32(5680), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5700), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(5480), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(-100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5680), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5700), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(5480), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(-100, 3)
-		assert.Equal(t, int32(5595), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5625), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(5295), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(-100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5595), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5625), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(5295), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(-100, 3)
-		assert.Equal(t, int32(5510), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5550), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(5110), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(-100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5510), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5550), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(5110), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(-100, 3)
-		assert.Equal(t, int32(5425), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5475), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(4925), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(-100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5425), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5475), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(4925), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(-100, 3)
-		assert.Equal(t, int32(5340), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5400), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(4740), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(-100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5340), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5400), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(4740), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(-100, 3)
-		assert.Equal(t, int32(5255), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5325), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(4555), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(-100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5255), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5325), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(4555), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(-100, 3)
-		assert.Equal(t, int32(5170), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5250), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(4370), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(-100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5170), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5250), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(4370), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(-100, 3)
-		assert.Equal(t, int32(5085), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5175), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(4185), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(-100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5085), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5175), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(4185), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(-100, 3)
-		assert.Equal(t, int32(5000), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5100), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(4000), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(-100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5000), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5100), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(4000), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(-100, 3)
-		assert.Equal(t, int32(5000), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5100), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(4000), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(-100, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5000), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5100), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(4000), rateLimitStates[2].LimitLevel)
 
 		cancel()
 		wg.Wait()
@@ -924,8 +1006,8 @@ func TestSession_ScaleWarningAndRateLimit(t *testing.T) {
 
 		now := time.Now()
 
-		sess := NewSession()
-		sess.SetRateClasses(now, rateClasses)
+		instance := NewSession().AddInstance()
+		instance.Session().SetRateClasses(now, rateClasses)
 
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -937,19 +1019,21 @@ func TestSession_ScaleWarningAndRateLimit(t *testing.T) {
 				select {
 				case <-ctx.Done():
 					return
-				case <-sess.WarningCh():
+				case <-instance.WarningCh():
 				}
 			}
 		}()
 
-		assert.Equal(t, int32(5000), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5100), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(4000), sess.rateLimitStates[2].LimitLevel)
+		rateLimitStates := instance.RateLimitStates()
+		assert.Equal(t, int32(5000), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5100), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(4000), rateLimitStates[2].LimitLevel)
 
-		sess.ScaleWarningAndRateLimit(1000, 3)
-		assert.Equal(t, int32(5850), sess.rateLimitStates[2].AlertLevel)
-		assert.Equal(t, int32(5850), sess.rateLimitStates[2].ClearLevel)
-		assert.Equal(t, int32(5850), sess.rateLimitStates[2].LimitLevel)
+		instance.Session().ScaleWarningAndRateLimit(1000, 3)
+		rateLimitStates = instance.RateLimitStates()
+		assert.Equal(t, int32(5850), rateLimitStates[2].AlertLevel)
+		assert.Equal(t, int32(5850), rateLimitStates[2].ClearLevel)
+		assert.Equal(t, int32(5850), rateLimitStates[2].LimitLevel)
 
 		cancel()
 		wg.Wait()

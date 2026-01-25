@@ -88,6 +88,25 @@ func NewSession() *Session {
 	}
 }
 
+// Instance returns the SessionInstance with the given instance number,
+// or nil if not found.
+func (s *Session) Instance(num uint8) *SessionInstance {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	return s.instances[num]
+}
+
+// Instances returns all instances in the order they were added.
+func (s *Session) Instances() []*SessionInstance {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	instances := make([]*SessionInstance, len(s.instancesOrdered))
+	copy(instances, s.instancesOrdered)
+	return instances
+}
+
 // AddInstance creates and adds a new connection instance to the session.
 // Returns the newly created SessionInstance with a unique instance number.
 func (s *Session) AddInstance() *SessionInstance {
@@ -110,21 +129,40 @@ func (s *Session) AddInstance() *SessionInstance {
 	return instance
 }
 
-// Instances returns all instances in the order they were added.
-func (s *Session) Instances() []*SessionInstance {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-
-	instances := make([]*SessionInstance, len(s.instancesOrdered))
-	copy(instances, s.instancesOrdered)
-	return instances
-}
-
 // InstanceCount returns the number of total instances in the session group.
 func (s *Session) InstanceCount() int {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	return len(s.instances)
+}
+
+// RemoveInstance removes an instance from the session group.
+func (s *Session) RemoveInstance(instance *SessionInstance) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	delete(s.instances, instance.instanceNum)
+	for i, inst := range s.instancesOrdered {
+		if inst == instance {
+			s.instancesOrdered = append(s.instancesOrdered[:i], s.instancesOrdered[i+1:]...)
+			break
+		}
+	}
+}
+
+// HasLiveInstances returns true if the session has at least one live instance.
+// A live instance is one that is not closed and has completed the sign-on sequence.
+func (s *Session) HasLiveInstances() bool {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	for _, instance := range s.instances {
+		if instance.live() {
+			return true
+		}
+	}
+
+	return false
 }
 
 // SetChatRoomCookie sets the chat room cookie.

@@ -14,8 +14,9 @@ import (
 var errSessConflict = errors.New("session conflict: another session was created concurrently for this user")
 
 type sessionSlot struct {
-	sess    *Session
-	removed chan bool
+	session      *Session
+	removed      chan bool
+	multiSession bool
 }
 
 // InMemorySessionManager handles the lifecycle of a user session and

@@ -36,19 +36,17 @@ func NewInMemorySessionManager(logger *slog.Logger) *InMemorySessionManager {
 	}
 }
 
-// RetrieveSession finds a session with a matching sessionID.
-// Returns nil if session is not found.
+// RetrieveSession finds a session with a matching screen name.
+// Returns nil if session is not found or if there are no active instances with complete signon.
 func (s *InMemorySessionManager) RetrieveSession(screenName IdentScreenName) *Session {
 	s.mapMutex.RLock()
 	defer s.mapMutex.RUnlock()
 
 	if rec, ok := s.store[screenName]; ok {
-		if rec.sess.SignonComplete() {
-			return rec.sess
+		if rec.session.HasLiveInstances() {
+			return rec.session
 		}
-		return nil
 	}
-
 	return nil
 }
 
@@ -58,10 +56,7 @@ func (s *InMemorySessionManager) RelayToAll(ctx context.Context, msg wire.SNACMe
 	defer s.mapMutex.RUnlock()
 
 	for _, rec := range s.store {
-		if !rec.sess.SignonComplete() {
-			continue
-		}
-		s.maybeRelayMessage(ctx, msg, rec.sess)
+		s.maybeRelayMessage(ctx, msg, rec.session)
 	}
 }
 
@@ -79,21 +74,6 @@ func (s *InMemorySessionManager) RelayToScreenNames(ctx context.Context, screenN
 	for _, sess := range s.retrieveByScreenNames(screenNames) {
 		s.maybeRelayMessage(ctx, msg, sess)
 	}
-}
-
-func (s *InMemorySessionManager) retrieveByScreenNames(screenNames []IdentScreenName) (ret []*Session) {
-	s.mapMutex.RLock()
-	defer s.mapMutex.RUnlock()
-
-	for _, sn := range screenNames {
-		for _, rec := range s.store {
-			if rec.sess.SignonComplete() && sn == rec.sess.IdentScreenName() {
-				ret = append(ret, rec.sess)
-			}
-		}
-	}
-
-	return ret
 }
 
 func (s *InMemorySessionManager) AddSession(ctx context.Context, screenName DisplayScreenName) (*Session, error) {
@@ -320,4 +300,20 @@ func (s *InMemoryChatSessionManager) RemoveUserFromAllChats(user IdentScreenName
 			sessionManager.RemoveSession(userSess)
 		}
 	}
+}
+
+func (s *InMemorySessionManager) retrieveByScreenNames(screenNames []IdentScreenName) []*Session {
+	s.mapMutex.RLock()
+	defer s.mapMutex.RUnlock()
+	var ret []*Session
+	for _, sn := range screenNames {
+		for _, rec := range s.store {
+			if sn == rec.session.IdentScreenName() {
+				ret = append(ret, rec.session)
+				break
+			}
+		}
+	}
+
+	return ret
 }

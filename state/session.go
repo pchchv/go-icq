@@ -110,6 +110,23 @@ func (s *Session) AddInstance() *SessionInstance {
 	return instance
 }
 
+// Instances returns all instances in the order they were added.
+func (s *Session) Instances() []*SessionInstance {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+
+	instances := make([]*SessionInstance, len(s.instancesOrdered))
+	copy(instances, s.instancesOrdered)
+	return instances
+}
+
+// InstanceCount returns the number of total instances in the session group.
+func (s *Session) InstanceCount() int {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	return len(s.instances)
+}
+
 // SetChatRoomCookie sets the chat room cookie.
 func (s *Session) SetChatRoomCookie(cookie string) {
 	s.mutex.Lock()

@@ -165,6 +165,28 @@ func (s *Session) HasLiveInstances() bool {
 	return false
 }
 
+// CloseSession closes all instances in the session.
+func (s *Session) CloseSession() {
+	s.mutex.RLock()
+	instances := make([]*SessionInstance, 0, len(s.instances))
+	for _, instance := range s.instances {
+		instances = append(instances, instance)
+	}
+	s.mutex.RUnlock()
+
+	for _, instance := range instances {
+		instance.closeOnly()
+	}
+}
+
+// OnSessionClose registers a function to be called once all instances have closed.
+func (s *Session) OnSessionClose(fn func()) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.onSessCloseFn = fn
+}
+
 // SetChatRoomCookie sets the chat room cookie.
 func (s *Session) SetChatRoomCookie(cookie string) {
 	s.mutex.Lock()

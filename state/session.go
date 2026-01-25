@@ -88,6 +88,28 @@ func NewSession() *Session {
 	}
 }
 
+// AddInstance creates and adds a new connection instance to the session.
+// Returns the newly created SessionInstance with a unique instance number.
+func (s *Session) AddInstance() *SessionInstance {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	instance := &SessionInstance{
+		session:           s,
+		instanceNum:       s.generateInstanceNum(),
+		msgCh:             make(chan wire.SNACMessage, 1000),
+		stopCh:            make(chan struct{}),
+		capabilities:      make([][16]byte, 0),
+		foodGroupVersions: defaultFoodGroupVersions(),
+		userInfoBitmask:   wire.OServiceUserFlagOSCARFree,
+		userStatusBitmask: wire.OServiceUserStatusAvailable,
+		onInstanceCloseFn: func() {},
+	}
+	s.instances[instance.instanceNum] = instance
+	s.instancesOrdered = append(s.instancesOrdered, instance)
+	return instance
+}
+
 // SetChatRoomCookie sets the chat room cookie.
 func (s *Session) SetChatRoomCookie(cookie string) {
 	s.mutex.Lock()
@@ -533,6 +555,20 @@ func (s *Session) userInfo() wire.TLVList {
 
 	tlvs.Append(wire.NewTLVBE(wire.OServiceUserInfoMySubscriptions, uint32(0)))
 	return tlvs
+}
+
+// generateInstanceNum generates the next available instance number for this session group.
+// It finds the next number that is not currently in use by iterating over the possible key range.
+func (s *Session) generateInstanceNum() uint8 {
+	// if num reaches 0, all number have been taken
+	for num := uint8(1); num != 0; num++ {
+		if _, exists := s.instances[num]; !exists {
+			return num
+		}
+	}
+
+	// the caller should ensure there are no more than 255 instances per session
+	panic("all instance numbers are taken (max 255 instances per session)")
 }
 
 // SessionInstance represents a single client connection instance

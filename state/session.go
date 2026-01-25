@@ -882,7 +882,7 @@ func (s *SessionInstance) SetFoodGroupVersions(versions [wire.MDir + 1]uint16) {
 func (s *SessionInstance) SetSignonComplete() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	
+
 	s.signonComplete = true
 }
 
@@ -928,4 +928,33 @@ func (s *SessionInstance) live() bool {
 	defer s.mutex.RUnlock()
 
 	return !s.closed && s.signonComplete
+}
+
+// defaultFoodGroupVersions returns default version numbers for all food groups.
+func defaultFoodGroupVersions() [wire.MDir + 1]uint16 {
+	vals := [wire.MDir + 1]uint16{}
+	vals[wire.OService] = 1
+	vals[wire.Locate] = 1
+	vals[wire.Buddy] = 1
+	vals[wire.ICBM] = 1
+	vals[wire.Advert] = 1
+	vals[wire.Invite] = 1
+	vals[wire.Admin] = 1
+	vals[wire.Popup] = 1
+	vals[wire.PermitDeny] = 1
+	vals[wire.UserLookup] = 1
+	vals[wire.Stats] = 1
+	vals[wire.Translate] = 1
+	vals[wire.ChatNav] = 1
+	vals[wire.Chat] = 1
+	vals[wire.ODir] = 1
+	vals[wire.BART] = 1
+	vals[wire.Feedbag] = 1
+	vals[wire.ICQ] = 1
+	vals[wire.BUCP] = 1
+	vals[wire.Alert] = 1
+	vals[wire.Plugin] = 1
+	vals[wire.UnnamedFG24] = 1
+	vals[wire.MDir] = 1
+	return vals
 }

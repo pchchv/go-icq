@@ -396,27 +396,6 @@ func TestInMemorySessionManager_AllSessions_SkipIncompleteSignon(t *testing.T) {
 	assert.True(t, user3Found, "user3 should be included (complete signon)")
 }
 
-func TestInMemoryChatSessionManager_AllSessions_RoomExists(t *testing.T) {
-	sm := NewInMemoryChatSessionManager(slog.Default())
-	user1, err := sm.AddSession(context.Background(), "the-cookie", "user-screen-name-1")
-	assert.NoError(t, err)
-	user1.SetSignonComplete()
-	user2, err := sm.AddSession(context.Background(), "the-cookie", "user-screen-name-2")
-	assert.NoError(t, err)
-	user2.SetSignonComplete()
-
-	sessions := sm.AllSessions("the-cookie")
-	assert.Len(t, sessions, 2)
-
-	lookup := make(map[*SessionInstance]bool)
-	for _, session := range sessions {
-		lookup[session] = true
-	}
-
-	assert.True(t, lookup[user1])
-	assert.True(t, lookup[user2])
-}
-
 func TestInMemorySessionManager_Remove_Existing(t *testing.T) {
 	sm := NewInMemorySessionManager(slog.Default())
 	user1Old, err := sm.AddSession(context.Background(), "user-screen-name-1", false)

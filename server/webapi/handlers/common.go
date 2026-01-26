@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -178,6 +179,72 @@ func SendXMLError(w http.ResponseWriter, statusCode int, message string) {
 
 	xmlOutput := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>%s`, xmlData)
 	w.Write([]byte(xmlOutput))
+}
+
+// SendAMF sends an AMF response.
+func SendAMF(w http.ResponseWriter, r *http.Request, data interface{}, logger *slog.Logger) {
+	encoder := NewAMFEncoder(logger)
+	version := DetectAMFVersion(r)
+	amfData, err := encoder.EncodeAMF(data, version)
+	if err != nil {
+		if logger != nil {
+			logger.Error("failed to encode AMF response",
+				"err", err.Error(),
+				"version", version,
+				"dataType", fmt.Sprintf("%T", data))
+		}
+		// fall back to JSON error
+		SendJSONError(w, http.StatusInternalServerError, "AMF encoding failed")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-amf")
+	w.Header().Set("Content-Length", strconv.Itoa(len(amfData)))
+
+	// debug logging if enabled
+	if logger != nil && logger.Enabled(context.TODO(), slog.LevelDebug) {
+		hexPreview := ""
+		if len(amfData) > 0 {
+			previewLen := len(amfData)
+			if previewLen > 64 {
+				previewLen = 64
+			}
+			hexPreview = hex.EncodeToString(amfData[:previewLen])
+		}
+
+		logger.Debug("sending AMF response",
+			"version", version,
+			"size", len(amfData),
+			"path", r.URL.Path,
+			"hexPreview", hexPreview)
+	}
+
+	if _, err := w.Write(amfData); err != nil {
+		if logger != nil {
+			logger.Error("failed to write AMF response",
+				"err", err.Error())
+		}
+	}
+}
+
+// SendAMFError sends an AMF error response.
+func SendAMFError(w http.ResponseWriter, r *http.Request, statusCode int, message string, logger *slog.Logger) {
+	errorResp := ErrorResponse{}
+	errorResp.Response.StatusCode = statusCode
+	errorResp.Response.StatusText = message
+	encoder := NewAMFEncoder(logger)
+	version := DetectAMFVersion(r)
+	amfData, err := encoder.EncodeAMF(errorResp, version)
+	if err != nil {
+		// If AMF encoding fails, fall back to JSON error
+		SendJSONError(w, statusCode, message)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-amf")
+	w.Header().Set("Content-Length", strconv.Itoa(len(amfData)))
+	w.WriteHeader(statusCode)
+	w.Write(amfData)
 }
 
 // IsValidCallback validates a JSONP callback name to prevent XSS.

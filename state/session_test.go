@@ -12,15 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSession_SetAndGetAwayMessage(t *testing.T) {
-	s := NewSession()
-	assert.Empty(t, s.AwayMessage())
-
-	msg := "here's my message"
-	s.SetAwayMessage(msg)
-	assert.Equal(t, msg, s.AwayMessage())
-}
-
 func TestSession_IncrementAndGetWarning(t *testing.T) {
 	s := NewSession().AddInstance()
 
@@ -1771,6 +1762,306 @@ func TestSession_InstanceNumberAssignment(t *testing.T) {
 			s.AddInstance()
 		})
 	})
+}
+
+func TestSessionGroup_AllInactive(t *testing.T) {
+	tests := []struct {
+		name              string
+		setupSessionGroup func() *Session
+		expectedResult    bool
+	}{
+		{
+			name: "no instances - should return true",
+			setupSessionGroup: func() *Session {
+				return NewSession()
+			},
+			expectedResult: true,
+		},
+		{
+			name: "one active instance - should return false",
+			setupSessionGroup: func() *Session {
+				sg := NewSession()
+				instance := sg.AddInstance()
+				instance.closed = false
+				instance.idle = false
+				instance.awayMsg = ""
+				instance.signonComplete = true
+				return sg
+			},
+			expectedResult: false,
+		},
+		{
+			name: "one closed instance - should return true",
+			setupSessionGroup: func() *Session {
+				sg := NewSession()
+				instance := sg.AddInstance()
+				instance.closed = true
+				instance.idle = false
+				instance.awayMsg = ""
+				return sg
+			},
+			expectedResult: true,
+		},
+		{
+			name: "one idle instance - should return true",
+			setupSessionGroup: func() *Session {
+				sg := NewSession()
+				instance := sg.AddInstance()
+				instance.closed = false
+				instance.idle = true
+				instance.awayMsg = ""
+				return sg
+			},
+			expectedResult: true,
+		},
+		{
+			name: "one instance with away message - should return true",
+			setupSessionGroup: func() *Session {
+				sg := NewSession()
+				instance := sg.AddInstance()
+				instance.closed = false
+				instance.idle = false
+				instance.awayMsg = "I'm away"
+				return sg
+			},
+			expectedResult: true,
+		},
+		{
+			name: "multiple instances - all inactive - should return true",
+			setupSessionGroup: func() *Session {
+				sg := NewSession()
+				// add closed instance
+				instance1 := sg.AddInstance()
+				instance1.closed = true
+				instance1.idle = false
+				instance1.awayMsg = ""
+				// add idle instance
+				instance2 := sg.AddInstance()
+				instance2.closed = false
+				instance2.idle = true
+				instance2.awayMsg = ""
+				// add instance with away message
+				instance3 := sg.AddInstance()
+				instance3.closed = false
+				instance3.idle = false
+				instance3.awayMsg = "I'm away"
+
+				return sg
+			},
+			expectedResult: true,
+		},
+		{
+			name: "multiple instances - one active - should return false",
+			setupSessionGroup: func() *Session {
+				sg := NewSession()
+				// add closed instance
+				instance1 := sg.AddInstance()
+				instance1.closed = true
+				instance1.idle = false
+				instance1.awayMsg = ""
+				// add active instance
+				instance2 := sg.AddInstance()
+				instance2.closed = false
+				instance2.idle = false
+				instance2.awayMsg = ""
+				instance2.signonComplete = true
+				// add idle instance
+				instance3 := sg.AddInstance()
+				instance3.closed = false
+				instance3.idle = true
+				instance3.awayMsg = ""
+
+				return sg
+			},
+			expectedResult: false,
+		},
+		{
+			name: "multiple instances - all active - should return false",
+			setupSessionGroup: func() *Session {
+				sg := NewSession()
+				// add first active instance
+				instance1 := sg.AddInstance()
+				instance1.closed = false
+				instance1.idle = false
+				instance1.awayMsg = ""
+				instance1.signonComplete = true
+				// add second active instance
+				instance2 := sg.AddInstance()
+				instance2.closed = false
+				instance2.idle = false
+				instance2.awayMsg = ""
+				instance2.signonComplete = true
+
+				return sg
+			},
+			expectedResult: false,
+		},
+		{
+			name: "mixed scenarios - some closed, some idle, some away, one active - should return false",
+			setupSessionGroup: func() *Session {
+				sg := NewSession()
+				// add closed instance
+				instance1 := sg.AddInstance()
+				instance1.closed = true
+				instance1.idle = false
+				instance1.awayMsg = ""
+				// add idle instance
+				instance2 := sg.AddInstance()
+				instance2.closed = false
+				instance2.idle = true
+				instance2.awayMsg = ""
+				// add instance with away message
+				instance3 := sg.AddInstance()
+				instance3.closed = false
+				instance3.idle = false
+				instance3.awayMsg = "I'm away"
+				// add active instance
+				instance4 := sg.AddInstance()
+				instance4.closed = false
+				instance4.idle = false
+				instance4.awayMsg = ""
+				instance4.signonComplete = true
+
+				return sg
+			},
+			expectedResult: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sg := tt.setupSessionGroup()
+			assert.Equal(t, tt.expectedResult, sg.Inactive())
+		})
+	}
+}
+
+func TestSessionGroup_InstanceCount(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupGroup    func() *Session
+		expectedCount int
+	}{
+		{
+			name: "empty session group should return 0",
+			setupGroup: func() *Session {
+				return NewSession()
+			},
+			expectedCount: 0,
+		},
+		{
+			name: "one instance should return 1",
+			setupGroup: func() *Session {
+				sg := NewSession()
+				sg.AddInstance()
+				return sg
+			},
+			expectedCount: 1,
+		},
+		{
+			name: "multiple instances should return correct count",
+			setupGroup: func() *Session {
+				sg := NewSession()
+				for i := 0; i < 3; i++ {
+					sg.AddInstance()
+				}
+				return sg
+			},
+			expectedCount: 3,
+		},
+		{
+			name: "instance count decreases after removal",
+			setupGroup: func() *Session {
+				sg := NewSession()
+				sg.AddInstance()
+				instance2 := sg.AddInstance()
+				sg.AddInstance()
+				// remove one instance
+				sg.RemoveInstance(instance2)
+				return sg
+			},
+			expectedCount: 2,
+		},
+		{
+			name: "instance count is correct after multiple add/remove operations",
+			setupGroup: func() *Session {
+				sg := NewSession()
+				instance1 := sg.AddInstance()
+				sg.AddInstance()
+				sg.RemoveInstance(instance1)
+				sg.AddInstance()
+				return sg
+			},
+			expectedCount: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sg := tt.setupGroup()
+			assert.Equal(t, tt.expectedCount, sg.InstanceCount())
+		})
+	}
+}
+
+func TestSessionGroup_Instances(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupGroup    func() *Session
+		expectedCount int
+		expectedAll   bool // whether all instances should be returned (including non-signed-in)
+	}{
+		{
+			name: "empty session group should return empty slice",
+			setupGroup: func() *Session {
+				return NewSession()
+			},
+			expectedCount: 0,
+			expectedAll:   true,
+		},
+		{
+			name: "returns all instances including non-signed-in",
+			setupGroup: func() *Session {
+				sg := NewSession()
+				instance1 := sg.AddInstance()
+				instance1.SetSignonComplete()
+				_ = sg.AddInstance()
+				// instance2 has not completed signon
+				return sg
+			},
+			expectedCount: 2,
+			expectedAll:   true,
+		},
+		{
+			name: "returns all instances with mixed signon states",
+			setupGroup: func() *Session {
+				sg := NewSession()
+				instance1 := sg.AddInstance()
+				instance1.SetSignonComplete()
+				_ = sg.AddInstance()
+				// instance2 has not completed signon
+				instance3 := sg.AddInstance()
+				instance3.SetSignonComplete()
+				return sg
+			},
+			expectedCount: 3,
+			expectedAll:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sg := tt.setupGroup()
+			instances := sg.Instances()
+			assert.Equal(t, tt.expectedCount, len(instances), "should return all instances")
+
+			if tt.expectedAll {
+				// verify that instances() returns all instances regardless of their state
+				// this is the key change: it should return all instances, not just live ones
+				assert.Equal(t, sg.InstanceCount(), len(instances), "Instances() should return all instances")
+			}
+		})
+	}
 }
 
 // capsEqual compares slices of capabilities (order-independent).

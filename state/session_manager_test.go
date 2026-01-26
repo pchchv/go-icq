@@ -116,20 +116,17 @@ func TestInMemorySessionManager_RelayToScreenNames(t *testing.T) {
 	}
 	sm.RelayToScreenNames(context.Background(), recips, want)
 
-	select {
-	case have := <-user1.ReceiveMessage():
-		assert.Equal(t, want, have)
-	}
+	have1 := <-user1.ReceiveMessage()
+	assert.Equal(t, want, have1)
 
-	select {
-	case have := <-user2.ReceiveMessage():
-		assert.Equal(t, want, have)
-	}
+	have2 := <-user2.ReceiveMessage()
+	assert.Equal(t, want, have2)
 
 	select {
 	case <-user3.ReceiveMessage():
 		assert.Fail(t, "user 3 should not receive a message")
 	default:
+		// success: no message was waiting
 	}
 }
 
@@ -155,21 +152,18 @@ func TestInMemorySessionManager_RelayToScreenNames_SkipIncompleteSignon(t *testi
 	}
 	sm.RelayToScreenNames(context.Background(), recips, want)
 
-	select {
-	case have := <-user1.ReceiveMessage():
-		assert.Equal(t, want, have)
-	}
+	have1 := <-user1.ReceiveMessage()
+	assert.Equal(t, want, have1)
 
 	select {
 	case <-user2.ReceiveMessage():
 		assert.Fail(t, "user 2 should not receive a message because signon is incomplete")
 	default:
+		// success: no message was waiting
 	}
 
-	select {
-	case have := <-user3.ReceiveMessage():
-		assert.Equal(t, want, have)
-	}
+	have3 := <-user3.ReceiveMessage()
+	assert.Equal(t, want, have3)
 }
 
 func TestInMemorySessionManager_Broadcast(t *testing.T) {
@@ -185,15 +179,11 @@ func TestInMemorySessionManager_Broadcast(t *testing.T) {
 
 	sm.RelayToAll(context.Background(), want)
 
-	select {
-	case have := <-user1.ReceiveMessage():
-		assert.Equal(t, want, have)
-	}
+	have1 := <-user1.ReceiveMessage()
+	assert.Equal(t, want, have1)
 
-	select {
-	case have := <-user2.ReceiveMessage():
-		assert.Equal(t, want, have)
-	}
+	have2 := <-user2.ReceiveMessage()
+	assert.Equal(t, want, have2)
 }
 
 func TestInMemorySessionManager_Broadcast_SkipClosedSession(t *testing.T) {
@@ -210,15 +200,14 @@ func TestInMemorySessionManager_Broadcast_SkipClosedSession(t *testing.T) {
 
 	sm.RelayToAll(context.Background(), want)
 
-	select {
-	case have := <-user1.ReceiveMessage():
-		assert.Equal(t, want, have)
-	}
+	have := <-user1.ReceiveMessage()
+	assert.Equal(t, want, have)
 
 	select {
 	case <-user2.ReceiveMessage():
 		assert.Fail(t, "user 2 should not receive a message")
 	default:
+		// success: no message was waiting
 	}
 }
 
@@ -235,15 +224,14 @@ func TestInMemorySessionManager_RelayToScreenName_SessionExists(t *testing.T) {
 	recip := NewIdentScreenName("user-screen-name-1")
 	sm.RelayToScreenName(context.Background(), recip, want)
 
-	select {
-	case have := <-user1.ReceiveMessage():
-		assert.Equal(t, want, have)
-	}
+	have := <-user1.ReceiveMessage()
+	assert.Equal(t, want, have)
 
 	select {
 	case <-user2.ReceiveMessage():
 		assert.Fail(t, "user 2 should not receive a message")
 	default:
+		// success: no message was waiting
 	}
 }
 
@@ -328,15 +316,14 @@ func TestInMemorySessionManager_RelayToAll_SkipIncompleteSignon(t *testing.T) {
 	want := wire.SNACMessage{Frame: wire.SNACFrame{FoodGroup: wire.ICBM}}
 	sm.RelayToAll(context.Background(), want)
 
-	select {
-	case have := <-user1.ReceiveMessage():
-		assert.Equal(t, want, have)
-	}
+	have := <-user1.ReceiveMessage()
+	assert.Equal(t, want, have)
 
 	select {
 	case <-user2.ReceiveMessage():
 		assert.Fail(t, "user 2 should not receive a message because signon is incomplete")
 	default:
+		// success: no message was waiting
 	}
 }
 
@@ -585,15 +572,14 @@ func TestInMemoryChatSessionManager_RelayToScreenName_SessionAndChatRoomExist(t 
 	recip := NewIdentScreenName("user-screen-name-1")
 	sm.RelayToScreenName(context.Background(), "chat-room-1", recip, want)
 
-	select {
-	case have := <-user1.ReceiveMessage():
-		assert.Equal(t, want, have)
-	}
+	have := <-user1.ReceiveMessage()
+	assert.Equal(t, want, have)
 
 	select {
 	case <-user2.ReceiveMessage():
 		assert.Fail(t, "user 2 should not receive a message")
 	default:
+		// success: no message was waiting
 	}
 }
 
@@ -614,21 +600,18 @@ func TestInMemoryChatSessionManager_RelayToAllExcept_HappyPath(t *testing.T) {
 
 	sm.RelayToAllExcept(context.Background(), cookie, user2.IdentScreenName(), want)
 
-	select {
-	case have := <-user1.ReceiveMessage():
-		assert.Equal(t, want, have)
-	}
+	have1 := <-user1.ReceiveMessage()
+	assert.Equal(t, want, have1)
 
 	select {
 	case <-user2.ReceiveMessage():
 		assert.Fail(t, "user 2 should not receive a message")
 	default:
+		// success: no message was waiting
 	}
 
-	select {
-	case have := <-user3.ReceiveMessage():
-		assert.Equal(t, want, have)
-	}
+	have2 := <-user3.ReceiveMessage()
+	assert.Equal(t, want, have2)
 }
 
 func TestInMemoryChatSessionManager_RemoveUserFromAllChats(t *testing.T) {

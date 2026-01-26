@@ -38,13 +38,13 @@ type BuddyListRegistry interface {
 type AuthService interface {
 	BUCPChallenge(ctx context.Context, bodyIn wire.SNAC_0x17_0x06_BUCPChallengeRequest, newUUID func() uuid.UUID) (wire.SNACMessage, error)
 	BUCPLogin(ctx context.Context, bodyIn wire.SNAC_0x17_0x02_BUCPLoginRequest, newUserFn func(screenName state.DisplayScreenName) (state.User, error), advertisedHost string) (wire.SNACMessage, error)
-	RegisterBOSSession(ctx context.Context, authCookie state.ServerCookie) (*state.Session, error)
+	RegisterBOSSession(ctx context.Context, authCookie state.ServerCookie) (*state.SessionInstance, error)
 }
 
 // SessionManager defines methods for OSCAR session management.
 type SessionManager interface {
-	AddSession(ctx context.Context, screenName state.DisplayScreenName) (*state.Session, error)
-	RemoveSession(instance *state.Session)
+	AddSession(ctx context.Context, screenName state.DisplayScreenName) (*state.SessionInstance, error)
+	RemoveSession(instance *state.SessionInstance)
 	RelayToScreenName(ctx context.Context, screenName state.IdentScreenName, msg wire.SNACMessage)
 }
 

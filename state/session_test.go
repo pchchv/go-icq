@@ -1039,3 +1039,255 @@ func TestSession_ScaleWarningAndRateLimit(t *testing.T) {
 		wg.Wait()
 	})
 }
+
+func TestSession_Profile(t *testing.T) {
+	tests := []struct {
+		name            string
+		setupSession    func() *Session
+		expectedProfile UserProfile
+	}{
+		{
+			name: "no instances - returns empty profile",
+			setupSession: func() *Session {
+				return NewSession()
+			},
+			expectedProfile: UserProfile{},
+		},
+		{
+			name: "one instance with empty profile - returns empty profile",
+			setupSession: func() *Session {
+				s := NewSession()
+				s.AddInstance()
+				return s
+			},
+			expectedProfile: UserProfile{},
+		},
+		{
+			name: "one instance with non-empty profile - returns that profile",
+			setupSession: func() *Session {
+				s := NewSession()
+				instance := s.AddInstance()
+				profileTime := time.Unix(1234567890, 0)
+				instance.SetProfile(UserProfile{
+					ProfileText: "My profile",
+					MIMEType:    "text/plain",
+					UpdateTime:  profileTime,
+				})
+				return s
+			},
+			expectedProfile: UserProfile{
+				ProfileText: "My profile",
+				MIMEType:    "text/plain",
+				UpdateTime:  time.Unix(1234567890, 0),
+			},
+		},
+		{
+			name: "multiple instances, all empty - returns empty profile",
+			setupSession: func() *Session {
+				s := NewSession()
+				s.AddInstance()
+				s.AddInstance()
+				s.AddInstance()
+				return s
+			},
+			expectedProfile: UserProfile{},
+		},
+		{
+			name: "multiple instances, one non-empty - returns that one",
+			setupSession: func() *Session {
+				s := NewSession()
+				s.AddInstance() // empty instance
+				instance2 := s.AddInstance()
+				instance2.SetProfile(UserProfile{
+					ProfileText: "Profile 2",
+					MIMEType:    "text/plain",
+					UpdateTime:  time.Unix(1234567890, 0),
+				})
+				s.AddInstance() // empty instance
+				return s
+			},
+			expectedProfile: UserProfile{
+				ProfileText: "Profile 2",
+				MIMEType:    "text/plain",
+				UpdateTime:  time.Unix(1234567890, 0),
+			},
+		},
+		{
+			name: "multiple instances, multiple non-empty - returns most recent UpdateTime",
+			setupSession: func() *Session {
+				s := NewSession()
+				instance1 := s.AddInstance()
+				instance1.SetProfile(UserProfile{
+					ProfileText: "Profile 1",
+					MIMEType:    "text/plain",
+					UpdateTime:  time.Unix(1234567900, 0), // later time - should be returned
+				})
+				instance2 := s.AddInstance()
+				instance2.SetProfile(UserProfile{
+					ProfileText: "Profile 2",
+					MIMEType:    "text/plain",
+					UpdateTime:  time.Unix(1234567890, 0), // earlier time
+				})
+				instance3 := s.AddInstance()
+				instance3.SetProfile(UserProfile{
+					ProfileText: "Profile 3",
+					MIMEType:    "text/plain",
+					UpdateTime:  time.Unix(1234567895, 0), // middle time
+				})
+				return s
+			},
+			expectedProfile: UserProfile{
+				ProfileText: "Profile 1",
+				MIMEType:    "text/plain",
+				UpdateTime:  time.Unix(1234567900, 0),
+			},
+		},
+		{
+			name: "first instance empty, later instances have profiles - returns most recent non-empty",
+			setupSession: func() *Session {
+				s := NewSession()
+				s.AddInstance() // empty instance
+				instance2 := s.AddInstance()
+				instance2.SetProfile(UserProfile{
+					ProfileText: "Profile 2",
+					MIMEType:    "text/plain",
+					UpdateTime:  time.Unix(1234567890, 0), // earlier
+				})
+				instance3 := s.AddInstance()
+				instance3.SetProfile(UserProfile{
+					ProfileText: "Profile 3",
+					MIMEType:    "text/plain",
+					UpdateTime:  time.Unix(1234567900, 0), // later time - should be returned
+				})
+				return s
+			},
+			expectedProfile: UserProfile{
+				ProfileText: "Profile 3",
+				MIMEType:    "text/plain",
+				UpdateTime:  time.Unix(1234567900, 0),
+			},
+		},
+		{
+			name: "profile with empty ProfileText is considered empty",
+			setupSession: func() *Session {
+				s := NewSession()
+				instance := s.AddInstance()
+				instance.SetProfile(UserProfile{
+					ProfileText: "",
+					MIMEType:    "text/plain",
+					UpdateTime:  time.Unix(1234567890, 0),
+				})
+				return s
+			},
+			expectedProfile: UserProfile{},
+		},
+		{
+			name: "profile with null byte ProfileText is considered empty",
+			setupSession: func() *Session {
+				s := NewSession()
+				instance := s.AddInstance()
+				instance.SetProfile(UserProfile{
+					ProfileText: "\x00",
+					MIMEType:    "text/plain",
+					UpdateTime:  time.Unix(1234567890, 0),
+				})
+				return s
+			},
+			expectedProfile: UserProfile{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := tt.setupSession()
+			profile := s.Profile()
+			assert.Equal(t, tt.expectedProfile, profile)
+		})
+	}
+}
+
+func TestSession_RunOnce(t *testing.T) {
+	t.Run("runs function on first call", func(t *testing.T) {
+		var callCount int
+		s := NewSession()
+		err := s.RunOnce(func() error {
+			callCount++
+			return nil
+		})
+
+		assert.NoError(t, err)
+		assert.Equal(t, 1, callCount)
+	})
+
+	t.Run("does not run function on subsequent calls", func(t *testing.T) {
+		var callCount int
+		s := NewSession()
+		// first call
+		err1 := s.RunOnce(func() error {
+			callCount++
+			return nil
+		})
+
+		// second call
+		err2 := s.RunOnce(func() error {
+			callCount++
+			return nil
+		})
+
+		// third call
+		err3 := s.RunOnce(func() error {
+			callCount++
+			return nil
+		})
+
+		assert.NoError(t, err1)
+		assert.NoError(t, err2)
+		assert.NoError(t, err3)
+		assert.Equal(t, 1, callCount, "function should only be called once")
+	})
+
+	t.Run("returns error from function", func(t *testing.T) {
+		s := NewSession()
+		expectedErr := assert.AnError
+
+		err := s.RunOnce(func() error {
+			return expectedErr
+		})
+
+		assert.Error(t, err)
+		assert.Equal(t, expectedErr, err)
+	})
+}
+
+func TestSession_CloseInstance(t *testing.T) {
+	var sessionCloseCount int
+	s := NewSession()
+	s.OnSessionClose(func() {
+		sessionCloseCount++
+	})
+
+	var instance1CloseCount, instance2CloseCount, instance3CloseCount int
+	instance1 := s.AddInstance()
+	instance2 := s.AddInstance()
+	instance3 := s.AddInstance()
+
+	instance1.OnClose(func() {
+		instance1CloseCount++
+	})
+	instance2.OnClose(func() {
+		instance2CloseCount++
+	})
+	instance3.OnClose(func() {
+		instance3CloseCount++
+	})
+
+	// close instance1 (instances 2 and 3 remain)
+	instance1.CloseInstance()
+	instance2.CloseInstance()
+	instance3.CloseInstance()
+
+	assert.Equal(t, 1, instance1CloseCount, "instance1 onInstanceCloseFn should only be called once")
+	assert.Equal(t, 1, instance2CloseCount, "instance2 onInstanceCloseFn should only be called once")
+	assert.Equal(t, 0, instance3CloseCount, "instance3 onInstanceCloseFn should not be called because it's the last instance")
+	assert.Equal(t, 1, sessionCloseCount, "session onSessCloseFn should not be called")
+}

@@ -75,7 +75,7 @@ func TestInMemorySessionManager_Retrieve(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sm := NewInMemorySessionManager(slog.Default())
 			for _, screenName := range tt.given {
-				sess, err := sm.AddSession(context.Background(), screenName)
+				sess, err := sm.AddSession(context.Background(), screenName, false)
 				assert.NoError(t, err)
 				sess.SetSignonComplete()
 			}
@@ -91,7 +91,7 @@ func TestInMemorySessionManager_Retrieve(t *testing.T) {
 
 func TestInMemorySessionManager_RetrieveSession_IncompleteSignon(t *testing.T) {
 	sm := NewInMemorySessionManager(slog.Default())
-	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1", false)
 	assert.NoError(t, err)
 	// user1 has not completed signon
 
@@ -101,29 +101,29 @@ func TestInMemorySessionManager_RetrieveSession_IncompleteSignon(t *testing.T) {
 	user1.SetSignonComplete()
 	sess = sm.RetrieveSession(NewIdentScreenName("user-screen-name-1"))
 	assert.NotNil(t, sess, "should return session after signon is complete")
-	assert.Equal(t, user1, sess)
+	assert.Equal(t, user1.Session(), sess)
 }
 
 func TestInMemorySessionManager_RetrieveSession_CompleteSignon(t *testing.T) {
 	sm := NewInMemorySessionManager(slog.Default())
-	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1", false)
 	assert.NoError(t, err)
 	user1.SetSignonComplete()
 
 	sess := sm.RetrieveSession(NewIdentScreenName("user-screen-name-1"))
 	assert.NotNil(t, sess)
-	assert.Equal(t, user1, sess)
+	assert.Equal(t, user1.Session(), sess)
 }
 
 func TestInMemorySessionManager_RelayToScreenNames(t *testing.T) {
 	sm := NewInMemorySessionManager(slog.Default())
-	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1", false)
 	assert.NoError(t, err)
 	user1.SetSignonComplete()
-	user2, err := sm.AddSession(context.Background(), "user-screen-name-2")
+	user2, err := sm.AddSession(context.Background(), "user-screen-name-2", false)
 	assert.NoError(t, err)
 	user2.SetSignonComplete()
-	user3, err := sm.AddSession(context.Background(), "user-screen-name-3")
+	user3, err := sm.AddSession(context.Background(), "user-screen-name-3", false)
 	assert.NoError(t, err)
 	user3.SetSignonComplete()
 
@@ -134,27 +134,34 @@ func TestInMemorySessionManager_RelayToScreenNames(t *testing.T) {
 	}
 	sm.RelayToScreenNames(context.Background(), recips, want)
 
-	have := <-user1.ReceiveMessage()
-	assert.Equal(t, want, have)
+	select {
+	case have := <-user1.ReceiveMessage():
+		assert.Equal(t, want, have)
+	}
 
-	have = <-user2.ReceiveMessage()
-	assert.Equal(t, want, have)
+	select {
+	case have := <-user2.ReceiveMessage():
+		assert.Equal(t, want, have)
+	}
 
-	<-user3.ReceiveMessage()
-	assert.Fail(t, "user 3 should not receive a message")
+	select {
+	case <-user3.ReceiveMessage():
+		assert.Fail(t, "user 3 should not receive a message")
+	default:
+	}
 }
 
 func TestInMemorySessionManager_RelayToScreenNames_SkipIncompleteSignon(t *testing.T) {
 	sm := NewInMemorySessionManager(slog.Default())
-	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1", false)
 	assert.NoError(t, err)
 	user1.SetSignonComplete()
 
-	user2, err := sm.AddSession(context.Background(), "user-screen-name-2")
+	user2, err := sm.AddSession(context.Background(), "user-screen-name-2", false)
 	assert.NoError(t, err)
 	// user2 has not completed signon
 
-	user3, err := sm.AddSession(context.Background(), "user-screen-name-3")
+	user3, err := sm.AddSession(context.Background(), "user-screen-name-3", false)
 	assert.NoError(t, err)
 	user3.SetSignonComplete()
 
@@ -166,22 +173,29 @@ func TestInMemorySessionManager_RelayToScreenNames_SkipIncompleteSignon(t *testi
 	}
 	sm.RelayToScreenNames(context.Background(), recips, want)
 
-	have := <-user1.ReceiveMessage()
-	assert.Equal(t, want, have)
+	select {
+	case have := <-user1.ReceiveMessage():
+		assert.Equal(t, want, have)
+	}
 
-	<-user2.ReceiveMessage()
-	assert.Fail(t, "user 2 should not receive a message because signon is incomplete")
+	select {
+	case <-user2.ReceiveMessage():
+		assert.Fail(t, "user 2 should not receive a message because signon is incomplete")
+	default:
+	}
 
-	have = <-user3.ReceiveMessage()
-	assert.Equal(t, want, have)
+	select {
+	case have := <-user3.ReceiveMessage():
+		assert.Equal(t, want, have)
+	}
 }
 
 func TestInMemorySessionManager_Broadcast(t *testing.T) {
 	sm := NewInMemorySessionManager(slog.Default())
-	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1", false)
 	assert.NoError(t, err)
 	user1.SetSignonComplete()
-	user2, err := sm.AddSession(context.Background(), "user-screen-name-2")
+	user2, err := sm.AddSession(context.Background(), "user-screen-name-2", false)
 	assert.NoError(t, err)
 	user2.SetSignonComplete()
 
@@ -189,40 +203,49 @@ func TestInMemorySessionManager_Broadcast(t *testing.T) {
 
 	sm.RelayToAll(context.Background(), want)
 
-	have := <-user1.ReceiveMessage()
-	assert.Equal(t, want, have)
+	select {
+	case have := <-user1.ReceiveMessage():
+		assert.Equal(t, want, have)
+	}
 
-	have = <-user2.ReceiveMessage()
-	assert.Equal(t, want, have)
+	select {
+	case have := <-user2.ReceiveMessage():
+		assert.Equal(t, want, have)
+	}
 }
 
 func TestInMemorySessionManager_Broadcast_SkipClosedSession(t *testing.T) {
 	sm := NewInMemorySessionManager(slog.Default())
-	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1", false)
 	assert.NoError(t, err)
 	user1.SetSignonComplete()
-	user2, err := sm.AddSession(context.Background(), "user-screen-name-2")
+	user2, err := sm.AddSession(context.Background(), "user-screen-name-2", false)
 	assert.NoError(t, err)
 	user2.SetSignonComplete()
-	user2.Close()
+	user2.CloseInstance()
 
 	want := wire.SNACMessage{Frame: wire.SNACFrame{FoodGroup: wire.ICBM}}
 
 	sm.RelayToAll(context.Background(), want)
 
-	have := <-user1.ReceiveMessage()
-	assert.Equal(t, want, have)
+	select {
+	case have := <-user1.ReceiveMessage():
+		assert.Equal(t, want, have)
+	}
 
-	<-user2.ReceiveMessage()
-	assert.Fail(t, "user 2 should not receive a message")
+	select {
+	case <-user2.ReceiveMessage():
+		assert.Fail(t, "user 2 should not receive a message")
+	default:
+	}
 }
 
 func TestInMemorySessionManager_RelayToScreenName_SessionExists(t *testing.T) {
 	sm := NewInMemorySessionManager(slog.Default())
-	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1", false)
 	assert.NoError(t, err)
 	user1.SetSignonComplete()
-	user2, err := sm.AddSession(context.Background(), "user-screen-name-2")
+	user2, err := sm.AddSession(context.Background(), "user-screen-name-2", false)
 	assert.NoError(t, err)
 	user2.SetSignonComplete()
 
@@ -230,16 +253,21 @@ func TestInMemorySessionManager_RelayToScreenName_SessionExists(t *testing.T) {
 	recip := NewIdentScreenName("user-screen-name-1")
 	sm.RelayToScreenName(context.Background(), recip, want)
 
-	have := <-user1.ReceiveMessage()
-	assert.Equal(t, want, have)
+	select {
+	case have := <-user1.ReceiveMessage():
+		assert.Equal(t, want, have)
+	}
 
-	<-user2.ReceiveMessage()
-	assert.Fail(t, "user 2 should not receive a message")
+	select {
+	case <-user2.ReceiveMessage():
+		assert.Fail(t, "user 2 should not receive a message")
+	default:
+	}
 }
 
 func TestInMemorySessionManager_RelayToScreenName_SessionNotExist(t *testing.T) {
 	sm := NewInMemorySessionManager(slog.Default())
-	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1", false)
 	assert.NoError(t, err)
 	user1.SetSignonComplete()
 
@@ -257,14 +285,14 @@ func TestInMemorySessionManager_RelayToScreenName_SessionNotExist(t *testing.T) 
 
 func TestInMemorySessionManager_RelayToScreenName_SkipFullSession(t *testing.T) {
 	sm := NewInMemorySessionManager(slog.Default())
-	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1", false)
 	assert.NoError(t, err)
 	user1.SetSignonComplete()
 	msg := wire.SNACMessage{Frame: wire.SNACFrame{FoodGroup: wire.ICBM}}
 
 	var wantCount int
 	for {
-		if user1.RelayMessage(msg) == SessQueueFull {
+		if user1.RelayMessageToInstance(msg) == SessQueueFull {
 			break
 		}
 		wantCount++
@@ -289,7 +317,7 @@ loop:
 
 func TestInMemorySessionManager_RelayToScreenName_IncompleteSignon(t *testing.T) {
 	sm := NewInMemorySessionManager(slog.Default())
-	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1", false)
 	assert.NoError(t, err)
 	// user1 has not completed signon
 
@@ -307,28 +335,33 @@ func TestInMemorySessionManager_RelayToScreenName_IncompleteSignon(t *testing.T)
 
 func TestInMemorySessionManager_RelayToAll_SkipIncompleteSignon(t *testing.T) {
 	sm := NewInMemorySessionManager(slog.Default())
-	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1", false)
 	assert.NoError(t, err)
 	user1.SetSignonComplete()
 
-	user2, err := sm.AddSession(context.Background(), "user-screen-name-2")
+	user2, err := sm.AddSession(context.Background(), "user-screen-name-2", false)
 	assert.NoError(t, err)
 	// user2 has not completed signon
 
 	want := wire.SNACMessage{Frame: wire.SNACFrame{FoodGroup: wire.ICBM}}
 	sm.RelayToAll(context.Background(), want)
 
-	have := <-user1.ReceiveMessage()
-	assert.Equal(t, want, have)
+	select {
+	case have := <-user1.ReceiveMessage():
+		assert.Equal(t, want, have)
+	}
 
-	<-user2.ReceiveMessage()
-	assert.Fail(t, "user 2 should not receive a message because signon is incomplete")
+	select {
+	case <-user2.ReceiveMessage():
+		assert.Fail(t, "user 2 should not receive a message because signon is incomplete")
+	default:
+	}
 }
 
 func TestInMemorySessionManager_AddSession(t *testing.T) {
 	sm := NewInMemorySessionManager(slog.Default())
 	ctx := context.Background()
-	sess1, err := sm.AddSession(ctx, "user-screen-name")
+	sess1, err := sm.AddSession(ctx, "user-screen-name", false)
 	assert.NoError(t, err)
 	sess1.SetSignonComplete()
 
@@ -337,39 +370,48 @@ func TestInMemorySessionManager_AddSession(t *testing.T) {
 		sm.RemoveSession(sess1)
 	}()
 
-	sess2, err := sm.AddSession(ctx, "user-screen-name")
+	sess2, err := sm.AddSession(ctx, "user-screen-name", false)
 	assert.NoError(t, err)
 	sess2.SetSignonComplete()
 
 	assert.NotSame(t, sess1, sess2)
-	assert.Contains(t, sm.AllSessions(), sess2)
+	assert.Contains(t, sm.AllSessions(), sess2.Session())
 }
 
 func TestInMemorySessionManager_AllSessions_SkipIncompleteSignon(t *testing.T) {
 	sm := NewInMemorySessionManager(slog.Default())
-	user1, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	user1, err := sm.AddSession(context.Background(), "user-screen-name-1", false)
 	assert.NoError(t, err)
 	user1.SetSignonComplete()
 
-	user2, err := sm.AddSession(context.Background(), "user-screen-name-2")
+	user2, err := sm.AddSession(context.Background(), "user-screen-name-2", false)
 	assert.NoError(t, err)
 	// user2 has not completed signon
 
-	user3, err := sm.AddSession(context.Background(), "user-screen-name-3")
+	user3, err := sm.AddSession(context.Background(), "user-screen-name-3", false)
 	assert.NoError(t, err)
 	user3.SetSignonComplete()
 
 	sessions := sm.AllSessions()
 	assert.Len(t, sessions, 2, "should only return sessions with complete signon")
 
-	lookup := make(map[*Session]bool)
+	// check that we have sessions for user1 and user3 (by checking Session identity)
+	var user1Found, user3Found, user2Found bool
 	for _, session := range sessions {
-		lookup[session] = true
+		if session == user1.Session() {
+			user1Found = true
+		}
+		if session == user2.Session() {
+			user2Found = true
+		}
+		if session == user3.Session() {
+			user3Found = true
+		}
 	}
 
-	assert.True(t, lookup[user1], "user1 should be included (complete signon)")
-	assert.False(t, lookup[user2], "user2 should not be included (incomplete signon)")
-	assert.True(t, lookup[user3], "user3 should be included (complete signon)")
+	assert.True(t, user1Found, "user1 should be included (complete signon)")
+	assert.False(t, user2Found, "user2 should not be included (incomplete signon)")
+	assert.True(t, user3Found, "user3 should be included (complete signon)")
 }
 
 func TestInMemoryChatSessionManager_AllSessions_RoomExists(t *testing.T) {
@@ -384,7 +426,7 @@ func TestInMemoryChatSessionManager_AllSessions_RoomExists(t *testing.T) {
 	sessions := sm.AllSessions("the-cookie")
 	assert.Len(t, sessions, 2)
 
-	lookup := make(map[*Session]bool)
+	lookup := make(map[*SessionInstance]bool)
 	for _, session := range sessions {
 		lookup[session] = true
 	}
@@ -395,47 +437,91 @@ func TestInMemoryChatSessionManager_AllSessions_RoomExists(t *testing.T) {
 
 func TestInMemorySessionManager_Remove_Existing(t *testing.T) {
 	sm := NewInMemorySessionManager(slog.Default())
-	user1Old, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	user1Old, err := sm.AddSession(context.Background(), "user-screen-name-1", false)
 	assert.NoError(t, err)
+
+	// verify the old session is in the store
+	rec, ok := sm.store[user1Old.IdentScreenName()]
+	assert.True(t, ok)
+	assert.Equal(t, user1Old.Session(), rec.session)
+
+	// remove the session
 	sm.RemoveSession(user1Old)
 
-	user1New, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	// verify the session is no longer in the store
+	_, ok = sm.store[user1Old.IdentScreenName()]
+	assert.False(t, ok)
+
+	// verify the removed channel was closed
+	select {
+	case <-rec.removed:
+		// channel was closed, as expected
+	default:
+		assert.Fail(t, "removed channel should be closed")
+	}
+
+	user1New, err := sm.AddSession(context.Background(), "user-screen-name-1", false)
 	assert.NoError(t, err)
 	user1New.SetSignonComplete()
 
-	user2, err := sm.AddSession(context.Background(), "user-screen-name-2")
+	user2, err := sm.AddSession(context.Background(), "user-screen-name-2", false)
 	assert.NoError(t, err)
 	user2.SetSignonComplete()
 
+	// remove user1New and verify it's gone
 	sm.RemoveSession(user1New)
+	_, ok = sm.store[user1New.IdentScreenName()]
+	assert.False(t, ok)
 
 	if assert.Len(t, sm.AllSessions(), 1) {
-		assert.NotContains(t, sm.AllSessions(), user1Old)
-		assert.NotContains(t, sm.AllSessions(), user1New)
-		assert.Contains(t, sm.AllSessions(), user2)
+		assert.NotContains(t, sm.AllSessions(), user1Old.Session())
+		assert.NotContains(t, sm.AllSessions(), user1New.Session())
+		assert.Contains(t, sm.AllSessions(), user2.Session())
 	}
 }
 
 func TestInMemorySessionManager_Remove_MissingSameScreenName(t *testing.T) {
 	sm := NewInMemorySessionManager(slog.Default())
-	user1Old, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	user1Old, err := sm.AddSession(context.Background(), "user-screen-name-1", false)
 	assert.NoError(t, err)
-	sm.RemoveSession(user1Old)
 
-	user1New, err := sm.AddSession(context.Background(), "user-screen-name-1")
+	// verify the old session is in the store
+	recOld, ok := sm.store[user1Old.IdentScreenName()]
+	assert.True(t, ok)
+	assert.Equal(t, user1Old.Session(), recOld.session)
+
+	// remove the old session
+	sm.RemoveSession(user1Old)
+	_, ok = sm.store[user1Old.IdentScreenName()]
+	assert.False(t, ok)
+
+	// create a new session with the same screen name but different Session
+	user1New, err := sm.AddSession(context.Background(), "user-screen-name-1", false)
 	assert.NoError(t, err)
 	user1New.SetSignonComplete()
 
-	user2, err := sm.AddSession(context.Background(), "user-screen-name-2")
+	// verify the new session is in the store with a different Session
+	recNew, ok := sm.store[user1New.IdentScreenName()]
+	assert.True(t, ok)
+	assert.Equal(t, user1New.Session(), recNew.session)
+	assert.NotEqual(t, user1Old.Session(), user1New.Session())
+
+	user2, err := sm.AddSession(context.Background(), "user-screen-name-2", false)
 	assert.NoError(t, err)
 	user2.SetSignonComplete()
 
+	// try to remove the old session again - should do nothing because Session doesn't match
 	sm.RemoveSession(user1Old)
 
+	// Verify the new session is still in the store (not removed)
+	recNewAfter, ok := sm.store[user1New.IdentScreenName()]
+	assert.True(t, ok, "new session should still be in store")
+	assert.Equal(t, user1New.Session(), recNewAfter.session)
+
 	if assert.Len(t, sm.AllSessions(), 2) {
-		assert.NotContains(t, sm.AllSessions(), user1Old)
-		assert.Contains(t, sm.AllSessions(), user1New)
-		assert.Contains(t, sm.AllSessions(), user2)
+		assert.NotContains(t, sm.AllSessions(), user1Old.Session())
+		assert.Contains(t, sm.AllSessions(), user1New.Session())
+		assert.Contains(t, sm.AllSessions(), user2.Session())
 	}
 }
 
@@ -463,7 +549,7 @@ func TestInMemorySessionManager_Empty(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sm := NewInMemorySessionManager(slog.Default())
 			for _, screenName := range tt.given {
-				sess, err := sm.AddSession(context.Background(), screenName)
+				sess, err := sm.AddSession(context.Background(), screenName, false)
 				assert.NoError(t, err)
 				sess.SetSignonComplete()
 			}
@@ -538,11 +624,16 @@ func TestInMemoryChatSessionManager_RelayToScreenName_SessionAndChatRoomExist(t 
 	recip := NewIdentScreenName("user-screen-name-1")
 	sm.RelayToScreenName(context.Background(), "chat-room-1", recip, want)
 
-	have := <-user1.ReceiveMessage()
-	assert.Equal(t, want, have)
+	select {
+	case have := <-user1.ReceiveMessage():
+		assert.Equal(t, want, have)
+	}
 
-	<-user2.ReceiveMessage()
-	assert.Fail(t, "user 2 should not receive a message")
+	select {
+	case <-user2.ReceiveMessage():
+		assert.Fail(t, "user 2 should not receive a message")
+	default:
+	}
 }
 
 func TestInMemoryChatSessionManager_RelayToAllExcept_HappyPath(t *testing.T) {
@@ -562,14 +653,21 @@ func TestInMemoryChatSessionManager_RelayToAllExcept_HappyPath(t *testing.T) {
 
 	sm.RelayToAllExcept(context.Background(), cookie, user2.IdentScreenName(), want)
 
-	have := <-user1.ReceiveMessage()
-	assert.Equal(t, want, have)
+	select {
+	case have := <-user1.ReceiveMessage():
+		assert.Equal(t, want, have)
+	}
 
-	<-user2.ReceiveMessage()
-	assert.Fail(t, "user 2 should not receive a message")
+	select {
+	case <-user2.ReceiveMessage():
+		assert.Fail(t, "user 2 should not receive a message")
+	default:
+	}
 
-	have = <-user3.ReceiveMessage()
-	assert.Equal(t, want, have)
+	select {
+	case have := <-user3.ReceiveMessage():
+		assert.Equal(t, want, have)
+	}
 }
 
 func TestInMemoryChatSessionManager_RemoveUserFromAllChats(t *testing.T) {
@@ -591,7 +689,7 @@ func TestInMemoryChatSessionManager_RemoveUserFromAllChats(t *testing.T) {
 		lookup[session] = true
 	}
 
-	assert.False(t, lookup[user1sess])
-	assert.True(t, lookup[user2sess])
+	assert.False(t, lookup[user1sess.Session()])
+	assert.True(t, lookup[user2sess.Session()])
 
 }

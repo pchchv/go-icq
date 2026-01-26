@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
@@ -245,6 +246,57 @@ func SendAMFError(w http.ResponseWriter, r *http.Request, statusCode int, messag
 	w.Header().Set("Content-Length", strconv.Itoa(len(amfData)))
 	w.WriteHeader(statusCode)
 	w.Write(amfData)
+}
+
+// SendResponse sends a response in the requested format (JSON, JSONP, XML, or AMF).
+// This is the centralized function that all handlers should use for responses.
+func SendResponse(w http.ResponseWriter, r *http.Request, data interface{}, logger *slog.Logger) {
+	// check for format parameter (f for format or callback for JSONP)
+	// first check URL query parameters
+	format := strings.ToLower(r.URL.Query().Get("f"))
+	callback := r.URL.Query().Get("callback")
+	// if format not in URL query, check form values (for POST requests)
+	if format == "" && r.Method == "POST" {
+		r.ParseForm()
+		format = strings.ToLower(r.FormValue("f"))
+		if callback == "" {
+			callback = r.FormValue("callback")
+		}
+	}
+
+	// check for AMF format first
+	if format == "amf" || format == "amf3" {
+		SendAMF(w, r, data, logger)
+	} else {
+		// check Accept header for AMF
+		accept := strings.ToLower(r.Header.Get("Accept"))
+		if strings.Contains(accept, "application/x-amf") ||
+			strings.Contains(accept, "application/amf") {
+			SendAMF(w, r, data, logger)
+		} else if callback != "" {
+			// if callback is provided, it's JSONP
+			SendJSONP(w, callback, data, logger)
+		} else if format == "xml" {
+			// check for XML format
+			SendXML(w, data, logger)
+		} else {
+			// default to JSON
+			SendJSON(w, data, logger)
+		}
+	}
+}
+
+// SendError sends an error response in the appropriate format.
+func SendError(w http.ResponseWriter, statusCode int, message string) {
+	// try to detect format from Content-Type header if already set
+	contentType := w.Header().Get("Content-Type")
+	if strings.Contains(contentType, "amf") {
+		SendAMFError(w, nil, statusCode, message, nil)
+	} else if strings.Contains(contentType, "xml") {
+		SendXMLError(w, statusCode, message)
+	} else {
+		SendJSONError(w, statusCode, message)
+	}
 }
 
 // IsValidCallback validates a JSONP callback name to prevent XSS.

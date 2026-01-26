@@ -1520,3 +1520,23 @@ func TestSession_AwayMessage(t *testing.T) {
 		})
 	}
 }
+
+// capsEqual compares slices of capabilities (order-independent).
+func capsEqual(a, b [][16]byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	capMap := make(map[[16]byte]bool)
+	for _, cap := range a {
+		capMap[cap] = true
+	}
+
+	for _, cap := range b {
+		if !capMap[cap] {
+			return false
+		}
+	}
+
+	return true
+}

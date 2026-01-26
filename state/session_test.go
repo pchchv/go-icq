@@ -1521,6 +1521,258 @@ func TestSession_AwayMessage(t *testing.T) {
 	}
 }
 
+func TestSession_Caps(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupSession  func() *Session
+		expectedCaps  [][16]byte
+		expectedCount int
+	}{
+		{
+			name: "empty session with no instances - should return empty slice",
+			setupSession: func() *Session {
+				return NewSession()
+			},
+			expectedCaps:  [][16]byte{},
+			expectedCount: 0,
+		},
+		{
+			name: "single instance with no capabilities - should return empty slice",
+			setupSession: func() *Session {
+				sg := NewSession()
+				_ = sg.AddInstance()
+				return sg
+			},
+			expectedCaps:  [][16]byte{},
+			expectedCount: 0,
+		},
+		{
+			name: "single instance with one cap - should return that cap",
+			setupSession: func() *Session {
+				sg := NewSession()
+				instance := sg.AddInstance()
+				cap1 := [16]byte{0x74, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00}
+				instance.SetCaps([][16]byte{cap1})
+				return sg
+			},
+			expectedCaps: [][16]byte{
+				{0x74, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00},
+			},
+			expectedCount: 1,
+		},
+		{
+			name: "single instance with multiple capabilities - should return all capabilities",
+			setupSession: func() *Session {
+				sg := NewSession()
+				instance := sg.AddInstance()
+				cap1 := [16]byte{0x74, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00}
+				cap2 := [16]byte{0x75, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x01}
+				cap3 := [16]byte{0x76, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x02}
+				instance.SetCaps([][16]byte{cap1, cap2, cap3})
+				return sg
+			},
+			expectedCaps: [][16]byte{
+				{0x74, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00},
+				{0x75, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x01},
+				{0x76, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x02},
+			},
+			expectedCount: 3,
+		},
+		{
+			name: "multiple instances with no overlapping capabilities - should return union of all capabilities",
+			setupSession: func() *Session {
+				sg := NewSession()
+				instance1 := sg.AddInstance()
+				cap1 := [16]byte{0x74, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00}
+				instance1.SetCaps([][16]byte{cap1})
+
+				instance2 := sg.AddInstance()
+				cap2 := [16]byte{0x75, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x01}
+				instance2.SetCaps([][16]byte{cap2})
+
+				instance3 := sg.AddInstance()
+				cap3 := [16]byte{0x76, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x02}
+				instance3.SetCaps([][16]byte{cap3})
+
+				return sg
+			},
+			expectedCaps: [][16]byte{
+				{0x74, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00},
+				{0x75, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x01},
+				{0x76, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x02},
+			},
+			expectedCount: 3,
+		},
+		{
+			name: "multiple instances with overlapping capabilities - should deduplicate",
+			setupSession: func() *Session {
+				sg := NewSession()
+				cap1 := [16]byte{0x74, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00}
+				cap2 := [16]byte{0x75, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x01}
+				cap3 := [16]byte{0x76, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x02}
+
+				instance1 := sg.AddInstance()
+				instance1.SetCaps([][16]byte{cap1, cap2})
+
+				instance2 := sg.AddInstance()
+				instance2.SetCaps([][16]byte{cap2, cap3}) // cap2 overlaps
+
+				return sg
+			},
+			expectedCaps: [][16]byte{
+				{0x74, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00},
+				{0x75, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x01},
+				{0x76, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x02},
+			},
+			expectedCount: 3,
+		},
+		{
+			name: "multiple instances with all same capabilities - should return unique capabilities",
+			setupSession: func() *Session {
+				sg := NewSession()
+				cap1 := [16]byte{0x74, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00}
+				cap2 := [16]byte{0x75, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x01}
+
+				instance1 := sg.AddInstance()
+				instance1.SetCaps([][16]byte{cap1, cap2})
+
+				instance2 := sg.AddInstance()
+				instance2.SetCaps([][16]byte{cap1, cap2}) // same caps
+
+				instance3 := sg.AddInstance()
+				instance3.SetCaps([][16]byte{cap1, cap2}) // same caps
+
+				return sg
+			},
+			expectedCaps: [][16]byte{
+				{0x74, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00},
+				{0x75, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x01},
+			},
+			expectedCount: 2,
+		},
+		{
+			name: "multiple instances with some having capabilities and some not - should return union",
+			setupSession: func() *Session {
+				sg := NewSession()
+				_ = sg.AddInstance()
+				// instance1 has no caps
+
+				instance2 := sg.AddInstance()
+				cap1 := [16]byte{0x74, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00}
+				instance2.SetCaps([][16]byte{cap1})
+
+				_ = sg.AddInstance()
+				// instance3 has no caps
+
+				instance4 := sg.AddInstance()
+				cap2 := [16]byte{0x75, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x01}
+				instance4.SetCaps([][16]byte{cap2})
+
+				return sg
+			},
+			expectedCaps: [][16]byte{
+				{0x74, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x00},
+				{0x75, 0x8f, 0x24, 0x20, 0x62, 0x87, 0x11, 0xd1, 0x82, 0x22, 0x44, 0x45, 0x53, 0x54, 0x00, 0x01},
+			},
+			expectedCount: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sg := tt.setupSession()
+			result := sg.Caps()
+
+			assert.Equal(t, tt.expectedCount, len(result), "cap count should match")
+			assert.True(t, capsEqual(tt.expectedCaps, result), "capabilities should match (order-independent)")
+		})
+	}
+}
+
+func TestSession_InstanceNumberAssignment(t *testing.T) {
+	t.Run("first instance gets number 1", func(t *testing.T) {
+		s := NewSession()
+		instance := s.AddInstance()
+		assert.Equal(t, uint8(1), instance.Num())
+	})
+
+	t.Run("multiple instances get sequential numbers", func(t *testing.T) {
+		s := NewSession()
+		instance1 := s.AddInstance()
+		instance2 := s.AddInstance()
+		instance3 := s.AddInstance()
+
+		assert.Equal(t, uint8(1), instance1.Num())
+		assert.Equal(t, uint8(2), instance2.Num())
+		assert.Equal(t, uint8(3), instance3.Num())
+	})
+
+	t.Run("removed instance numbers are reused", func(t *testing.T) {
+		s := NewSession()
+		instance1 := s.AddInstance()
+		instance2 := s.AddInstance()
+		instance3 := s.AddInstance()
+
+		assert.Equal(t, uint8(1), instance1.Num())
+		assert.Equal(t, uint8(2), instance2.Num())
+		assert.Equal(t, uint8(3), instance3.Num())
+
+		// remove instance 2
+		s.RemoveInstance(instance2)
+		// new instance should reuse number 2
+		instance4 := s.AddInstance()
+		assert.Equal(t, uint8(2), instance4.Num())
+		// verify all instance numbers are unique
+		instances := s.Instances()
+		instanceNums := make(map[uint8]bool)
+		for _, inst := range instances {
+			assert.False(t, instanceNums[inst.Num()], "instance number %d should be unique", inst.Num())
+			instanceNums[inst.Num()] = true
+		}
+	})
+
+	t.Run("finds lowest available number", func(t *testing.T) {
+		s := NewSession()
+		// create instances 1, 2, 3
+		instance1 := s.AddInstance()
+		instance2 := s.AddInstance()
+		instance3 := s.AddInstance()
+
+		assert.Equal(t, uint8(1), instance1.Num())
+		assert.Equal(t, uint8(2), instance2.Num())
+		assert.Equal(t, uint8(3), instance3.Num())
+
+		// remove instance 1
+		s.RemoveInstance(instance1)
+		// new instance should get number 1 (lowest available)
+		instance4 := s.AddInstance()
+		assert.Equal(t, uint8(1), instance4.Num())
+		// remove instance 2
+		s.RemoveInstance(instance2)
+		// new instance should get number 2 (lowest available)
+		instance5 := s.AddInstance()
+		assert.Equal(t, uint8(2), instance5.Num())
+		// verify instance 3 still has its number
+		assert.Equal(t, uint8(3), instance3.Num())
+	})
+
+	t.Run("panics when all instance numbers are taken", func(t *testing.T) {
+		s := NewSession()
+		// fill up all 255 instance numbers
+		instances := make([]*SessionInstance, 255)
+		for i := 0; i < 255; i++ {
+			instances[i] = s.AddInstance()
+		}
+
+		// verify we have 255 instances
+		assert.Equal(t, 255, s.InstanceCount())
+		// try to create one more - should panic
+		assert.PanicsWithValue(t, "all instance numbers are taken (max 255 instances per session)", func() {
+			s.AddInstance()
+		})
+	})
+}
+
 // capsEqual compares slices of capabilities (order-independent).
 func capsEqual(a, b [][16]byte) bool {
 	if len(a) != len(b) {

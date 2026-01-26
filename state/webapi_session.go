@@ -257,7 +257,7 @@ func (m *WebAPISessionManager) Shutdown(ctx context.Context) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// close all event queues
+	// close session all event queues
 	for _, session := range m.sessions {
 		if session.EventQueue != nil {
 			session.EventQueue.Close()
@@ -331,7 +331,7 @@ func (m *WebAPISessionManager) GetSessionsByScreenName(ctx context.Context, scre
 }
 
 // CreateSession creates a new WebAPI session.
-func (m *WebAPISessionManager) CreateSession(ctx context.Context, screenName DisplayScreenName, devID string, events []string, oscarSession *Session, logger *slog.Logger) (*WebAPISession, error) {
+func (m *WebAPISessionManager) CreateSession(ctx context.Context, screenName DisplayScreenName, devID string, events []string, oscarSession *SessionInstance, logger *slog.Logger) (*WebAPISession, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

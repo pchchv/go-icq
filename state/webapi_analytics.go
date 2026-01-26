@@ -102,13 +102,7 @@ func (a *APIAnalytics) LogRequest(ctx context.Context, log APIUsageLog) {
 }
 
 // LogHTTPRequest logs an HTTP request with timing information.
-func (a *APIAnalytics) LogHTTPRequest(
-	ctx context.Context,
-	r *http.Request,
-	statusCode int,
-	responseTime time.Duration,
-	responseSize int,
-	errorMsg string) {
+func (a *APIAnalytics) LogHTTPRequest(ctx context.Context, r *http.Request, statusCode int, responseTime time.Duration, responseSize int, errorMsg string) {
 	// extract IP address
 	ip := r.RemoteAddr
 	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
@@ -355,36 +349,6 @@ func nullString(s string) sql.NullString {
 	}
 }
 
-func (a *APIAnalytics) createQuota(ctx context.Context, devID string) (*APIQuota, error) {
-	// create default quota
-	now := time.Now()
-	quota := &APIQuota{
-		DevID:            devID,
-		DailyLimit:       10000,
-		MonthlyLimit:     300000,
-		DailyUsed:        0,
-		MonthlyUsed:      0,
-		LastResetDaily:   now.Truncate(24 * time.Hour),
-		LastResetMonthly: time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()),
-		OverageAllowed:   false,
-	}
-	insertQuery := `
-			INSERT INTO api_quotas (
-				dev_id, daily_limit, monthly_limit, daily_used, monthly_used,
-				last_reset_daily, last_reset_monthly, overage_allowed
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-			`
-	if _, err := a.db.ExecContext(ctx, insertQuery,
-		quota.DevID, quota.DailyLimit, quota.MonthlyLimit,
-		quota.DailyUsed, quota.MonthlyUsed,
-		quota.LastResetDaily.Unix(), quota.LastResetMonthly.Unix(),
-		quota.OverageAllowed,
-	); err != nil {
-		return nil, fmt.Errorf("failed to create quota: %w", err)
-	}
-	return quota, nil
-}
-
 // getOrCreateQuota retrieves or creates a quota record for a developer.
 func (a *APIAnalytics) getOrCreateQuota(ctx context.Context, devID string) (*APIQuota, error) {
 	quota := &APIQuota{DevID: devID}
@@ -402,8 +366,32 @@ func (a *APIAnalytics) getOrCreateQuota(ctx context.Context, devID string) (*API
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			if quota, err = a.createQuota(ctx, devID); err != nil {
-				return nil, err
+			// create default quota
+			now := time.Now()
+			quota = &APIQuota{
+				DevID:            devID,
+				DailyLimit:       10000,
+				MonthlyLimit:     300000,
+				DailyUsed:        0,
+				MonthlyUsed:      0,
+				LastResetDaily:   now.Truncate(24 * time.Hour),
+				LastResetMonthly: time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()),
+				OverageAllowed:   false,
+			}
+			insertQuery := `
+			INSERT INTO api_quotas (
+			    dev_id, daily_limit, monthly_limit, daily_used, monthly_used,
+				last_reset_daily, last_reset_monthly, overage_allowed
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			`
+			_, err = a.db.ExecContext(ctx, insertQuery,
+				quota.DevID, quota.DailyLimit, quota.MonthlyLimit,
+				quota.DailyUsed, quota.MonthlyUsed,
+				quota.LastResetDaily.Unix(), quota.LastResetMonthly.Unix(),
+				quota.OverageAllowed,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create quota: %w", err)
 			}
 		} else {
 			return nil, fmt.Errorf("failed to get quota: %w", err)

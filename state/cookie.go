@@ -25,6 +25,7 @@ type ServerCookie struct {
 	ChatCookie    string            `oscar:"len_prefix=uint8"`
 	KerberosAuth  uint8             // indicates whether the client used Kerberos for authentication
 	MultiConnFlag uint8
+	SessionNum    uint8
 }
 
 type HMACCookieBaker struct {
@@ -45,6 +46,7 @@ func (c HMACCookieBaker) Crack(data []byte) ([]byte, error) {
 	if err := wire.UnmarshalBE(&hmacTok, bytes.NewBuffer(data)); err != nil {
 		return nil, fmt.Errorf("unable to unmarshal HMAC cooie: %w", err)
 	}
+
 	if !hmacTok.validate(c.key) {
 		return nil, errors.New("invalid HMAC cookie")
 	}

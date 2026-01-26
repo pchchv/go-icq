@@ -490,10 +490,14 @@ type UserProfile struct {
 	UpdateTime time.Time
 }
 
-// Empty returns true if the profile has not been set
-// (all fields are zero values).
-func (p UserProfile) Empty() bool {
-	return p.ProfileText == "" && p.MIMEType == "" && p.UpdateTime.IsZero()
+// IsZero returns true if the profile has not been set.
+func (p UserProfile) IsZero() bool {
+	return p.UpdateTime.IsZero()
+}
+
+// IsEmpty returns true of the profile is empty (including not set).
+func (p UserProfile) IsEmpty() bool {
+	return p.IsZero() || p.ProfileText == "" || p.ProfileText == "\x00"
 }
 
 // validateAIMPassword returns an error if the AIM password is invalid.

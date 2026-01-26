@@ -24,15 +24,15 @@ var (
 type WebAPISession struct {
 	AimSID          string            // Unique session ID for web client
 	ScreenName      DisplayScreenName // User identity
-	OSCARSession    *Session          // Bridge to existing OSCAR session
+	OSCARSession    *SessionInstance  // Bridge to existing OSCAR session
 	Events          []string          // Subscribed event types
 	EventQueue      *types.EventQueue // Per-session event queue
 	DevID           string            // Developer ID that created this session
 	ClientName      string            // Client application name
 	ClientVersion   string            // Client application version
-	CreatedAt       time.Time         // Session creation time
+	CreatedAt       time.Time         // SessionInstance creation time
 	LastAccessed    time.Time         // Last activity time
-	ExpiresAt       time.Time         // Session expiration time
+	ExpiresAt       time.Time         // SessionInstance expiration time
 	FetchTimeout    int               // Long-polling timeout in milliseconds
 	TimeToNextFetch int               // Suggested delay before next fetch
 	RemoteAddr      string            // Client IP address
@@ -257,7 +257,7 @@ func (m *WebAPISessionManager) Shutdown(ctx context.Context) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// close all event queues
+	// close session all event queues
 	for _, session := range m.sessions {
 		if session.EventQueue != nil {
 			session.EventQueue.Close()
@@ -331,7 +331,7 @@ func (m *WebAPISessionManager) GetSessionsByScreenName(ctx context.Context, scre
 }
 
 // CreateSession creates a new WebAPI session.
-func (m *WebAPISessionManager) CreateSession(ctx context.Context, screenName DisplayScreenName, devID string, events []string, oscarSession *Session, logger *slog.Logger) (*WebAPISession, error) {
+func (m *WebAPISessionManager) CreateSession(ctx context.Context, screenName DisplayScreenName, devID string, events []string, oscarSession *SessionInstance, logger *slog.Logger) (*WebAPISession, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

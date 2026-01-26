@@ -2064,6 +2064,169 @@ func TestSessionGroup_Instances(t *testing.T) {
 	}
 }
 
+func TestInstance_Active(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupInstance  func() *SessionInstance
+		expectedActive bool
+	}{
+		{
+			name: "active instance - not closed, not idle, no away message",
+			setupInstance: func() *SessionInstance {
+				sg := NewSession()
+				instance := &SessionInstance{
+					session:        sg,
+					closed:         false,
+					idle:           false,
+					awayMsg:        "",
+					signonComplete: true,
+				}
+				return instance
+			},
+			expectedActive: true,
+		},
+		{
+			name: "inactive instance - closed",
+			setupInstance: func() *SessionInstance {
+				sg := NewSession()
+				instance := &SessionInstance{
+					session: sg,
+					closed:  true,
+					idle:    false,
+					awayMsg: "",
+				}
+				return instance
+			},
+			expectedActive: false,
+		},
+		{
+			name: "inactive instance - idle",
+			setupInstance: func() *SessionInstance {
+				sg := NewSession()
+				instance := &SessionInstance{
+					session: sg,
+					closed:  false,
+					idle:    true,
+					awayMsg: "",
+				}
+				return instance
+			},
+			expectedActive: false,
+		},
+		{
+			name: "inactive instance - has away message",
+			setupInstance: func() *SessionInstance {
+				sg := NewSession()
+				instance := &SessionInstance{
+					session:         sg,
+					closed:          false,
+					idle:            false,
+					awayMsg:         "I'm away",
+					userInfoBitmask: wire.OServiceUserFlagUnavailable,
+				}
+				return instance
+			},
+			expectedActive: false,
+		},
+		{
+			name: "inactive instance - closed and idle",
+			setupInstance: func() *SessionInstance {
+				sg := NewSession()
+				instance := &SessionInstance{
+					session: sg,
+					closed:  true,
+					idle:    true,
+					awayMsg: "",
+				}
+				return instance
+			},
+			expectedActive: false,
+		},
+		{
+			name: "inactive instance - closed and has away message",
+			setupInstance: func() *SessionInstance {
+				sg := NewSession()
+				instance := &SessionInstance{
+					session:         sg,
+					closed:          true,
+					idle:            false,
+					awayMsg:         "I'm away",
+					userInfoBitmask: wire.OServiceUserFlagUnavailable,
+				}
+				return instance
+			},
+			expectedActive: false,
+		},
+		{
+			name: "inactive instance - idle and has away message",
+			setupInstance: func() *SessionInstance {
+				sg := NewSession()
+				instance := &SessionInstance{
+					session:         sg,
+					closed:          false,
+					idle:            true,
+					awayMsg:         "I'm away",
+					userInfoBitmask: wire.OServiceUserFlagUnavailable,
+				}
+				return instance
+			},
+			expectedActive: false,
+		},
+		{
+			name: "inactive instance - closed, idle, and has away message",
+			setupInstance: func() *SessionInstance {
+				sg := NewSession()
+				instance := &SessionInstance{
+					session:         sg,
+					closed:          true,
+					idle:            true,
+					awayMsg:         "I'm away",
+					userInfoBitmask: wire.OServiceUserFlagUnavailable,
+				}
+				return instance
+			},
+			expectedActive: false,
+		},
+		{
+			name: "inactive instance - signon not complete",
+			setupInstance: func() *SessionInstance {
+				sg := NewSession()
+				instance := &SessionInstance{
+					session:        sg,
+					closed:         false,
+					idle:           false,
+					awayMsg:        "",
+					signonComplete: false,
+				}
+				return instance
+			},
+			expectedActive: false,
+		},
+		{
+			name: "inactive instance - signon not complete and idle",
+			setupInstance: func() *SessionInstance {
+				sg := NewSession()
+				instance := &SessionInstance{
+					session:        sg,
+					closed:         false,
+					idle:           true,
+					awayMsg:        "",
+					signonComplete: false,
+				}
+				return instance
+			},
+			expectedActive: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			instance := tt.setupInstance()
+			assert.Equal(t, tt.expectedActive, instance.active())
+		})
+	}
+}
+
 // capsEqual compares slices of capabilities (order-independent).
 func capsEqual(a, b [][16]byte) bool {
 	if len(a) != len(b) {

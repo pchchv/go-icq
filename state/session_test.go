@@ -1291,3 +1291,232 @@ func TestSession_CloseInstance(t *testing.T) {
 	assert.Equal(t, 0, instance3CloseCount, "instance3 onInstanceCloseFn should not be called because it's the last instance")
 	assert.Equal(t, 1, sessionCloseCount, "session onSessCloseFn should not be called")
 }
+
+func TestSession_CloseSession(t *testing.T) {
+	s := NewSession()
+	var sessionCloseCount int
+
+	s.OnSessionClose(func() {
+		sessionCloseCount++
+	})
+
+	var instance1CloseCount, instance2CloseCount, instance3CloseCount int
+	instance1 := s.AddInstance()
+	instance2 := s.AddInstance()
+	instance3 := s.AddInstance()
+
+	instance1.OnClose(func() {
+		instance1CloseCount++
+	})
+	instance2.OnClose(func() {
+		instance2CloseCount++
+	})
+	instance3.OnClose(func() {
+		instance3CloseCount++
+	})
+
+	s.CloseSession()
+
+	assert.Equal(t, 0, instance1CloseCount, "instance1 onInstanceCloseFn should not be called")
+	assert.Equal(t, 0, instance2CloseCount, "instance2 onInstanceCloseFn should not be called")
+	assert.Equal(t, 0, instance3CloseCount, "instance3 onInstanceCloseFn should not be called")
+	assert.Equal(t, 1, sessionCloseCount, "session onSessCloseFn should only be called once")
+}
+
+func TestSession_AwayMessage(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupSession   func() *Session
+		expectedResult string
+	}{
+		{
+			name: "no instances - should return empty string",
+			setupSession: func() *Session {
+				return NewSession()
+			},
+			expectedResult: "",
+		},
+		{
+			name: "one instance not away - should return empty string",
+			setupSession: func() *Session {
+				sg := NewSession()
+				_ = sg.AddInstance()
+				// instance has no away message and is not set as away
+				return sg
+			},
+			expectedResult: "",
+		},
+		{
+			name: "one instance away via SetUserInfoFlag - should return away message",
+			setupSession: func() *Session {
+				sg := NewSession()
+				instance := sg.AddInstance()
+				instance.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				instance.SetAwayMessage("I'm away")
+				return sg
+			},
+			expectedResult: "I'm away",
+		},
+		{
+			name: "one instance away via SetUserStatusBitmask - should return away message",
+			setupSession: func() *Session {
+				sg := NewSession()
+				instance := sg.AddInstance()
+				instance.SetUserStatusBitmask(wire.OServiceUserStatusAway)
+				instance.SetAwayMessage("I'm away")
+				return sg
+			},
+			expectedResult: "I'm away",
+		},
+		{
+			name: "multiple instances - not all away - should return away message from away instance",
+			setupSession: func() *Session {
+				sg := NewSession()
+				instance1 := sg.AddInstance()
+				instance1.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				instance1.SetAwayMessage("I'm away")
+				_ = sg.AddInstance()
+				// instance2 has no away message and is not set as away
+				return sg
+			},
+			expectedResult: "I'm away",
+		},
+		{
+			name: "multiple instances - all away - should return latest away message",
+			setupSession: func() *Session {
+				sg := NewSession()
+				baseTime := time.Now()
+				callCount := 0
+				sg.nowFn = func() time.Time {
+					callCount++
+					return baseTime.Add(time.Duration(callCount) * time.Second)
+				}
+				instance1 := sg.AddInstance()
+				instance1.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				instance1.SetAwayMessage("First away message")
+				instance2 := sg.AddInstance()
+				instance2.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				instance2.SetAwayMessage("Second away message")
+				return sg
+			},
+			expectedResult: "Second away message",
+		},
+		{
+			name: "multiple instances - all away after multiple updates - should return latest away message",
+			setupSession: func() *Session {
+				sg := NewSession()
+				baseTime := time.Now()
+				callCount := 0
+				sg.nowFn = func() time.Time {
+					callCount++
+					return baseTime.Add(time.Duration(callCount) * time.Second)
+				}
+				instance1 := sg.AddInstance()
+				instance1.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				instance1.SetAwayMessage("First away message")
+				instance2 := sg.AddInstance()
+				instance2.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				instance2.SetAwayMessage("Second away message")
+				// Update instance1's away status again (this will update awayTime)
+				instance1.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				instance1.SetAwayMessage("Third away message")
+				return sg
+			},
+			expectedResult: "Third away message",
+		},
+		{
+			name: "multiple instances - different away methods - should return latest away message",
+			setupSession: func() *Session {
+				sg := NewSession()
+				baseTime := time.Now()
+				callCount := 0
+				sg.nowFn = func() time.Time {
+					callCount++
+					return baseTime.Add(time.Duration(callCount) * time.Second)
+				}
+				instance1 := sg.AddInstance()
+				instance1.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				instance1.SetAwayMessage("First away message")
+				instance2 := sg.AddInstance()
+				instance2.SetUserStatusBitmask(wire.OServiceUserStatusAway)
+				instance2.SetAwayMessage("Second away message")
+				return sg
+			},
+			expectedResult: "Second away message",
+		},
+		{
+			name: "instance sets away message then clears message - should return empty string",
+			setupSession: func() *Session {
+				sg := NewSession()
+				instance := sg.AddInstance()
+				instance.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				instance.SetAwayMessage("I'm away")
+				instance.SetAwayMessage("") // clear away message (but still away)
+				return sg
+			},
+			expectedResult: "",
+		},
+		{
+			name: "instance sets away message then clears away status - should return empty string",
+			setupSession: func() *Session {
+				sg := NewSession()
+				instance := sg.AddInstance()
+				instance.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				instance.SetAwayMessage("I'm away")
+				instance.ClearUserInfoFlag(wire.OServiceUserFlagUnavailable) // clear away status
+				return sg
+			},
+			expectedResult: "",
+		},
+		{
+			name: "multiple instances - one away with message, one away without message - should return message from most recent",
+			setupSession: func() *Session {
+				sg := NewSession()
+				baseTime := time.Now()
+				callCount := 0
+				sg.nowFn = func() time.Time {
+					callCount++
+					return baseTime.Add(time.Duration(callCount) * time.Second)
+				}
+				instance1 := sg.AddInstance()
+				instance1.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				instance1.SetAwayMessage("I'm away")
+				instance2 := sg.AddInstance()
+				instance2.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				// instance2 is away but has no message, and was set away after instance1
+				return sg
+			},
+			expectedResult: "", // instance2 has more recent awayTime but no message
+		},
+		{
+			name: "multiple instances - one away with message set later - should return that message",
+			setupSession: func() *Session {
+				sg := NewSession()
+				baseTime := time.Now()
+				callCount := 0
+				sg.nowFn = func() time.Time {
+					callCount++
+					return baseTime.Add(time.Duration(callCount) * time.Second)
+				}
+				instance1 := sg.AddInstance()
+				instance1.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				instance1.SetAwayMessage("I'm away")
+				instance2 := sg.AddInstance()
+				instance2.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				// instance2 is away but has no message
+				// Now update instance1's away status to make it more recent
+				instance1.SetUserInfoFlag(wire.OServiceUserFlagUnavailable)
+				return sg
+			},
+			expectedResult: "I'm away", // instance1 has more recent awayTime and has a message
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sg := tt.setupSession()
+			result := sg.AwayMessage()
+			assert.Equal(t, tt.expectedResult, result)
+		})
+	}
+}

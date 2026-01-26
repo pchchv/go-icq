@@ -160,7 +160,7 @@ func TestSliceToArray(t *testing.T) {
 	if resultArray[0] != "string" {
 		t.Errorf("Expected first element to be 'string', got %v", resultArray[0])
 	}
-	
+
 	if resultArray[1] != 42 {
 		t.Errorf("Expected second element to be 42, got %v", resultArray[1])
 	}
@@ -391,6 +391,73 @@ func TestIsAMFRequest(t *testing.T) {
 			result := IsAMFRequest(tt.request)
 			if result != tt.expected {
 				t.Errorf("IsAMFRequest() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSendAMF(t *testing.T) {
+	tests := []struct {
+		name         string
+		request      *http.Request
+		data         interface{}
+		expectStatus int
+	}{
+		{
+			name:    "Simple response",
+			request: httptest.NewRequest("GET", "/?f=amf", nil),
+			data: BaseResponse{
+				Response: ResponseBody{
+					StatusCode: 200,
+					StatusText: "OK",
+					Data:       map[string]interface{}{"test": "value"},
+				},
+			},
+			expectStatus: http.StatusOK,
+		},
+		{
+			name:    "AMF3 response with array",
+			request: httptest.NewRequest("GET", "/?f=amf3", nil),
+			data: BaseResponse{
+				Response: ResponseBody{
+					StatusCode: 200,
+					StatusText: "OK",
+					Data:       []interface{}{"item1", "item2"},
+				},
+			},
+			expectStatus: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// first test if the encoder can handle the data
+			encoder := NewAMFEncoder(nil)
+			version := DetectAMFVersion(tt.request)
+			_, encodeErr := encoder.EncodeAMF(tt.data, version)
+			if encodeErr != nil {
+				t.Fatalf("Encoding failed: %v", encodeErr)
+			}
+
+			w := httptest.NewRecorder()
+			SendAMF(w, tt.request, tt.data, nil)
+
+			resp := w.Result()
+			if resp.StatusCode != tt.expectStatus {
+				t.Errorf("Expected status %d, got %d", tt.expectStatus, resp.StatusCode)
+				// print response body for debugging
+				body := w.Body.String()
+				t.Logf("Response body: %s", body)
+			}
+
+			contentType := resp.Header.Get("Content-Type")
+			if contentType != "application/x-amf" {
+				t.Errorf("Expected Content-Type application/x-amf, got %s", contentType)
+			}
+
+			body := w.Body.Bytes()
+			if len(body) == 0 {
+				t.Error("Response body is empty")
 			}
 		})
 	}

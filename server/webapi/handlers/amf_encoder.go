@@ -66,7 +66,63 @@ func (e *AMFEncoder) isZeroValue(v reflect.Value) bool {
 
 // toAMF3Compatible converts Go types to AMF3-compatible format for goAMF3.
 func (e *AMFEncoder) toAMF3Compatible(data interface{}) interface{} {
-	return map[string]interface{}{}
+	if data == nil {
+		return map[string]interface{}{}
+	}
+
+	// goAMF3 handles regular Go types well, just need to ensure maps are used
+	// don't use ECMAArray for AMF3 - just regular maps
+	switch d := data.(type) {
+	case BaseResponse:
+		return e.baseResponseToMap(d)
+	case ResponseBody:
+		return e.responseBodyToMap(d)
+	case ErrorResponse:
+		return e.errorResponseToMap(d)
+	case StartSessionResponse:
+		// special handling for StartSessionResponse
+		return map[string]interface{}{
+			"response": map[string]interface{}{
+				"statusCode": d.Response.StatusCode,
+				"statusText": d.Response.StatusText,
+				"data": map[string]interface{}{
+					"aimsid":          d.Response.Data.AimSID,
+					"fetchTimeout":    d.Response.Data.FetchTimeout,
+					"timeToNextFetch": d.Response.Data.TimeToNextFetch,
+					"fetchBaseURL":    d.Response.Data.FetchBaseURL, // Required for Gromit
+					"events":          d.Response.Data.Events,
+					"wellKnownUrls":   d.Response.Data.WellKnownUrls,
+				},
+			},
+		}
+	case FetchEventsResponse:
+		// special handling for FetchEventsResponse
+		// goAMF3 can't handle uint64, must convert to int
+		return map[string]interface{}{
+			"response": map[string]interface{}{
+				"statusCode": d.Response.StatusCode,
+				"statusText": d.Response.StatusText,
+				"data": map[string]interface{}{
+					"events":          d.Response.Data.Events,
+					"lastSeqNum":      int(d.Response.Data.LastSeqNum), // Convert uint64 to int
+					"timeToNextFetch": d.Response.Data.TimeToNextFetch,
+					"fetchBaseURL":    d.Response.Data.FetchBaseURL,
+				},
+			},
+		}
+	case EndSessionResponse:
+		// special handling for EndSessionResponse - Gromit expects flat structure
+		// based on Gromit's MockServer, it expects:
+		// { "data": {}, "statusCode": 200, "statusText": "OK" }
+		return map[string]interface{}{
+			"data":       map[string]interface{}{}, // Empty data object
+			"statusCode": d.Response.StatusCode,
+			"statusText": d.Response.StatusText,
+		}
+	default:
+		// for other types, convert structs to maps
+		return e.convertToMap(data)
+	}
 }
 
 // mapToAMFMap converts a Go map to an AMF3-compatible map.

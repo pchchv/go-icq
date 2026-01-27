@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"log/slog"
 	"time"
 
 	"github.com/pchchv/go-icq/state"
@@ -40,4 +43,13 @@ type AuthHandler struct {
 	UserManager UserManager
 	TokenStore  TokenStore
 	Logger      *slog.Logger
+}
+
+// generateToken generates a secure random token.
+func (h *AuthHandler) generateToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
 }

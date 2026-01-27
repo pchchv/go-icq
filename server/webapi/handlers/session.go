@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/xml"
 
 	"github.com/google/uuid"
 	"github.com/pchchv/go-icq/state"
@@ -46,6 +47,35 @@ type SessionManager interface {
 	AddSession(ctx context.Context, screenName state.DisplayScreenName) (*state.SessionInstance, error)
 	RemoveSession(instance *state.SessionInstance)
 	RelayToScreenName(ctx context.Context, screenName state.IdentScreenName, msg wire.SNACMessage)
+}
+
+// StartSessionXMLResponse represents the XML response for startSession endpoint.
+type StartSessionXMLResponse struct {
+	XMLName    xml.Name `xml:"response"`
+	StatusCode int      `xml:"statusCode"`
+	StatusText string   `xml:"statusText"`
+	Data       struct {
+		AimSID          string `xml:"aimsid"`
+		FetchTimeout    int    `xml:"fetchTimeout"`
+		TimeToNextFetch int    `xml:"timeToNextFetch"`
+		FetchBaseURL    string `xml:"fetchBaseURL"`
+		WellKnownUrls   *struct {
+			WebApiBase   string `xml:"webApiBase"`
+			FetchBaseURL string `xml:"fetchBaseURL"`
+		} `xml:"wellKnownUrls,omitempty"`
+		MyInfo *struct {
+			AimID     string `xml:"aimId"`
+			DisplayID string `xml:"displayId"`
+			Buddylist struct {
+				Groups *[]BuddyGroup `xml:"group,omitempty"`
+			} `xml:"buddylist,omitempty"`
+		} `xml:"myInfo,omitempty"`
+		Events *struct {
+			BuddyList struct {
+				Groups *[]BuddyGroup `xml:"group,omitempty"`
+			} `xml:"buddylist"`
+		} `xml:"events,omitempty"`
+	} `xml:"data"`
 }
 
 // StartSessionResponse represents the response for startSession endpoint.

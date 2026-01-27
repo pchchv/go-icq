@@ -120,3 +120,51 @@ func (m *BuddyListManager) FormatBuddyListEvent(groups []WebAPIBuddyGroup) map[s
 		"groups": groupMaps,
 	}
 }
+
+// GetPresenceForBuddy retrieves presence information for a specific buddy.
+func (m *BuddyListManager) GetPresenceForBuddy(screenName string) WebAPIBuddyInfo {
+	return m.getBuddyInfo(screenName)
+}
+
+// getBuddyInfo retrieves the current presence information for a buddy.
+func (m *BuddyListManager) getBuddyInfo(buddyName string) WebAPIBuddyInfo {
+	// default to offline
+	info := WebAPIBuddyInfo{
+		AimID:     buddyName,
+		DisplayID: buddyName,
+		State:     "offline",
+		UserType:  "aim",
+		Bot:       false,
+		Service:   "aim",
+	}
+
+	// check if buddy is online
+	buddyScreenName := state.NewIdentScreenName(buddyName)
+	if session := m.sessionRetriever.RetrieveSession(buddyScreenName); session != nil {
+		// buddy is online
+		info.State = "online"
+		info.OnlineTime = session.SignonTime().Unix()
+
+		// check away status
+		if session.Away() {
+			info.State = "away"
+			info.AwayMsg = session.AwayMessage()
+		}
+
+		// check idle status
+		if session.Idle() {
+			idleDuration := time.Since(session.IdleTime())
+			info.IdleTime = int(idleDuration.Minutes())
+			if info.State == "online" {
+				info.State = "idle"
+			}
+		}
+
+		// status messages not currently supported in SessionInstance
+		// set capabilities
+		// capabilities parsing not implemented
+		info.Capabilities = []string{}
+	}
+
+	return info
+}

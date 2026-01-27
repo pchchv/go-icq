@@ -48,6 +48,22 @@ type SessionManager interface {
 	RelayToScreenName(ctx context.Context, screenName state.IdentScreenName, msg wire.SNACMessage)
 }
 
+// StartSessionResponse represents the response for startSession endpoint.
+type StartSessionResponse struct {
+	Response struct {
+		StatusCode int    `json:"statusCode"`
+		StatusText string `json:"statusText"`
+		Data       struct {
+			AimSID          string                 `json:"aimsid"`
+			FetchTimeout    int                    `json:"fetchTimeout"`
+			TimeToNextFetch int                    `json:"timeToNextFetch"`
+			FetchBaseURL    string                 `json:"fetchBaseURL"` // Gromit expects this directly in data!
+			Events          map[string]interface{} `json:"events,omitempty"`
+			WellKnownUrls   map[string]string      `json:"wellKnownUrls,omitempty"`
+		} `json:"data"`
+	} `json:"response"`
+}
+
 // EndSessionResponse represents the response for endSession endpoint.
 type EndSessionResponse struct {
 	Response struct {

@@ -142,6 +142,15 @@ func ConvertEventForAMF3(event types.Event) map[string]interface{} {
 	return result
 }
 
+// ConvertEventsForAMF3 converts a slice of WebAPIEvents for AMF3 encoding.
+func ConvertEventsForAMF3(events []types.Event) []interface{} {
+	result := make([]interface{}, len(events))
+	for i, event := range events {
+		result[i] = ConvertEventForAMF3(event)
+	}
+	return result
+}
+
 // isTimestampField checks if a field name suggests it contains a timestamp.
 func isTimestampField(fieldName string) bool {
 	timestampFields := []string{

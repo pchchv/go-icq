@@ -26,3 +26,10 @@ type UserManager interface {
 	// InsertUser creates a new user (for DISABLE_AUTH mode).
 	InsertUser(ctx context.Context, u state.User) error
 }
+
+// ClientLoginRequest represents the request body for clientLogin.
+type ClientLoginRequest struct {
+	DevID    string `json:"devId"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+}

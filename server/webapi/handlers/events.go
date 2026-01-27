@@ -9,3 +9,12 @@ type FetchEventsData struct {
 	TimeToNextFetch int           `json:"timeToNextFetch"`
 	FetchBaseURL    string        `json:"fetchBaseURL"`
 }
+
+// FetchEventsResponse represents the response for fetchEvents endpoint.
+type FetchEventsResponse struct {
+	Response struct {
+		StatusCode int             `json:"statusCode"`
+		StatusText string          `json:"statusText"`
+		Data       FetchEventsData `json:"data"`
+	} `json:"response"`
+}

@@ -1,6 +1,14 @@
 package handlers
 
-import "log/slog"
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"time"
+
+	"github.com/pchchv/go-icq/state"
+	"github.com/pchchv/go-icq/wire"
+)
 
 // WebAPIBuddyInfo represents a buddy in the WebAPI format.
 type WebAPIBuddyInfo struct {
@@ -124,6 +132,118 @@ func (m *BuddyListManager) FormatBuddyListEvent(groups []WebAPIBuddyGroup) map[s
 // GetPresenceForBuddy retrieves presence information for a specific buddy.
 func (m *BuddyListManager) GetPresenceForBuddy(screenName string) WebAPIBuddyInfo {
 	return m.getBuddyInfo(screenName)
+}
+
+// GetBuddyListForUser retrieves and converts the buddy list for a user.
+func (m *BuddyListManager) GetBuddyListForUser(ctx context.Context, screenName state.IdentScreenName) ([]WebAPIBuddyGroup, error) {
+	// retrieve feedbag items
+	items, err := m.feedbagRetriever.RetrieveFeedbag(ctx, screenName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve feedbag: %w", err)
+	}
+
+	// build group map
+	groupMap := make(map[uint16]string)
+	buddyGroupMap := make(map[uint16][]wire.FeedbagItem)
+	for _, item := range items {
+		switch item.ClassID {
+		case wire.FeedbagClassIdGroup:
+			// store group name
+			groupMap[item.ItemID] = item.Name
+			buddyGroupMap[item.ItemID] = []wire.FeedbagItem{}
+		case wire.FeedbagClassIdBuddy:
+			// add buddy to its group
+			if _, exists := buddyGroupMap[item.GroupID]; !exists {
+				// create implicit group if it doesn't exist
+				buddyGroupMap[item.GroupID] = []wire.FeedbagItem{}
+			}
+			buddyGroupMap[item.GroupID] = append(buddyGroupMap[item.GroupID], item)
+		}
+	}
+
+	// convert to WebAPI format
+	var groups []WebAPIBuddyGroup
+	// add online group (virtual group for online buddies)
+	onlineGroup := WebAPIBuddyGroup{
+		Name:    "Online",
+		Buddies: []WebAPIBuddyInfo{},
+	}
+	// process each group
+	for groupID, buddyItems := range buddyGroupMap {
+		groupName := groupMap[groupID]
+		if groupName == "" {
+			groupName = "Buddies" // Default group name
+		}
+
+		group := WebAPIBuddyGroup{
+			Name:    groupName,
+			Buddies: []WebAPIBuddyInfo{},
+		}
+		// process buddies in this group
+		for _, buddyItem := range buddyItems {
+			buddyInfo := m.getBuddyInfo(buddyItem.Name)
+			// add to online group if buddy is online
+			if buddyInfo.State == "online" || buddyInfo.State == "away" || buddyInfo.State == "idle" {
+				onlineGroup.Buddies = append(onlineGroup.Buddies, buddyInfo)
+			}
+
+			group.Buddies = append(group.Buddies, buddyInfo)
+		}
+
+		// only add group if it has buddies
+		if len(group.Buddies) > 0 {
+			groups = append(groups, group)
+		}
+	}
+
+	// add online group at the beginning if it has buddies
+	if len(onlineGroup.Buddies) > 0 {
+		groups = append([]WebAPIBuddyGroup{onlineGroup}, groups...)
+	}
+
+	// always add an "Offline" group at the end for offline buddies
+	offlineGroup := WebAPIBuddyGroup{
+		Name:    "Offline",
+		Buddies: []WebAPIBuddyInfo{},
+	}
+	// collect all offline buddies
+	for _, group := range groups {
+		if group.Name != "Online" {
+			for _, buddy := range group.Buddies {
+				if buddy.State == "offline" {
+					offlineGroup.Buddies = append(offlineGroup.Buddies, buddy)
+				}
+			}
+		}
+	}
+
+	if len(offlineGroup.Buddies) > 0 {
+		groups = append(groups, offlineGroup)
+	}
+
+	return groups, nil
+}
+
+// GetOnlineBuddies returns a list of all online buddies for a user.
+func (m *BuddyListManager) GetOnlineBuddies(ctx context.Context, userScreenName state.IdentScreenName) ([]WebAPIBuddyInfo, error) {
+	// get user's buddy list
+	items, err := m.feedbagRetriever.RetrieveFeedbag(ctx, userScreenName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve feedbag: %w", err)
+	}
+
+	var onlineBuddies []WebAPIBuddyInfo
+	// check each buddy's presence
+	for _, item := range items {
+		if item.ClassID == wire.FeedbagClassIdBuddy {
+			buddyInfo := m.getBuddyInfo(item.Name)
+			if buddyInfo.State != "offline" {
+				onlineBuddies = append(onlineBuddies, buddyInfo)
+			}
+		}
+	}
+
+	return onlineBuddies, nil
 }
 
 // getBuddyInfo retrieves the current presence information for a buddy.

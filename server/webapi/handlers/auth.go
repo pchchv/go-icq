@@ -33,3 +33,11 @@ type ClientLoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
+
+// AuthHandler handles Web AIM API authentication endpoints.
+type AuthHandler struct {
+	DisableAuth bool
+	UserManager UserManager
+	TokenStore  TokenStore
+	Logger      *slog.Logger
+}

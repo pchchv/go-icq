@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/xml"
 	"log/slog"
+	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/pchchv/go-icq/state"
@@ -114,4 +115,9 @@ type SessionHandler struct {
 	SessionManager      *state.WebAPISessionManager
 	TokenStore          TokenStore
 	Logger              *slog.Logger
+}
+
+// sendError is a convenience method that wraps the common SendError function.
+func (h *SessionHandler) sendError(w http.ResponseWriter, statusCode int, message string) {
+	SendError(w, statusCode, message)
 }

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/xml"
+	"log/slog"
 
 	"github.com/google/uuid"
 	"github.com/pchchv/go-icq/state"
@@ -100,4 +101,17 @@ type EndSessionResponse struct {
 		StatusCode int    `json:"statusCode"`
 		StatusText string `json:"statusText"`
 	} `json:"response"`
+}
+
+// SessionHandler handles Web AIM API session management endpoints.
+type SessionHandler struct {
+	OSCARSessionManager SessionManager
+	BuddyListRegistry   BuddyListRegistry
+	OSCARAuthService    AuthService
+	BuddyListService    BuddyListService
+	BuddyBroadcaster    BuddyBroadcaster
+	BuddyListManager    *BuddyListManager
+	SessionManager      *state.WebAPISessionManager
+	TokenStore          TokenStore
+	Logger              *slog.Logger
 }

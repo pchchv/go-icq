@@ -469,6 +469,67 @@ func (h *SessionHandler) StartSession(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
+// EndSession handles GET /aim/endSession requests.
+func (h *SessionHandler) EndSession(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// get session ID from parameters
+	aimsid := r.URL.Query().Get("aimsid")
+	if aimsid == "" {
+		h.sendError(w, http.StatusBadRequest, "missing aimsid parameter")
+		return
+	}
+
+	// get session
+	session, err := h.SessionManager.GetSession(r.Context(), aimsid)
+	if err != nil {
+		switch err {
+		case state.ErrNoWebAPISession:
+			h.sendError(w, http.StatusNotFound, "session not found")
+		case state.ErrWebAPISessionExpired:
+			h.sendError(w, http.StatusGone, "session expired")
+		default:
+			h.sendError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+
+	// clean up OSCAR session if present
+	if session.OSCARSession != nil && h.OSCARSessionManager != nil {
+		// broadcast departure to OSCAR clients
+		if h.BuddyBroadcaster != nil {
+			if err := h.BuddyBroadcaster.BroadcastBuddyDeparted(ctx, session.OSCARSession); err != nil {
+				h.Logger.ErrorContext(ctx, "failed to broadcast buddy departure", "err", err.Error())
+			}
+		}
+
+		// unregister buddy list
+		if h.BuddyListRegistry != nil {
+			if err := h.BuddyListRegistry.UnregisterBuddyList(ctx, session.ScreenName.IdentScreenName()); err != nil {
+				h.Logger.ErrorContext(ctx, "failed to unregister buddy list", "err", err.Error())
+			}
+		}
+
+		// remove OSCAR session
+		h.OSCARSessionManager.RemoveSession(session.OSCARSession)
+		session.OSCARSession = nil
+	}
+
+	// remove session
+	if err := h.SessionManager.RemoveSession(r.Context(), aimsid); err != nil {
+		h.Logger.ErrorContext(ctx, "failed to remove session", "err", err.Error())
+		h.sendError(w, http.StatusInternalServerError, "failed to end session")
+		return
+	}
+
+	// send response
+	resp := EndSessionResponse{}
+	resp.Response.StatusCode = 200
+	resp.Response.StatusText = "OK"
+	// send response in requested format (JSON, JSONP, or AMF)
+	SendResponse(w, r, resp, h.Logger)
+	h.Logger.DebugContext(ctx, "session ended", "aimsid", aimsid, "screen_name", session.ScreenName)
+}
+
 // sendError is a convenience method that wraps the common SendError function.
 func (h *SessionHandler) sendError(w http.ResponseWriter, statusCode int, message string) {
 	SendError(w, statusCode, message)

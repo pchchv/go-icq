@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/xml"
 	"log/slog"
+	"net/http"
 
 	"github.com/pchchv/go-icq/server/webapi/types"
 	"github.com/pchchv/go-icq/state"
@@ -42,4 +43,9 @@ type FetchEventsXMLResponse struct {
 type EventsHandler struct {
 	SessionManager *state.WebAPISessionManager
 	Logger         *slog.Logger
+}
+
+// sendError is a convenience method that wraps the common SendError function.
+func (h *EventsHandler) sendError(w http.ResponseWriter, statusCode int, message string) {
+	SendError(w, statusCode, message)
 }

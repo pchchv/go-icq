@@ -1,6 +1,10 @@
 package handlers
 
-import "github.com/pchchv/go-icq/server/webapi/types"
+import (
+	"encoding/xml"
+
+	"github.com/pchchv/go-icq/server/webapi/types"
+)
 
 // FetchEventsData contains the events and metadata.
 type FetchEventsData struct {
@@ -17,4 +21,17 @@ type FetchEventsResponse struct {
 		StatusText string          `json:"statusText"`
 		Data       FetchEventsData `json:"data"`
 	} `json:"response"`
+}
+
+// FetchEventsXMLResponse represents the XML response for fetchEvents endpoint.
+type FetchEventsXMLResponse struct {
+	XMLName    xml.Name `xml:"response"`
+	StatusCode int      `xml:"statusCode"`
+	StatusText string   `xml:"statusText"`
+	Data       struct {
+		Events          []types.Event `xml:"events>event"`
+		LastSeqNum      uint64        `xml:"lastSeqNum"`
+		TimeToNextFetch int           `xml:"timeToNextFetch"`
+		FetchBaseURL    string        `xml:"fetchBaseURL"`
+	} `xml:"data"`
 }

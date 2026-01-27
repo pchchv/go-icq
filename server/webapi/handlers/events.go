@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/xml"
+	"log/slog"
 
 	"github.com/pchchv/go-icq/server/webapi/types"
+	"github.com/pchchv/go-icq/state"
 )
 
 // FetchEventsData contains the events and metadata.
@@ -34,4 +36,10 @@ type FetchEventsXMLResponse struct {
 		TimeToNextFetch int           `xml:"timeToNextFetch"`
 		FetchBaseURL    string        `xml:"fetchBaseURL"`
 	} `xml:"data"`
+}
+
+// EventsHandler handles Web AIM API event fetching endpoints.
+type EventsHandler struct {
+	SessionManager *state.WebAPISessionManager
+	Logger         *slog.Logger
 }

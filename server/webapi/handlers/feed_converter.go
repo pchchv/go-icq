@@ -2,6 +2,7 @@ package handlers
 
 import "encoding/xml"
 
+// Atom/RSS feed structures for XML output.
 type AtomAuthor struct {
 	Name string `xml:"name"`
 }
@@ -54,4 +55,10 @@ type RSSChannel struct {
 	Language    string    `xml:"language,omitempty"`
 	PubDate     string    `xml:"pubDate,omitempty"`
 	Items       []RSSItem `xml:"item"`
+}
+
+type RSSFeed struct {
+	XMLName xml.Name   `xml:"rss"`
+	Version string     `xml:"version,attr"`
+	Channel RSSChannel `xml:"channel"`
 }

@@ -36,3 +36,13 @@ type AtomFeed struct {
 	Updated string      `xml:"updated"`
 	Entries []AtomEntry `xml:"entry"`
 }
+
+type RSSItem struct {
+	Title       string   `xml:"title"`
+	Link        string   `xml:"link"`
+	Description string   `xml:"description"`
+	Author      string   `xml:"author,omitempty"`
+	Categories  []string `xml:"category,omitempty"`
+	GUID        string   `xml:"guid,omitempty"`
+	PubDate     string   `xml:"pubDate"`
+}

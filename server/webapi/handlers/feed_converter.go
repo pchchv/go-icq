@@ -62,3 +62,11 @@ type RSSFeed struct {
 	Version string     `xml:"version,attr"`
 	Channel RSSChannel `xml:"channel"`
 }
+
+// FeedConverter handles conversion of feed data to various output formats.
+type FeedConverter struct{}
+
+// NewFeedConverter creates a new feed converter.
+func NewFeedConverter() *FeedConverter {
+	return &FeedConverter{}
+}

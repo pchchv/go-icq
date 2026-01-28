@@ -1,6 +1,10 @@
 package handlers
 
-import "encoding/xml"
+import (
+	"encoding/xml"
+
+	"github.com/pchchv/go-icq/state"
+)
 
 // Atom/RSS feed structures for XML output.
 type AtomAuthor struct {
@@ -69,4 +73,10 @@ type FeedConverter struct{}
 // NewFeedConverter creates a new feed converter.
 func NewFeedConverter() *FeedConverter {
 	return &FeedConverter{}
+}
+
+// FeedResponse wraps feed data with conversion methods.
+type FeedResponse struct {
+	Feed  state.BuddyFeed       `json:"feed"`
+	Items []state.BuddyFeedItem `json:"items"`
 }

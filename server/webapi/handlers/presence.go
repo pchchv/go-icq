@@ -303,6 +303,168 @@ func (h *PresenceHandler) SetProfile(w http.ResponseWriter, r *http.Request) {
 	SendResponse(w, r, response, h.Logger)
 }
 
+// GetProfile handles GET /presence/getProfile requests to retrieve user's profile.
+func (h *PresenceHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// get session ID from parameters
+	aimsid := r.URL.Query().Get("aimsid")
+	if aimsid == "" {
+		h.sendError(w, http.StatusBadRequest, "missing aimsid parameter")
+		return
+	}
+
+	// get session
+	session, err := h.SessionManager.GetSession(r.Context(), aimsid)
+	if err != nil {
+		h.sendError(w, http.StatusUnauthorized, "invalid or expired session")
+		return
+	}
+
+	// update session activity
+	if err := h.SessionManager.TouchSession(r.Context(), aimsid); err != nil {
+		h.Logger.WarnContext(ctx, "failed to touch session", "aimsid", aimsid, "error", err)
+	}
+
+	// get target screen name (optional - defaults to self)
+	targetSN := r.URL.Query().Get("sn")
+	if targetSN == "" {
+		targetSN = session.ScreenName.String()
+	}
+
+	// retrieve profile using ProfileManager
+	profile, err := h.ProfileManager.Profile(ctx, state.NewIdentScreenName(targetSN))
+	if err != nil {
+		h.Logger.WarnContext(ctx, "failed to get profile", "err", err.Error())
+		// return empty profile on error
+		profile = state.UserProfile{}
+	}
+
+	// send response
+	var lastUpdated int64
+	if !profile.UpdateTime.IsZero() {
+		lastUpdated = profile.UpdateTime.Unix()
+	}
+
+	responseData := map[string]interface{}{
+		"screenName":  targetSN,
+		"profile":     profile.ProfileText,
+		"lastUpdated": lastUpdated,
+	}
+
+	response := BaseResponse{}
+	response.Response.StatusCode = 200
+	response.Response.StatusText = "OK"
+	response.Response.Data = responseData
+	SendResponse(w, r, response, h.Logger)
+}
+
+// GetPresence handles GET /presence/get requests.
+func (h *PresenceHandler) GetPresence(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// get session ID from parameters
+	aimsid := r.URL.Query().Get("aimsid")
+	if aimsid == "" {
+		h.sendError(w, http.StatusBadRequest, "missing aimsid parameter")
+		return
+	}
+
+	// get session
+	session, err := h.SessionManager.GetSession(r.Context(), aimsid)
+	if err != nil {
+		switch err {
+		case state.ErrNoWebAPISession:
+			h.sendError(w, http.StatusNotFound, "session not found")
+		case state.ErrWebAPISessionExpired:
+			h.sendError(w, http.StatusGone, "session expired")
+		default:
+			h.sendError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+
+	// touch the session
+	if err := h.SessionManager.TouchSession(r.Context(), aimsid); err != nil {
+		h.Logger.WarnContext(ctx, "failed to touch session", "aimsid", aimsid, "error", err)
+	}
+
+	// check if buddy list is requested
+	getBuddyList := r.URL.Query().Get("bl") == "1"
+
+	// get target users if specified
+	targetUsers := r.URL.Query().Get("t")
+
+	// prepare response
+	resp := BaseResponse{}
+	resp.Response.StatusCode = 200
+	resp.Response.StatusText = "OK"
+	// create PresenceData struct to hold the response data
+	presenceData := PresenceData{}
+	if getBuddyList {
+		// retrieve buddy list from feedbag
+		groups, err := h.getBuddyListGroups(ctx, session.ScreenName.IdentScreenName())
+		if err != nil {
+			h.Logger.ErrorContext(ctx, "failed to get buddy list", "err", err.Error())
+			// return empty buddy list on error instead of failing
+			groups = []BuddyGroupInfo{}
+		}
+		presenceData.Groups = groups
+	} else if targetUsers != "" {
+		// get presence for specific users
+		users := strings.Split(targetUsers, ",")
+		presenceList := make([]BuddyPresenceInfo, 0, len(users))
+		for _, user := range users {
+			user = strings.TrimSpace(user)
+			if user == "" {
+				continue
+			}
+
+			userScreenName := state.NewIdentScreenName(user)
+			// check blocking relationship (OSCAR compliant)
+			rel, err := h.RelationshipFetcher.Relationship(ctx, session.ScreenName.IdentScreenName(), userScreenName)
+			if err != nil {
+				h.Logger.WarnContext(ctx, "failed to get relationship", "error", err)
+				// on error, show as offline
+				presence := BuddyPresenceInfo{
+					AimID:    user,
+					State:    "offline",
+					UserType: "aim",
+				}
+				presenceList = append(presenceList, presence)
+				continue
+			}
+
+			// OSCAR compliance: mutual invisibility when blocking
+			if rel.YouBlock || rel.BlocksYou {
+				presence := BuddyPresenceInfo{
+					AimID:    user,
+					State:    "offline",
+					UserType: "aim",
+				}
+				presenceList = append(presenceList, presence)
+			} else {
+				presence := h.getUserPresence(userScreenName)
+				presenceList = append(presenceList, presence)
+			}
+		}
+
+		presenceData.Users = presenceList
+	} else {
+		// no specific request, return empty data
+		presenceData.Groups = []BuddyGroupInfo{}
+	}
+
+	// set the data to the response
+	resp.Response.Data = presenceData
+	// send response in requested format
+	SendResponse(w, r, resp, h.Logger)
+
+	h.Logger.DebugContext(ctx, "presence retrieved",
+		"aimsid", aimsid,
+		"buddy_list", getBuddyList,
+		"targets", targetUsers,
+	)
+}
+
 // broadcastPresenceEvent sends presence updates to all WebAPI sessions watching this user.
 func (h *PresenceHandler) broadcastPresenceEvent(screenName state.IdentScreenName, stateStr, awayMsg, statusMsg string) {
 	// get all sessions that have this user in their buddy list

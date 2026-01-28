@@ -13,3 +13,14 @@ type AtomContent struct {
 	Type string `xml:"type,attr"`
 	Text string `xml:",chardata"`
 }
+
+type AtomEntry struct {
+	ID        string      `xml:"id"`
+	Link      AtomLink    `xml:"link"`
+	Title     string      `xml:"title"`
+	Author    AtomAuthor  `xml:"author,omitempty"`
+	Updated   string      `xml:"updated"`
+	Summary   string      `xml:"summary,omitempty"`
+	Content   AtomContent `xml:"content,omitempty"`
+	Published string      `xml:"published,omitempty"`
+}

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
@@ -40,4 +41,15 @@ type ProfileManager interface {
 type PresenceData struct {
 	Groups []BuddyGroupInfo    `json:"groups,omitempty" xml:"groups>group,omitempty"`
 	Users  []BuddyPresenceInfo `json:"users,omitempty" xml:"users>user,omitempty"`
+}
+
+// PresenceHandler handles Web AIM API presence-related endpoints.
+type PresenceHandler struct {
+	RelationshipFetcher RelationshipFetcher
+	SessionRetriever    SessionRetriever
+	FeedbagRetriever    FeedbagRetriever
+	BuddyBroadcaster    BuddyBroadcaster
+	SessionManager      *state.WebAPISessionManager
+	ProfileManager      ProfileManager
+	Logger              *slog.Logger
 }

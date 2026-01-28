@@ -23,3 +23,9 @@ type BuddyPresenceInfo struct {
 	IdleTime   int    `json:"idleTime,omitempty" xml:"idleTime,omitempty"`
 	UserType   string `json:"userType" xml:"userType"` // "aim", "icq", "admin"
 }
+
+// BuddyGroupInfo represents a buddy group with its members.
+type BuddyGroupInfo struct {
+	Name    string              `json:"name" xml:"name"`
+	Buddies []BuddyPresenceInfo `json:"buddies" xml:"buddies>buddy"`
+}

@@ -46,3 +46,12 @@ type RSSItem struct {
 	GUID        string   `xml:"guid,omitempty"`
 	PubDate     string   `xml:"pubDate"`
 }
+
+type RSSChannel struct {
+	Title       string    `xml:"title"`
+	Link        string    `xml:"link"`
+	Description string    `xml:"description"`
+	Language    string    `xml:"language,omitempty"`
+	PubDate     string    `xml:"pubDate,omitempty"`
+	Items       []RSSItem `xml:"item"`
+}

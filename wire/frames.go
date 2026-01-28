@@ -8,6 +8,12 @@ import (
 )
 
 const (
+	// ReqIDFromServer is the SNAC frame Request ID value that
+	// indicates the SNAC is initiated by the server.
+	// Some clients, such as the Java AIM 1.1.19,
+	// completely fail to process some server SNACs if the
+	// high bit is not set on request ID.
+	ReqIDFromServer          = 1 << 31
 	FLAPFrameData      uint8 = 0x02
 	FLAPFrameError     uint8 = 0x03
 	FLAPFrameSignon    uint8 = 0x01

@@ -29,3 +29,9 @@ type BuddyGroupInfo struct {
 	Name    string              `json:"name" xml:"name"`
 	Buddies []BuddyPresenceInfo `json:"buddies" xml:"buddies>buddy"`
 }
+
+// PresenceData contains presence information.
+type PresenceData struct {
+	Groups []BuddyGroupInfo    `json:"groups,omitempty" xml:"groups>group,omitempty"`
+	Users  []BuddyPresenceInfo `json:"users,omitempty" xml:"users>user,omitempty"`
+}

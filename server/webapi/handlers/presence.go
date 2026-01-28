@@ -30,6 +30,12 @@ type BuddyGroupInfo struct {
 	Buddies []BuddyPresenceInfo `json:"buddies" xml:"buddies>buddy"`
 }
 
+// ProfileManager manages user profiles (uses types.ProfileManager).
+type ProfileManager interface {
+	SetProfile(ctx context.Context, screenName state.IdentScreenName, profile state.UserProfile) error
+	Profile(ctx context.Context, screenName state.IdentScreenName) (state.UserProfile, error)
+}
+
 // PresenceData contains presence information.
 type PresenceData struct {
 	Groups []BuddyGroupInfo    `json:"groups,omitempty" xml:"groups>group,omitempty"`

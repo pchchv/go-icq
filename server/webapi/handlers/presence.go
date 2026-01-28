@@ -3,7 +3,9 @@ package handlers
 import (
 	"context"
 	"log/slog"
+	"net/http"
 
+	"github.com/pchchv/go-icq/server/webapi/types"
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 )
@@ -52,4 +54,33 @@ type PresenceHandler struct {
 	SessionManager      *state.WebAPISessionManager
 	ProfileManager      ProfileManager
 	Logger              *slog.Logger
+}
+
+// broadcastPresenceEvent sends presence updates to all WebAPI sessions watching this user.
+func (h *PresenceHandler) broadcastPresenceEvent(screenName state.IdentScreenName, stateStr, awayMsg, statusMsg string) {
+	// get all sessions that have this user in their buddy list
+	// for now, we'll broadcast to all sessions (this should be optimized)
+	// using background context as this is an async broadcast operation
+	for _, sess := range h.SessionManager.GetAllSessions(context.Background()) {
+		if sess.EventQueue != nil && sess.Events != nil {
+			// check if session is subscribed to presence events
+			for _, event := range sess.Events {
+				if event == "presence" || event == "myInfo" {
+					eventData := types.PresenceEvent{
+						AimID:     screenName.String(),
+						State:     stateStr,
+						AwayMsg:   awayMsg,
+						StatusMsg: statusMsg,
+					}
+					sess.EventQueue.Push(types.EventTypePresence, eventData)
+					break
+				}
+			}
+		}
+	}
+}
+
+// sendError is a convenience method that wraps the common SendError function.
+func (h *PresenceHandler) sendError(w http.ResponseWriter, statusCode int, message string) {
+	SendError(w, statusCode, message)
 }

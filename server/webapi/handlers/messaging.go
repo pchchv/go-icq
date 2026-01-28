@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/binary"
@@ -166,4 +167,27 @@ func (h *MessagingHandler) sendSuccessResponse(w http.ResponseWriter, r *http.Re
 // sendErrorResponse sends an error response in Web AIM API format.
 func (h *MessagingHandler) sendErrorResponse(w http.ResponseWriter, statusCode int, errorText string) {
 	SendError(w, statusCode, errorText)
+}
+
+// encodeIMMessage encodes a text message into the OSCAR IM format.
+func (h *MessagingHandler) encodeIMMessage(text string, autoResponse bool) []byte {
+	// create ICBM fragment list for the message
+	frags, err := wire.ICBMFragmentList(text)
+	if err != nil {
+		// fragment creation fails
+		// return simple text bytes
+		return []byte(text)
+	}
+
+	// marshal the fragments
+	buf := &bytes.Buffer{}
+	for _, frag := range frags {
+		if err := wire.MarshalBE(frag, buf); err != nil {
+			// marshaling fails
+			// return simple text bytes
+			return []byte(text)
+		}
+	}
+
+	return buf.Bytes()
 }

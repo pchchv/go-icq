@@ -331,3 +331,18 @@ func (h *PresenceHandler) broadcastPresenceEvent(screenName state.IdentScreenNam
 func (h *PresenceHandler) sendError(w http.ResponseWriter, statusCode int, message string) {
 	SendError(w, statusCode, message)
 }
+
+// isICQScreenName checks if a screen name is an ICQ number.
+func isICQScreenName(screenName string) bool {
+	if len(screenName) == 0 {
+		return false
+	}
+
+	for _, r := range screenName {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+
+	return true
+}

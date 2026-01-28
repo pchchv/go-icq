@@ -332,6 +332,147 @@ func (h *PresenceHandler) sendError(w http.ResponseWriter, statusCode int, messa
 	SendError(w, statusCode, message)
 }
 
+// getUserPresence gets the current presence state for a user.
+func (h *PresenceHandler) getUserPresence(screenName state.IdentScreenName) BuddyPresenceInfo {
+	// default offline presence
+	presence := BuddyPresenceInfo{
+		AimID:    screenName.String(),
+		State:    "offline",
+		UserType: "aim",
+	}
+
+	// check if user is online by looking for their OSCAR session
+	if session := h.SessionRetriever.RetrieveSession(screenName); session != nil {
+		presence.State = "online"
+		// check user status
+		if session.Away() {
+			presence.State = "away"
+		} else if session.AllUserStatusBitmask(wire.OServiceUserStatusDND) {
+			presence.State = "dnd"
+		}
+
+		// check idle time
+		if session.Idle() {
+			presence.State = "idle"
+			idleTime := time.Since(session.IdleTime())
+			presence.IdleTime = int(idleTime.Minutes())
+		}
+
+		// get online time
+		presence.OnlineTime = session.SignonTime().Unix()
+	}
+
+	// determine user type
+	if strings.HasPrefix(screenName.String(), "admin") {
+		presence.UserType = "admin"
+	} else if isICQScreenName(screenName.String()) {
+		presence.UserType = "icq"
+	}
+
+	return presence
+}
+
+// getBuddyListGroups retrieves the buddy list organized by groups.
+func (h *PresenceHandler) getBuddyListGroups(ctx context.Context, screenName state.IdentScreenName) ([]BuddyGroupInfo, error) {
+	// get feedbag items
+	items, err := h.FeedbagRetriever.RetrieveFeedbag(ctx, screenName)
+	if err != nil {
+		return nil, err
+	}
+
+	// organize items into groups
+	groupMap := make(map[uint16]*BuddyGroupInfo)
+	buddyToGroup := make(map[string]uint16)
+	// first pass: identify groups
+	for _, item := range items {
+		if item.ClassID == wire.FeedbagClassIdGroup {
+			name := item.Name
+			if name == "" {
+				// default group name
+				name = "Buddies"
+			}
+
+			groupMap[item.ItemID] = &BuddyGroupInfo{
+				Name:    name,
+				Buddies: []BuddyPresenceInfo{},
+			}
+		}
+	}
+
+	// second pass: add buddies to groups
+	for _, item := range items {
+		if item.ClassID == wire.FeedbagClassIdBuddy {
+			// get buddy screen name
+			buddyName := item.Name
+			if buddyName == "" {
+				continue
+			}
+
+			// find buddy's group
+			groupID := item.GroupID
+			buddyToGroup[buddyName] = groupID
+		}
+	}
+
+	// if no groups exist, create a default one
+	if len(groupMap) == 0 {
+		groupMap[0] = &BuddyGroupInfo{
+			Name:    "Buddies",
+			Buddies: []BuddyPresenceInfo{},
+		}
+	}
+
+	// add buddies to their groups with presence info
+	for buddyName, groupID := range buddyToGroup {
+		group, exists := groupMap[groupID]
+		if !exists {
+			// put in first available group if group doesn't exist
+			for _, g := range groupMap {
+				group = g
+				break
+			}
+		}
+
+		buddyScreenName := state.NewIdentScreenName(buddyName)
+		// check blocking relationship (OSCAR compliant)
+		rel, err := h.RelationshipFetcher.Relationship(ctx, screenName, buddyScreenName)
+		if err != nil {
+			h.Logger.WarnContext(ctx, "failed to get relationship", "error", err)
+			// on error, include the buddy but they'll appear offline
+			presence := BuddyPresenceInfo{
+				AimID:    buddyName,
+				State:    "offline",
+				UserType: "aim",
+			}
+			group.Buddies = append(group.Buddies, presence)
+			continue
+		}
+
+		// OSCAR compliance: mutual invisibility when blocking
+		if rel.YouBlock || rel.BlocksYou {
+			// add them as offline to maintain buddy list structure
+			presence := BuddyPresenceInfo{
+				AimID:    buddyName,
+				State:    "offline",
+				UserType: "aim",
+			}
+			group.Buddies = append(group.Buddies, presence)
+		} else {
+			// normal presence lookup
+			presence := h.getUserPresence(buddyScreenName)
+			group.Buddies = append(group.Buddies, presence)
+		}
+	}
+
+	// convert map to slice
+	groups := make([]BuddyGroupInfo, 0, len(groupMap))
+	for _, group := range groupMap {
+		groups = append(groups, *group)
+	}
+
+	return groups, nil
+}
+
 // isICQScreenName checks if a screen name is an ICQ number.
 func isICQScreenName(screenName string) bool {
 	if len(screenName) == 0 {

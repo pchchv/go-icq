@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/pchchv/go-icq/server/webapi/types"
 	"github.com/pchchv/go-icq/state"
@@ -54,6 +56,54 @@ type PresenceHandler struct {
 	SessionManager      *state.WebAPISessionManager
 	ProfileManager      ProfileManager
 	Logger              *slog.Logger
+}
+
+// Icon handles GET /presence/icon requests for presence icons.
+func (h *PresenceHandler) Icon(w http.ResponseWriter, r *http.Request) {
+	// get parameters
+	name := r.URL.Query().Get("name")
+	size := r.URL.Query().Get("size")
+	iconType := r.URL.Query().Get("type")
+	if name == "" {
+		h.sendError(w, http.StatusBadRequest, "missing name parameter")
+		return
+	}
+
+	// default values
+	if size == "" {
+		size = "32"
+	}
+
+	if iconType == "" {
+		iconType = "aim"
+	}
+
+	// for now, redirect to a placeholder icon
+	iconURL := "/static/icons/default_" + iconType + "_" + size + ".png"
+	// If it's an email lookup, extract username
+	if strings.Contains(name, "@") {
+		parts := strings.Split(name, "@")
+		if len(parts) > 0 {
+			name = parts[0]
+		}
+	}
+
+	// check if user is online and get their state
+	screenName := state.NewIdentScreenName(name)
+	if session := h.SessionRetriever.RetrieveSession(screenName); session != nil {
+		if session.Away() {
+			iconURL = "/static/icons/away_" + iconType + "_" + size + ".png"
+		} else if session.Idle() {
+			iconURL = "/static/icons/idle_" + iconType + "_" + size + ".png"
+		} else {
+			iconURL = "/static/icons/online_" + iconType + "_" + size + ".png"
+		}
+	} else {
+		iconURL = "/static/icons/offline_" + iconType + "_" + size + ".png"
+	}
+
+	// redirect to icon URL
+	http.Redirect(w, r, iconURL, http.StatusFound)
 }
 
 // SetState handles GET /presence/setState requests to update user's presence state.
@@ -191,6 +241,59 @@ func (h *PresenceHandler) SetStatus(w http.ResponseWriter, r *http.Request) {
 		"screenName", session.ScreenName.String(),
 		"statusMsg", statusMsg,
 		"statusCode", statusCode,
+	)
+
+	// send success response
+	response := BaseResponse{}
+	response.Response.StatusCode = 200
+	response.Response.StatusText = "OK"
+	SendResponse(w, r, response, h.Logger)
+}
+
+// SetProfile handles GET /presence/setProfile requests to update user's profile.
+func (h *PresenceHandler) SetProfile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// get session ID from parameters
+	aimsid := r.URL.Query().Get("aimsid")
+	if aimsid == "" {
+		h.sendError(w, http.StatusBadRequest, "missing aimsid parameter")
+		return
+	}
+
+	// get session
+	session, err := h.SessionManager.GetSession(r.Context(), aimsid)
+	if err != nil {
+		h.sendError(w, http.StatusUnauthorized, "invalid or expired session")
+		return
+	}
+
+	// update session activity
+	if err := h.SessionManager.TouchSession(r.Context(), aimsid); err != nil {
+		h.Logger.WarnContext(ctx, "failed to touch session", "aimsid", aimsid, "error", err)
+	}
+
+	// get the profile content
+	profileText := r.URL.Query().Get("profile")
+	// limit profile size (4KB max)
+	if len(profileText) > 4096 {
+		h.sendError(w, http.StatusBadRequest, "profile too large (max 4KB)")
+		return
+	}
+
+	// save profile using ProfileManager
+	profile := state.UserProfile{
+		ProfileText: profileText,
+		UpdateTime:  time.Now().UTC(),
+	}
+	if err := h.ProfileManager.SetProfile(ctx, session.ScreenName.IdentScreenName(), profile); err != nil {
+		h.Logger.ErrorContext(ctx, "failed to set profile", "err", err.Error())
+		h.sendError(w, http.StatusInternalServerError, "failed to save profile")
+		return
+	}
+
+	h.Logger.InfoContext(ctx, "profile updated",
+		"screenName", session.ScreenName.String(),
+		"profileSize", len(profileText),
 	)
 
 	// send success response

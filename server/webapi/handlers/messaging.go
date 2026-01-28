@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"log/slog"
+	"net/http"
 
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
@@ -31,4 +32,18 @@ type MessagingHandler struct {
 	SessionManager        *state.WebAPISessionManager
 	MessageRelayer        MessageRelayer
 	Logger                *slog.Logger
+}
+
+// sendSuccessResponse sends a success response in Web AIM API format.
+func (h *MessagingHandler) sendSuccessResponse(w http.ResponseWriter, r *http.Request, data interface{}) {
+	response := BaseResponse{}
+	response.Response.StatusCode = 200
+	response.Response.StatusText = "OK"
+	response.Response.Data = data
+	SendResponse(w, r, response, h.Logger)
+}
+
+// sendErrorResponse sends an error response in Web AIM API format.
+func (h *MessagingHandler) sendErrorResponse(w http.ResponseWriter, statusCode int, errorText string) {
+	SendError(w, statusCode, errorText)
 }

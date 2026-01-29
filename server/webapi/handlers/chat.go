@@ -15,7 +15,7 @@ type ChatHandler struct {
 	Logger         *slog.Logger
 }
 
-// CreateAndJoinChat creates (if needed) and joins a chat room
+// CreateAndJoinChat creates (if needed) and joins a chat room.
 // GET /chat/createAndJoinChat
 func (h *ChatHandler) CreateAndJoinChat(w http.ResponseWriter, r *http.Request) {
 	// extract parameters
@@ -86,7 +86,7 @@ func (h *ChatHandler) CreateAndJoinChat(w http.ResponseWriter, r *http.Request) 
 	h.Logger.Info("user joined chat room", "screenName", session.ScreenName, "roomName", room.RoomName, "roomID", room.RoomID, "chatsid", chatSession.ChatSID)
 }
 
-// LeaveChat leaves the current chat room
+// LeaveChat leaves the current chat room.
 // GET /chat/leaveChat
 func (h *ChatHandler) LeaveChat(w http.ResponseWriter, r *http.Request) {
 	// extract parameters
@@ -133,4 +133,131 @@ func (h *ChatHandler) LeaveChat(w http.ResponseWriter, r *http.Request) {
 	// send response
 	SendResponse(w, r, response, h.Logger)
 	h.Logger.Info("user left chat room", "screenName", session.ScreenName, "chatsid", chatsid)
+}
+
+// SendMessage sends a message to a chat room.
+// GET /chat/sendMessage
+func (h *ChatHandler) SendMessage(w http.ResponseWriter, r *http.Request) {
+	// extract parameters
+	aimsid := r.URL.Query().Get("aimsid")
+	chatsid := r.URL.Query().Get("chatsid")
+	message := r.URL.Query().Get("message")
+	whisperTarget := r.URL.Query().Get("whisperTarget")
+	// validate session
+	_, err := h.SessionManager.GetSession(r.Context(), aimsid)
+	if err != nil {
+		h.Logger.Error("invalid session", "aimsid", aimsid, "error", err)
+		SendError(w, http.StatusUnauthorized, "Authentication Required")
+		return
+	}
+
+	// validate required parameters
+	if chatsid == "" {
+		SendError(w, http.StatusBadRequest, "chatsid is required")
+		return
+	}
+
+	if message == "" {
+		SendError(w, http.StatusBadRequest, "message is required")
+		return
+	}
+
+	// send the message
+	if err = h.ChatManager.SendMessage(r.Context(), chatsid, message, whisperTarget); err != nil {
+		h.Logger.Error("failed to send message", "error", err, "chatsid", chatsid)
+		// determine appropriate error code
+		statusCode := http.StatusInternalServerError
+		message := "Internal Server Error"
+		if strings.Contains(err.Error(), "invalid chat session") || strings.Contains(err.Error(), "user has left") {
+			statusCode = http.StatusNotFound
+			message = "Chat session not found"
+		}
+
+		SendError(w, statusCode, message)
+		return
+	}
+
+	// build response
+	response := BaseResponse{
+		Response: ResponseBody{
+			StatusCode: 200,
+			StatusText: "OK",
+			Data:       map[string]interface{}{},
+		},
+	}
+
+	// send response
+	SendResponse(w, r, response, h.Logger)
+	logMsg := "message sent to chat room"
+	if whisperTarget != "" {
+		logMsg = "whisper sent in chat room"
+	}
+	h.Logger.Debug(logMsg, "chatsid", chatsid, "whisperTarget", whisperTarget)
+}
+
+// SetTyping sets typing status for a chat room.
+// GET /chat/setTyping
+func (h *ChatHandler) SetTyping(w http.ResponseWriter, r *http.Request) {
+	// extract parameters
+	aimsid := r.URL.Query().Get("aimsid")
+	chatsid := r.URL.Query().Get("chatsid")
+	typingStatus := r.URL.Query().Get("typingStatus")
+
+	// validate session
+	_, err := h.SessionManager.GetSession(r.Context(), aimsid)
+	if err != nil {
+		h.Logger.Error("invalid session", "aimsid", aimsid, "error", err)
+		SendError(w, http.StatusUnauthorized, "Authentication Required")
+		return
+	}
+
+	// validate required parameters
+	if chatsid == "" {
+		SendError(w, http.StatusBadRequest, "chatsid is required")
+		return
+	}
+
+	if typingStatus == "" {
+		SendError(w, http.StatusBadRequest, "typingStatus is required")
+		return
+	}
+
+	// validate typing status value
+	validStatuses := map[string]bool{
+		"none":   true,
+		"typing": true,
+		"typed":  true,
+	}
+	if !validStatuses[typingStatus] {
+		SendError(w, http.StatusBadRequest, "Invalid typingStatus value")
+		return
+	}
+
+	// set typing status
+	if err = h.ChatManager.SetTyping(r.Context(), chatsid, typingStatus); err != nil {
+		h.Logger.Error("failed to set typing status", "error", err, "chatsid", chatsid)
+		// determine appropriate error code
+		statusCode := http.StatusInternalServerError
+		errMessage := "Internal Server Error"
+		if strings.Contains(err.Error(), "invalid chat session") || strings.Contains(err.Error(), "user has left") {
+			statusCode = http.StatusNotFound
+			errMessage = "Chat session not found"
+		}
+
+		SendError(w, statusCode, errMessage)
+		return
+	}
+
+	// build response
+	response := BaseResponse{
+		Response: ResponseBody{
+			StatusCode: 200,
+			StatusText: "OK",
+			Data:       map[string]interface{}{},
+		},
+	}
+
+	// send response
+	SendResponse(w, r, response, h.Logger)
+	h.Logger.Debug("typing status updated", "chatsid", chatsid, "status", typingStatus)
 }

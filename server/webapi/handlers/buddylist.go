@@ -4,7 +4,9 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 
+	"github.com/pchchv/go-icq/server/webapi/types"
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 )
@@ -28,6 +30,168 @@ type BuddyListHandler struct {
 	SessionManager WebAPISessionManager
 	FeedbagManager FeedbagManager
 	Logger         *slog.Logger
+}
+
+// AddBuddy handles GET /buddylist/addBuddy requests.
+func (h *BuddyListHandler) AddBuddy(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// get session ID from parameters
+	aimsid := r.URL.Query().Get("aimsid")
+	if aimsid == "" {
+		h.sendError(w, http.StatusBadRequest, "missing aimsid parameter")
+		return
+	}
+
+	// get session
+	session, err := h.SessionManager.GetSession(r.Context(), aimsid)
+	if err != nil {
+		switch err {
+		case state.ErrNoWebAPISession:
+			h.sendError(w, http.StatusNotFound, "session not found")
+		case state.ErrWebAPISessionExpired:
+			h.sendError(w, http.StatusGone, "session expired")
+		default:
+			h.sendError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+
+	// touch the session
+	h.SessionManager.TouchSession(r.Context(), aimsid)
+	// get buddy and group parameters
+	buddyName := strings.TrimSpace(r.URL.Query().Get("buddy"))
+	groupName := strings.TrimSpace(r.URL.Query().Get("group"))
+	if buddyName == "" {
+		h.sendError(w, http.StatusBadRequest, "missing buddy parameter")
+		return
+	}
+
+	if groupName == "" {
+		// default group
+		groupName = "Buddies"
+	}
+
+	// add buddy to feedbag
+	resultCode, buddyInfo := h.addBuddyToFeedbag(ctx, session.ScreenName.IdentScreenName(), buddyName, groupName)
+	// prepare response
+	responseData := map[string]interface{}{
+		"resultCode": resultCode,
+	}
+	if resultCode == "success" {
+		responseData["buddyInfo"] = buddyInfo
+	}
+
+	resp := BaseResponse{}
+	resp.Response.StatusCode = 200
+	resp.Response.StatusText = "OK"
+	resp.Response.Data = responseData
+	SendResponse(w, r, resp, h.Logger)
+
+	if resultCode == "success" && session.EventQueue != nil {
+		// push buddy list update event to the session's event queue
+		event := types.BuddyListEvent{
+			Action: "add",
+			Buddy:  buddyInfo,
+			Group:  groupName,
+		}
+		session.EventQueue.Push(types.EventTypeBuddyList, event)
+	}
+
+	h.Logger.InfoContext(ctx, "buddy added",
+		"aimsid", aimsid,
+		"buddy", buddyName,
+		"group", groupName,
+		"result", resultCode,
+	)
+}
+
+// AddTempBuddy handles GET /aim/addTempBuddy requests.
+// This adds temporary buddies to the session without persisting them to the feedbag.
+// The temporary buddies are only visible for the duration of the session.
+func (h *BuddyListHandler) AddTempBuddy(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// get session ID from parameters
+	aimsid := r.URL.Query().Get("aimsid")
+	if aimsid == "" {
+		h.sendError(w, http.StatusBadRequest, "missing aimsid parameter")
+		return
+	}
+
+	// get session
+	session, err := h.SessionManager.GetSession(r.Context(), aimsid)
+	if err != nil {
+		switch err {
+		case state.ErrNoWebAPISession:
+			h.sendError(w, http.StatusNotFound, "session not found")
+		case state.ErrWebAPISessionExpired:
+			h.sendError(w, http.StatusGone, "session expired")
+		default:
+			h.sendError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+
+	// touch the session
+	h.SessionManager.TouchSession(r.Context(), aimsid)
+	// get buddy names from parameters
+	// the WebAPI accepts multiple buddy names via &t= parameters
+	buddyNames := r.URL.Query()["t"]
+	if len(buddyNames) == 0 {
+		h.sendError(w, http.StatusBadRequest, "missing buddy names (t parameter)")
+		return
+	}
+
+	// store temporary buddies in the session
+	// NOTE: These are not persisted to the feedbag database.
+	if session.TempBuddies == nil {
+		session.TempBuddies = make(map[string]bool)
+	}
+
+	for _, buddyName := range buddyNames {
+		buddyName = strings.TrimSpace(buddyName)
+		if buddyName != "" {
+			session.TempBuddies[buddyName] = true
+		}
+	}
+
+	// prepare response
+	responseData := map[string]interface{}{
+		"resultCode": "success",
+		"buddyNames": buddyNames,
+	}
+
+	resp := BaseResponse{}
+	resp.Response.StatusCode = 200
+	resp.Response.StatusText = "OK"
+	resp.Response.Data = responseData
+	SendResponse(w, r, resp, h.Logger)
+
+	// push temp buddy event to the session's event queue
+	if session.EventQueue != nil {
+		for _, buddyName := range buddyNames {
+			buddyName = strings.TrimSpace(buddyName)
+			if buddyName != "" {
+				// create minimal buddy info for temp buddy
+				buddyInfo := &BuddyPresenceInfo{
+					AimID:    buddyName,
+					State:    "offline", // Default state
+					UserType: "aim",
+				}
+
+				event := types.BuddyListEvent{
+					Action: "addTemp",
+					Buddy:  buddyInfo,
+				}
+				session.EventQueue.Push(types.EventTypeBuddyList, event)
+			}
+		}
+	}
+
+	h.Logger.InfoContext(ctx, "temporary buddies added",
+		"aimsid", aimsid,
+		"buddies", buddyNames,
+		"count", len(buddyNames),
+	)
 }
 
 // addBuddyToFeedbag adds a buddy to the user's feedbag.

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/xml"
+	"time"
 
 	"github.com/pchchv/go-icq/state"
 )
@@ -157,4 +158,58 @@ func (fr *FeedResponse) ToRSS() *RSSFeed {
 		rss.Channel.Items = append(rss.Channel.Items, rssItem)
 	}
 	return rss
+}
+
+// BuildFeedData creates feed data map from request parameters.
+func BuildFeedData(params map[string]string) map[string]interface{} {
+	feedData := make(map[string]interface{})
+	// required fields
+	if title, ok := params["itemTitle"]; ok {
+		feedData["title"] = title
+	}
+
+	if desc, ok := params["itemDesc"]; ok {
+		feedData["description"] = desc
+	}
+
+	if link, ok := params["itemLink"]; ok {
+		feedData["link"] = link
+	}
+
+	if guid, ok := params["itemGuid"]; ok {
+		feedData["guid"] = guid
+	}
+
+	// feed metadata
+	if feedTitle, ok := params["feedTitle"]; ok {
+		feedData["feedTitle"] = feedTitle
+	}
+
+	if feedLink, ok := params["feedLink"]; ok {
+		feedData["feedLink"] = feedLink
+	}
+
+	if feedDesc, ok := params["feedDesc"]; ok {
+		feedData["feedDesc"] = feedDesc
+	}
+
+	// optional fields
+	if publisher, ok := params["feedPublisher"]; ok && publisher != "" {
+		feedData["publisher"] = publisher
+	}
+
+	if pubDate, ok := params["itemPubDate"]; ok && pubDate != "" {
+		feedData["pubDate"] = pubDate
+	}
+
+	if category, ok := params["itemCategory"]; ok && category != "" {
+		feedData["categories"] = []string{category}
+	}
+
+	// default type if not specified
+	if _, ok := feedData["type"]; !ok {
+		feedData["type"] = "status"
+	}
+
+	return feedData
 }

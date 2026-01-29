@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// MockWebAPISessionManager is a mock implementation of the WebAPISessionManager
+// MockWebAPISessionManager is a mock implementation of the WebAPISessionManager.
 type MockWebAPISessionManager struct {
 	mock.Mock
 }
@@ -23,4 +23,9 @@ func (m *MockWebAPISessionManager) GetSession(ctx context.Context, aimsid string
 func (m *MockWebAPISessionManager) TouchSession(ctx context.Context, aimsid string) error {
 	args := m.Called(ctx, aimsid)
 	return args.Error(0)
+}
+
+// MockFeedbagManager is a mock implementation of FeedbagManager.
+type MockFeedbagManager struct {
+	mock.Mock
 }

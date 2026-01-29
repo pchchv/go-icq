@@ -45,3 +45,11 @@ func (m *MockFeedbagManager) DeleteItem(ctx context.Context, screenName state.Id
 	args := m.Called(ctx, screenName, item)
 	return args.Error(0)
 }
+
+func (m *MockFeedbagManager) RetrieveFeedbag(ctx context.Context, screenName state.IdentScreenName) ([]wire.FeedbagItem, error) {
+	args := m.Called(ctx, screenName)
+	if items := args.Get(0); items != nil {
+		return items.([]wire.FeedbagItem), args.Error(1)
+	}
+	return nil, args.Error(1)
+}

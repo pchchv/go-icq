@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/pchchv/go-icq/state"
+	"github.com/pchchv/go-icq/wire"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -28,4 +29,19 @@ func (m *MockWebAPISessionManager) TouchSession(ctx context.Context, aimsid stri
 // MockFeedbagManager is a mock implementation of FeedbagManager.
 type MockFeedbagManager struct {
 	mock.Mock
+}
+
+func (m *MockFeedbagManager) InsertItem(ctx context.Context, screenName state.IdentScreenName, item wire.FeedbagItem) error {
+	args := m.Called(ctx, screenName, item)
+	return args.Error(0)
+}
+
+func (m *MockFeedbagManager) UpdateItem(ctx context.Context, screenName state.IdentScreenName, item wire.FeedbagItem) error {
+	args := m.Called(ctx, screenName, item)
+	return args.Error(0)
+}
+
+func (m *MockFeedbagManager) DeleteItem(ctx context.Context, screenName state.IdentScreenName, item wire.FeedbagItem) error {
+	args := m.Called(ctx, screenName, item)
+	return args.Error(0)
 }

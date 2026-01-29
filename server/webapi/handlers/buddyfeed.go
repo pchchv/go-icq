@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/pchchv/go-icq/state"
@@ -117,6 +118,75 @@ func (h *BuddyFeedHandler) PushFeed(w http.ResponseWriter, r *http.Request) {
 	SendResponse(w, r, response, h.Logger)
 }
 
+// GetUser handles GET /buddyfeed/getUser requests to retrieve a user's feed.
+func (h *BuddyFeedHandler) GetUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// get target user from 't' parameter as per spec
+	targetUser := r.URL.Query().Get("t")
+	if targetUser == "" {
+		SendError(w, http.StatusBadRequest, "missing 't' parameter")
+		return
+	}
+
+	// get format parameter
+	format := strings.ToLower(r.URL.Query().Get("f"))
+	h.Logger.DebugContext(ctx, "retrieving user feed",
+		"user", targetUser,
+		"format", format,
+	)
+
+	// get the feed configuration
+	feed, err := h.FeedManager.GetUserFeed(ctx, targetUser)
+	if err != nil {
+		h.Logger.ErrorContext(ctx, "failed to get user feed",
+			"user", targetUser,
+			"error", err,
+		)
+		SendError(w, http.StatusInternalServerError, "failed to retrieve feed")
+		return
+	}
+
+	// build feed response
+	var feedResponse *FeedResponse
+	if feed == nil {
+		// no feed configured
+		// generate empty feed
+		feedResponse = GenerateEmptyFeed(targetUser)
+	} else {
+		// get feed items
+		items, err := h.FeedManager.GetFeedItems(ctx, feed.ID, 50)
+		if err != nil {
+			h.Logger.ErrorContext(ctx, "failed to get feed items",
+				"feedID", feed.ID,
+				"error", err,
+			)
+			SendError(w, http.StatusInternalServerError, "failed to retrieve feed items")
+			return
+		}
+
+		feedResponse = &FeedResponse{
+			Feed:  *feed,
+			Items: items,
+		}
+	}
+
+	// send response based on format
+	switch format {
+	case "atom":
+		h.sendAtomFeed(w, feedResponse.ToAtom())
+	case "json":
+		response := BaseResponse{}
+		response.Response.StatusCode = 200
+		response.Response.StatusText = "OK"
+		response.Response.Data = feedResponse.ToJSON()
+		SendResponse(w, r, response, h.Logger)
+	case "rss", "native", "":
+		h.sendRSSFeed(w, feedResponse.ToRSS())
+	default:
+		h.sendRSSFeed(w, feedResponse.ToRSS())
+	}
+}
+
 // sendRSSFeed sends an RSS feed response.
 func (h *BuddyFeedHandler) sendRSSFeed(w http.ResponseWriter, feed *RSSFeed) {
 	w.Header().Set("Content-Type", "application/rss+xml; charset=utf-8")
@@ -143,4 +213,17 @@ func (h *BuddyFeedHandler) sendEmptyRSSFeed(w http.ResponseWriter, screenName st
   </channel>
 </rss>`, screenName)
 	w.Write([]byte(emptyFeed))
+}
+
+// sendAtomFeed sends an Atom feed response.
+func (h *BuddyFeedHandler) sendAtomFeed(w http.ResponseWriter, feed *AtomFeed) {
+	w.Header().Set("Content-Type", "application/atom+xml; charset=utf-8")
+	// add XML declaration
+	w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>`))
+	// marshal and write the feed
+	encoder := xml.NewEncoder(w)
+	encoder.Indent("", "  ")
+	if err := encoder.Encode(feed); err != nil {
+		h.Logger.Error("failed to encode Atom feed", "error", err)
+	}
 }

@@ -80,3 +80,81 @@ type FeedResponse struct {
 	Feed  state.BuddyFeed       `json:"feed"`
 	Items []state.BuddyFeedItem `json:"items"`
 }
+
+// ToJSON converts the feed response to JSON format.
+func (fr *FeedResponse) ToJSON() map[string]interface{} {
+	jsonItems := make([]map[string]interface{}, 0, len(fr.Items))
+	for _, item := range fr.Items {
+		jsonItem := map[string]interface{}{
+			"id":          item.GUID,
+			"title":       item.Title,
+			"description": item.Description,
+			"link":        item.Link,
+			"author":      item.Author,
+			"categories":  item.Categories,
+			"published":   item.PublishedAt.Unix(),
+		}
+		jsonItems = append(jsonItems, jsonItem)
+	}
+	return map[string]interface{}{
+		"title":       fr.Feed.Title,
+		"description": fr.Feed.Description,
+		"link":        fr.Feed.Link,
+		"updated":     fr.Feed.UpdatedAt.Unix(),
+		"items":       jsonItems,
+	}
+}
+
+// ToAtom converts the feed response to Atom format.
+func (fr *FeedResponse) ToAtom() *AtomFeed {
+	atom := &AtomFeed{
+		Title:   fr.Feed.Title,
+		Link:    AtomLink{Href: fr.Feed.Link, Rel: "alternate"},
+		Updated: fr.Feed.UpdatedAt.Format(time.RFC3339),
+		ID:      fr.Feed.Link,
+		Author:  AtomAuthor{Name: fr.Feed.ScreenName},
+		Entries: make([]AtomEntry, 0, len(fr.Items)),
+	}
+	for _, item := range fr.Items {
+		entry := AtomEntry{
+			Title:     item.Title,
+			Link:      AtomLink{Href: item.Link},
+			ID:        item.GUID,
+			Updated:   item.PublishedAt.Format(time.RFC3339),
+			Published: item.PublishedAt.Format(time.RFC3339),
+			Author:    AtomAuthor{Name: item.Author},
+			Summary:   item.Description,
+			Content:   AtomContent{Type: "html", Text: item.Description},
+		}
+		atom.Entries = append(atom.Entries, entry)
+	}
+	return atom
+}
+
+// ToRSS converts the feed response to RSS format.
+func (fr *FeedResponse) ToRSS() *RSSFeed {
+	rss := &RSSFeed{
+		Version: "2.0",
+		Channel: RSSChannel{
+			Title:       fr.Feed.Title,
+			Link:        fr.Feed.Link,
+			Description: fr.Feed.Description,
+			Language:    "en-US",
+			PubDate:     fr.Feed.PublishedAt.Format(time.RFC1123Z),
+			Items:       make([]RSSItem, 0, len(fr.Items)),
+		},
+	}
+	for _, item := range fr.Items {
+		rssItem := RSSItem{
+			Title:       item.Title,
+			Link:        item.Link,
+			Description: item.Description,
+			Author:      item.Author,
+			Categories:  item.Categories,
+			GUID:        item.GUID,
+			PubDate:     item.PublishedAt.Format(time.RFC1123Z),
+		}
+		rss.Channel.Items = append(rss.Channel.Items, rssItem)
+	}
+	return rss
+}

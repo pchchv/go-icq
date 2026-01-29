@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -181,6 +182,119 @@ func (h *BuddyFeedHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 		response.Response.Data = feedResponse.ToJSON()
 		SendResponse(w, r, response, h.Logger)
 	case "rss", "native", "":
+		h.sendRSSFeed(w, feedResponse.ToRSS())
+	default:
+		h.sendRSSFeed(w, feedResponse.ToRSS())
+	}
+}
+
+// GetBuddylist handles GET /buddyfeed/getBuddylist requests to retrieve aggregated buddy feeds.
+func (h *BuddyFeedHandler) GetBuddylist(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// authentication required for buddy list feed
+	aimsid := r.URL.Query().Get("aimsid")
+	if aimsid == "" {
+		SendError(w, http.StatusBadRequest, "missing aimsid parameter")
+		return
+	}
+
+	// get session
+	session, err := h.SessionManager.GetSession(r.Context(), aimsid)
+	if err != nil {
+		SendError(w, http.StatusUnauthorized, "invalid or expired session")
+		return
+	}
+
+	// update session activity
+	if err := h.SessionManager.TouchSession(r.Context(), aimsid); err != nil {
+		h.Logger.WarnContext(ctx, "failed to touch session", "aimsid", aimsid, "error", err)
+	}
+
+	// get format and limit parameters
+	format := strings.ToLower(r.URL.Query().Get("f"))
+	if format == "" {
+		format = "rss"
+	}
+
+	// default limit
+	limit := 100
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+			if limit > 500 {
+				// max limit
+				limit = 500
+			}
+		}
+	}
+
+	h.Logger.DebugContext(ctx, "retrieving buddy list feed",
+		"screenName", session.ScreenName.String(),
+		"format", format,
+		"limit", limit,
+	)
+
+	// get buddy list from OSCAR session if available
+	var buddies []state.IdentScreenName
+	// return empty feed for now - buddy list integration pending
+	if len(buddies) == 0 {
+		h.Logger.InfoContext(ctx, "no buddies found for feed aggregation",
+			"screenName", session.ScreenName.String(),
+		)
+
+		// return empty feed
+		emptyFeed := map[string]interface{}{
+			"title":       fmt.Sprintf("%s's Buddy Feed", session.ScreenName.String()),
+			"description": "Aggregated feed from your buddy list",
+			"items":       []interface{}{},
+		}
+
+		if format == "json" {
+			response := BaseResponse{}
+			response.Response.StatusCode = 200
+			response.Response.StatusText = "OK"
+			response.Response.Data = emptyFeed
+			SendResponse(w, r, response, h.Logger)
+		} else {
+			h.sendEmptyRSSFeed(w, session.ScreenName.String())
+		}
+		return
+	}
+
+	// get aggregated feed items
+	items, err := h.FeedManager.GetBuddyListFeedItems(ctx, buddies, limit)
+	if err != nil {
+		h.Logger.ErrorContext(ctx, "failed to get buddy list feed",
+			"screenName", session.ScreenName.String(),
+			"error", err,
+		)
+		SendError(w, http.StatusInternalServerError, "failed to retrieve feed")
+		return
+	}
+
+	// build aggregated feed response
+	feedResponse := &FeedResponse{
+		Feed: state.BuddyFeed{
+			Title:       "Buddy List Feed",
+			Description: "Aggregated feed from your buddy list",
+			Link:        "/buddyfeed/getBuddylist",
+			PublishedAt: time.Now(),
+			UpdatedAt:   time.Now(),
+		},
+		Items: items,
+	}
+
+	// send response based on format
+	switch format {
+	case "atom":
+		h.sendAtomFeed(w, feedResponse.ToAtom())
+	case "json":
+		response := BaseResponse{}
+		response.Response.StatusCode = 200
+		response.Response.StatusText = "OK"
+		response.Response.Data = feedResponse.ToJSON()
+		SendResponse(w, r, response, h.Logger)
+	case "rss", "":
 		h.sendRSSFeed(w, feedResponse.ToRSS())
 	default:
 		h.sendRSSFeed(w, feedResponse.ToRSS())

@@ -213,3 +213,19 @@ func BuildFeedData(params map[string]string) map[string]interface{} {
 
 	return feedData
 }
+
+// GenerateEmptyFeed creates an empty feed for users without configured feeds.
+func GenerateEmptyFeed(screenName string) *FeedResponse {
+	feed := state.BuddyFeed{
+		ScreenName:  screenName,
+		Title:       screenName + "'s Feed",
+		Description: "No updates from " + screenName,
+		Link:        "/buddyfeed/getUser?u=" + screenName,
+		PublishedAt: time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	return &FeedResponse{
+		Feed:  feed,
+		Items: []state.BuddyFeedItem{},
+	}
+}

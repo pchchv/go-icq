@@ -118,3 +118,149 @@ func (h *VanityHandler) GetVanityInfo(w http.ResponseWriter, r *http.Request) {
 	response.Response.Data = responseData
 	SendResponse(w, r, response, h.Logger)
 }
+
+// SetVanityURL handles requests to set or update a vanity URL (requires authentication).
+func (h *VanityHandler) SetVanityURL(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// authentication required
+	aimsid := r.URL.Query().Get("aimsid")
+	if aimsid == "" {
+		SendError(w, http.StatusBadRequest, "missing aimsid parameter")
+		return
+	}
+
+	// get session
+	session, err := h.SessionManager.GetSession(r.Context(), aimsid)
+	if err != nil {
+		SendError(w, http.StatusUnauthorized, "invalid or expired session")
+		return
+	}
+
+	// update session activity
+	if err := h.SessionManager.TouchSession(r.Context(), aimsid); err != nil {
+		h.Logger.WarnContext(ctx, "failed to touch session", "aimsid", aimsid, "error", err)
+	}
+
+	// get vanity URL from parameters
+	vanityURL := r.URL.Query().Get("vanityUrl")
+	if vanityURL == "" {
+		SendError(w, http.StatusBadRequest, "missing vanityUrl parameter")
+		return
+	}
+
+	// collect optional profile information
+	info := make(map[string]interface{})
+	if displayName := r.URL.Query().Get("displayName"); displayName != "" {
+		info["displayName"] = displayName
+	}
+
+	if bio := r.URL.Query().Get("bio"); bio != "" {
+		info["bio"] = bio
+	}
+
+	if location := r.URL.Query().Get("location"); location != "" {
+		info["location"] = location
+	}
+
+	if website := r.URL.Query().Get("website"); website != "" {
+		info["website"] = website
+	}
+
+	h.Logger.InfoContext(ctx, "setting vanity URL",
+		"screenName", session.ScreenName.String(),
+		"vanityUrl", vanityURL,
+	)
+
+	// create or update the vanity URL
+	if err := h.VanityManager.CreateOrUpdateVanityURL(ctx, session.ScreenName.String(), vanityURL, info); err != nil {
+		h.Logger.ErrorContext(ctx, "failed to set vanity URL",
+			"screenName", session.ScreenName.String(),
+			"vanityUrl", vanityURL,
+			"error", err,
+		)
+
+		// check if it's a validation or duplicate error
+		if strings.Contains(err.Error(), "reserved") ||
+			strings.Contains(err.Error(), "already taken") ||
+			strings.Contains(err.Error(), "must be") ||
+			strings.Contains(err.Error(), "cannot") {
+			SendError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		SendError(w, http.StatusInternalServerError, "failed to set vanity URL")
+		return
+	}
+
+	// return success response with the new vanity info
+	vanityInfo, _ := h.VanityManager.GetVanityInfoByScreenName(ctx, session.ScreenName.String())
+	responseData := map[string]interface{}{
+		"success":    true,
+		"screenName": session.ScreenName.String(),
+		"vanityUrl":  vanityURL,
+	}
+
+	if vanityInfo != nil {
+		responseData["profileUrl"] = vanityInfo.ProfileURL
+	}
+
+	response := BaseResponse{}
+	response.Response.StatusCode = 200
+	response.Response.StatusText = "OK"
+	response.Response.Data = responseData
+	SendResponse(w, r, response, h.Logger)
+}
+
+// CheckAvailability handles requests to check if a vanity URL is available.
+func (h *VanityHandler) CheckAvailability(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// get vanity URL from parameters
+	vanityURL := r.URL.Query().Get("vanityUrl")
+	if vanityURL == "" {
+		SendError(w, http.StatusBadRequest, "missing vanityUrl parameter")
+		return
+	}
+
+	h.Logger.DebugContext(ctx, "checking vanity URL availability",
+		"vanityUrl", vanityURL,
+	)
+
+	// check availability
+	available, err := h.VanityManager.CheckAvailability(ctx, vanityURL)
+	if err != nil {
+		// if it's a validation error, return it as a bad request
+		if strings.Contains(err.Error(), "must be") || strings.Contains(err.Error(), "cannot") || strings.Contains(err.Error(), "can only") {
+			response := BaseResponse{}
+			response.Response.StatusCode = 200
+			response.Response.StatusText = "OK"
+			response.Response.Data = map[string]interface{}{
+				"available": false,
+				"reason":    err.Error(),
+			}
+			SendResponse(w, r, response, h.Logger)
+			return
+		}
+
+		h.Logger.ErrorContext(ctx, "failed to check availability",
+			"vanityUrl", vanityURL,
+			"error", err,
+		)
+		SendError(w, http.StatusInternalServerError, "failed to check availability")
+		return
+	}
+
+	// build response
+	responseData := map[string]interface{}{
+		"available": available,
+		"vanityUrl": vanityURL,
+	}
+	if !available {
+		responseData["reason"] = "This vanity URL is already taken or reserved"
+	}
+
+	response := BaseResponse{}
+	response.Response.StatusCode = 200
+	response.Response.StatusText = "OK"
+	response.Response.Data = responseData
+	SendResponse(w, r, response, h.Logger)
+}

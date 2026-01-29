@@ -264,3 +264,52 @@ func (h *VanityHandler) CheckAvailability(w http.ResponseWriter, r *http.Request
 	response.Response.Data = responseData
 	SendResponse(w, r, response, h.Logger)
 }
+
+// DeleteVanityURL handles requests to delete a vanity URL (requires authentication).
+func (h *VanityHandler) DeleteVanityURL(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// authentication required
+	aimsid := r.URL.Query().Get("aimsid")
+	if aimsid == "" {
+		SendError(w, http.StatusBadRequest, "missing aimsid parameter")
+		return
+	}
+
+	// get session
+	session, err := h.SessionManager.GetSession(r.Context(), aimsid)
+	if err != nil {
+		SendError(w, http.StatusUnauthorized, "invalid or expired session")
+		return
+	}
+
+	// update session activity
+	if err := h.SessionManager.TouchSession(r.Context(), aimsid); err != nil {
+		h.Logger.WarnContext(ctx, "failed to touch session", "aimsid", aimsid, "error", err)
+	}
+
+	h.Logger.InfoContext(ctx, "deleting vanity URL",
+		"screenName", session.ScreenName.String(),
+	)
+
+	// delete the vanity URL
+	if err := h.VanityManager.DeleteVanityURL(ctx, session.ScreenName.String()); err != nil {
+		h.Logger.ErrorContext(ctx, "failed to delete vanity URL",
+			"screenName", session.ScreenName.String(),
+			"error", err,
+		)
+		SendError(w, http.StatusInternalServerError, "failed to delete vanity URL")
+		return
+	}
+
+	// return success response
+	response := BaseResponse{}
+	response.Response.StatusCode = 200
+	response.Response.StatusText = "OK"
+	response.Response.Data = map[string]interface{}{
+		"success":    true,
+		"screenName": session.ScreenName.String(),
+		"message":    "Vanity URL deleted successfully",
+	}
+
+	SendResponse(w, r, response, h.Logger)
+}

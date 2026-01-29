@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"encoding/xml"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -113,4 +115,32 @@ func (h *BuddyFeedHandler) PushFeed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	SendResponse(w, r, response, h.Logger)
+}
+
+// sendRSSFeed sends an RSS feed response.
+func (h *BuddyFeedHandler) sendRSSFeed(w http.ResponseWriter, feed *RSSFeed) {
+	w.Header().Set("Content-Type", "application/rss+xml; charset=utf-8")
+	// add XML declaration
+	w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>`))
+	// marshal and write the feed
+	encoder := xml.NewEncoder(w)
+	encoder.Indent("", "  ")
+	if err := encoder.Encode(feed); err != nil {
+		h.Logger.Error("failed to encode RSS feed", "error", err)
+	}
+}
+
+// sendEmptyRSSFeed sends an empty RSS feed.
+func (h *BuddyFeedHandler) sendEmptyRSSFeed(w http.ResponseWriter, screenName string) {
+	w.Header().Set("Content-Type", "application/rss+xml; charset=utf-8")
+	emptyFeed := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>%s's Buddy Feed</title>
+    <description>Aggregated feed from your buddy list</description>
+    <link>/buddyfeed/getBuddylist</link>
+    <language>en-US</language>
+  </channel>
+</rss>`, screenName)
+	w.Write([]byte(emptyFeed))
 }

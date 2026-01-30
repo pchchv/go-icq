@@ -44,3 +44,15 @@ type StartOSCARSessionResponse struct {
 		Compression string `json:"-" xml:"compression,omitempty"`
 	} `json:"-" xml:"data"`
 }
+
+// OSCARConfig provides configuration for OSCAR services.
+type OSCARConfig interface {
+	// GetBOSAddress returns the BOS server address for client connections.
+	GetBOSAddress() (host string, port int)
+	// GetSSLBOSAddress returns the SSL-enabled BOS server address.
+	GetSSLBOSAddress() (host string, port int)
+	// IsSSLAvailable checks if SSL is configured for BOS connections.
+	IsSSLAvailable() bool
+	// IsAuthDisabled returns whether authentication is disabled.
+	IsAuthDisabled() bool
+}

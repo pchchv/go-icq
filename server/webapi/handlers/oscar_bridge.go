@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/pchchv/go-icq/state"
 )
@@ -157,4 +158,25 @@ func (h *OSCARBridgeHandler) buildResponse(host string, port int, cookie []byte,
 func (h *OSCARBridgeHandler) sendResponse(w http.ResponseWriter, r *http.Request, resp *StartOSCARSessionResponse) {
 	// Use the centralized SendResponse function which handles all formats.
 	SendResponse(w, r, resp, h.Logger)
+}
+
+// returnExistingBridge returns details for an existing OSCAR bridge.
+func (h *OSCARBridgeHandler) returnExistingBridge(w http.ResponseWriter, r *http.Request, session *state.WebAPISession) {
+	// retrieve existing bridge details from store
+	if h.BridgeStore != nil {
+		if bridge, err := h.BridgeStore.GetBridgeSession(r.Context(), session.AimSID); err == nil && bridge != nil {
+			resp := h.buildResponse(bridge.BOSHost, bridge.BOSPort, bridge.OSCARCookie, bridge.UseSSL, false)
+			h.sendResponse(w, r, resp)
+			return
+		}
+	}
+
+	// if we can't retrieve the bridge, return an error
+	h.sendError(w, r, http.StatusInternalServerError, "failed to retrieve existing bridge")
+}
+
+// parseBoolParam parses a boolean parameter from query string.
+func (h *OSCARBridgeHandler) parseBoolParam(value string) bool {
+	value = strings.ToLower(value)
+	return value == "true" || value == "1" || value == "yes"
 }

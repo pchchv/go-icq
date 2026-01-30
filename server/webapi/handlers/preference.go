@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"log/slog"
+	"net/http"
 
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
@@ -39,4 +40,38 @@ type PreferenceHandler struct {
 	PermitDenyManager PermitDenyManager
 	SessionManager    *state.WebAPISessionManager
 	Logger            *slog.Logger
+}
+
+// getDefaultPreferences returns default preference values that clients expect.
+func (h *PreferenceHandler) getDefaultPreferences() map[string]interface{} {
+	return map[string]interface{}{
+		"autoPlay":            "1",
+		"playIMSound":         "1",
+		"playBuddySound":      "1",
+		"showTimestamps":      "1",
+		"showAdsFlag":         "1",
+		"soundSetting":        "1",
+		"awayMessageOn":       "0",
+		"awayMessage":         "",
+		"confirmSignOff":      "0",
+		"skipNavigator":       "1",
+		"displayIdleTime":     "1",
+		"repliesAnyone":       "0",
+		"repliesUsersOnline":  "0",
+		"repliesBuddies":      "0",
+		"replyMessage":        "",
+		"allowAccessPresence": "0",
+		"blockIdleStatus":     "0",
+		"reportIdleTyping":    "1",
+		"smileysDisabled":     "0",
+		"sortBuddiesAlpha":    "0",
+		"statusMsg":           "",
+		"statusIcon":          "",
+		"skin":                "default",
+	}
+}
+
+// sendError sends an error response in Web AIM API format.
+func (h *PreferenceHandler) sendError(w http.ResponseWriter, statusCode int, message string) {
+	SendError(w, statusCode, message)
 }

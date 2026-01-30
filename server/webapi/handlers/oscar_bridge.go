@@ -81,3 +81,16 @@ type OSCARAuthService interface {
 	// Signout ends an OSCAR session.
 	Signout(ctx context.Context, instance *state.SessionInstance)
 }
+
+// OSCARBridgeHandler handles Web API to OSCAR protocol bridging endpoints.
+// This handler is responsible for creating a
+// bridge between web-based clients and the native OSCAR protocol,
+// allowing web clients to connect to OSCAR services.
+type OSCARBridgeHandler struct {
+	OSCARAuthService OSCARAuthService
+	SessionManager   *state.WebAPISessionManager
+	CookieBaker      CookieBaker
+	BridgeStore      OSCARBridgeStore
+	Config           OSCARConfig
+	Logger           *slog.Logger
+}

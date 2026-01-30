@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
@@ -40,6 +41,189 @@ type PreferenceHandler struct {
 	PermitDenyManager PermitDenyManager
 	SessionManager    *state.WebAPISessionManager
 	Logger            *slog.Logger
+}
+
+// GetPermitDeny handles GET /preference/getPermitDeny requests to retrieve permit/deny settings.
+func (h *PreferenceHandler) GetPermitDeny(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// get session ID from parameters
+	aimsid := r.URL.Query().Get("aimsid")
+	if aimsid == "" {
+		h.sendError(w, http.StatusBadRequest, "missing aimsid parameter")
+		return
+	}
+
+	// get session
+	session, err := h.SessionManager.GetSession(r.Context(), aimsid)
+	if err != nil {
+		h.sendError(w, http.StatusUnauthorized, "invalid or expired session")
+		return
+	}
+
+	// update session activity
+	if err := h.SessionManager.TouchSession(r.Context(), aimsid); err != nil {
+		h.Logger.WarnContext(ctx, "failed to touch session", "aimsid", aimsid, "error", err)
+	}
+
+	// get PD data
+	pdMode, _ := h.PermitDenyManager.GetPDMode(ctx, session.ScreenName.IdentScreenName())
+	permitList, _ := h.PermitDenyManager.GetPermitList(ctx, session.ScreenName.IdentScreenName())
+	denyList, _ := h.PermitDenyManager.GetDenyList(ctx, session.ScreenName.IdentScreenName())
+	// convert to string arrays
+	permitUsers := make([]string, len(permitList))
+	for i, u := range permitList {
+		permitUsers[i] = u.String()
+	}
+
+	denyUsers := make([]string, len(denyList))
+	for i, u := range denyList {
+		denyUsers[i] = u.String()
+	}
+
+	h.Logger.DebugContext(ctx, "permit/deny settings retrieved",
+		"screenName", session.ScreenName.String(),
+		"pdMode", pdMode,
+		"permitCount", len(permitUsers),
+		"denyCount", len(denyUsers),
+	)
+	// send response
+	permitDenyData := PermitDenyData{
+		PDMode:     int(pdMode),
+		PermitList: permitUsers,
+		DenyList:   denyUsers,
+	}
+	response := BaseResponse{}
+	response.Response.StatusCode = 200
+	response.Response.StatusText = "OK"
+	response.Response.Data = permitDenyData
+	SendResponse(w, r, response, h.Logger)
+}
+
+// GetPreferences handles GET /preference/get requests to retrieve user preferences.
+func (h *PreferenceHandler) GetPreferences(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// get session ID from parameters
+	aimsid := r.URL.Query().Get("aimsid")
+	if aimsid == "" {
+		h.sendError(w, http.StatusBadRequest, "missing aimsid parameter")
+		return
+	}
+
+	// get session
+	session, err := h.SessionManager.GetSession(r.Context(), aimsid)
+	if err != nil {
+		h.sendError(w, http.StatusUnauthorized, "invalid or expired session")
+		return
+	}
+
+	// update session activity
+	if err := h.SessionManager.TouchSession(r.Context(), aimsid); err != nil {
+		h.Logger.WarnContext(ctx, "failed to touch session", "aimsid", aimsid, "error", err)
+	}
+
+	// get target user (optional, defaults to session user)
+	targetUser := session.ScreenName.IdentScreenName()
+	if t := r.URL.Query().Get("t"); t != "" {
+		targetUser = state.NewIdentScreenName(t)
+	}
+
+	// get all stored preferences or defaults
+	allPrefs, err := h.PreferenceManager.GetPreferences(ctx, targetUser)
+	if err != nil {
+		h.Logger.ErrorContext(ctx, "failed to get preferences", "err", err.Error())
+		allPrefs = h.getDefaultPreferences()
+	}
+
+	if len(allPrefs) == 0 {
+		allPrefs = h.getDefaultPreferences()
+	}
+
+	// check if specific preferences are being requested
+	requestedPrefs := make(map[string]interface{})
+	defaultPrefs := h.getDefaultPreferences()
+	// check each known preference key in the query parameters
+	// when a preference appears in the query (e.g., playIMSound=1),
+	// the client is requesting that specific preference value
+	for key := range defaultPrefs {
+		if r.URL.Query().Has(key) {
+			// client is requesting this specific preference
+			if prefValue, exists := allPrefs[key]; exists {
+				requestedPrefs[key] = prefValue
+			} else {
+				requestedPrefs[key] = defaultPrefs[key]
+			}
+		}
+	}
+
+	// if no specific preferences were requested, return all
+	var prefs map[string]interface{}
+	if len(requestedPrefs) > 0 {
+		prefs = requestedPrefs
+	} else {
+		prefs = allPrefs
+	}
+
+	h.Logger.DebugContext(ctx, "preferences retrieved",
+		"screenName", targetUser.String(),
+		"prefCount", len(prefs),
+		"requested", len(requestedPrefs) > 0,
+	)
+	// check for AMF format to handle special Gromit compatibility requirements
+	format := strings.ToLower(r.URL.Query().Get("f"))
+	if format == "amf" || format == "amf3" {
+		// convert string "1"/"0" to numeric values for Gromit compatibility
+		// Gromit expects numeric values for boolean preferences
+		convertedPrefs := make(map[string]interface{})
+		for key, val := range prefs {
+			switch v := val.(type) {
+			case string:
+				switch v {
+				case "1":
+					convertedPrefs[key] = 1
+				case "0":
+					convertedPrefs[key] = 0
+				}
+			default:
+				// keep non-boolean values as strings
+				convertedPrefs[key] = val
+			}
+		}
+
+		prefs = convertedPrefs
+		h.Logger.DebugContext(ctx, "AMF preference response",
+			"prefs", prefs,
+			"prefCount", len(prefs),
+			"format", format,
+		)
+
+		// ensure prefs is never nil or empty for Gromit
+		if len(prefs) == 0 {
+			// if no preferences found, at least return the requested ones with defaults
+			if len(requestedPrefs) > 0 {
+				prefs = requestedPrefs
+			} else {
+				// return playIMSound as default if nothing else
+				prefs = map[string]interface{}{
+					"playIMSound": 1,
+				}
+			}
+		}
+
+		// for single preference requests, return directly for Gromit compatibility
+		// for multiple preferences, wrap in jsonData
+		if len(prefs) != 1 {
+			prefs = map[string]interface{}{
+				"jsonData": prefs,
+			}
+		}
+	}
+
+	// send response in requested format
+	response := BaseResponse{}
+	response.Response.StatusCode = 200
+	response.Response.StatusText = "OK"
+	response.Response.Data = prefs
+	SendResponse(w, r, response, h.Logger)
 }
 
 // getDefaultPreferences returns default preference values that clients expect.

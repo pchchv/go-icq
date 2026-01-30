@@ -1,6 +1,11 @@
 package handlers
 
-import "encoding/xml"
+import (
+	"context"
+	"encoding/xml"
+
+	"github.com/pchchv/go-icq/state"
+)
 
 // CookieBaker issues and validates authentication cookies for OSCAR services.
 type CookieBaker interface {
@@ -65,4 +70,14 @@ type OSCARBridgeStore interface {
 	GetBridgeSession(ctx context.Context, webSessionID string) (*state.OSCARBridgeSession, error)
 	// DeleteBridgeSession removes a bridge session.
 	DeleteBridgeSession(ctx context.Context, webSessionID string) error
+}
+
+// OSCARAuthService defines methods needed for OSCAR authentication and session management.
+type OSCARAuthService interface {
+	// RegisterBOSSession creates a new BOS (Basic OSCAR Service) sessio0n.
+	RegisterBOSSession(ctx context.Context, authCookie state.ServerCookie) (*state.SessionInstance, error)
+	// RetrieveBOSSession retrieves an existing BOS session.
+	RetrieveBOSSession(ctx context.Context, authCookie state.ServerCookie) (*state.SessionInstance, error)
+	// Signout ends an OSCAR session.
+	Signout(ctx context.Context, instance *state.SessionInstance)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/pchchv/go-icq/state"
@@ -219,6 +220,207 @@ func (h *PreferenceHandler) GetPreferences(w http.ResponseWriter, r *http.Reques
 	}
 
 	// send response in requested format
+	response := BaseResponse{}
+	response.Response.StatusCode = 200
+	response.Response.StatusText = "OK"
+	response.Response.Data = prefs
+	SendResponse(w, r, response, h.Logger)
+}
+
+// SetPermitDeny handles GET /preference/setPermitDeny requests to update permit/deny settings.
+func (h *PreferenceHandler) SetPermitDeny(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// get session ID from parameters
+	aimsid := r.URL.Query().Get("aimsid")
+	if aimsid == "" {
+		h.sendError(w, http.StatusBadRequest, "missing aimsid parameter")
+		return
+	}
+
+	// get session
+	session, err := h.SessionManager.GetSession(r.Context(), aimsid)
+	if err != nil {
+		h.sendError(w, http.StatusUnauthorized, "invalid or expired session")
+		return
+	}
+
+	// update session activity
+	if err := h.SessionManager.TouchSession(r.Context(), aimsid); err != nil {
+		h.Logger.WarnContext(ctx, "failed to touch session", "aimsid", aimsid, "error", err)
+	}
+
+	// get pdMode parameter
+	if pdModeStr := r.URL.Query().Get("pdMode"); pdModeStr != "" {
+		pdMode, err := strconv.Atoi(pdModeStr)
+		if err != nil || pdMode < 0 || pdMode > 5 {
+			h.sendError(w, http.StatusBadRequest, "invalid pdMode value (must be 0-5)")
+			return
+		}
+
+		// set the PD mode
+		if err = h.PermitDenyManager.SetPDMode(ctx, session.ScreenName.IdentScreenName(), wire.FeedbagPDMode(pdMode)); err != nil {
+			h.Logger.ErrorContext(ctx, "failed to set PD mode", "err", err.Error())
+			h.sendError(w, http.StatusInternalServerError, "failed to update PD mode")
+			return
+		}
+	}
+
+	// handle permit list updates
+	if permitAdd := r.URL.Query().Get("permitAdd"); permitAdd != "" {
+		users := strings.Split(permitAdd, ",")
+		for _, user := range users {
+			if user = strings.TrimSpace(user); user != "" {
+				targetSN := state.NewIdentScreenName(user)
+				if err := h.PermitDenyManager.AddPermitBuddy(ctx, session.ScreenName.IdentScreenName(), targetSN); err != nil {
+					h.Logger.ErrorContext(ctx, "failed to add to permit list", "user", user, "err", err.Error())
+				}
+			}
+		}
+	}
+
+	if permitRemove := r.URL.Query().Get("permitRemove"); permitRemove != "" {
+		users := strings.Split(permitRemove, ",")
+		for _, user := range users {
+			if user = strings.TrimSpace(user); user != "" {
+				targetSN := state.NewIdentScreenName(user)
+				if err := h.PermitDenyManager.RemovePermitBuddy(ctx, session.ScreenName.IdentScreenName(), targetSN); err != nil {
+					h.Logger.ErrorContext(ctx, "failed to remove from permit list", "user", user, "err", err.Error())
+				}
+			}
+		}
+	}
+
+	// handle deny list updates
+	if denyAdd := r.URL.Query().Get("denyAdd"); denyAdd != "" {
+		users := strings.Split(denyAdd, ",")
+		for _, user := range users {
+			if user = strings.TrimSpace(user); user != "" {
+				targetSN := state.NewIdentScreenName(user)
+				if err := h.PermitDenyManager.AddDenyBuddy(ctx, session.ScreenName.IdentScreenName(), targetSN); err != nil {
+					h.Logger.ErrorContext(ctx, "failed to add to deny list", "user", user, "err", err.Error())
+				}
+			}
+		}
+	}
+
+	if denyRemove := r.URL.Query().Get("denyRemove"); denyRemove != "" {
+		users := strings.Split(denyRemove, ",")
+		for _, user := range users {
+			if user = strings.TrimSpace(user); user != "" {
+				targetSN := state.NewIdentScreenName(user)
+				if err := h.PermitDenyManager.RemoveDenyBuddy(ctx, session.ScreenName.IdentScreenName(), targetSN); err != nil {
+					h.Logger.ErrorContext(ctx, "failed to remove from deny list", "user", user, "err", err.Error())
+				}
+			}
+		}
+	}
+
+	// get updated PD data
+	pdMode, _ := h.PermitDenyManager.GetPDMode(ctx, session.ScreenName.IdentScreenName())
+	permitList, _ := h.PermitDenyManager.GetPermitList(ctx, session.ScreenName.IdentScreenName())
+	denyList, _ := h.PermitDenyManager.GetDenyList(ctx, session.ScreenName.IdentScreenName())
+	// convert to string arrays
+	permitUsers := make([]string, len(permitList))
+	for i, u := range permitList {
+		permitUsers[i] = u.String()
+	}
+
+	denyUsers := make([]string, len(denyList))
+	for i, u := range denyList {
+		denyUsers[i] = u.String()
+	}
+
+	h.Logger.DebugContext(ctx, "permit/deny settings updated",
+		"screenName", session.ScreenName.String(),
+		"pdMode", pdMode,
+		"permitCount", len(permitUsers),
+		"denyCount", len(denyUsers),
+	)
+	// NOTE: We don't broadcast immediate presence changes here.
+	// The blocking relationship is now in the database and will be
+	// respected by all future presence checks and message routing.
+	// The blocked users will appear offline to each other on the next presence update.
+
+	// send response
+	permitDenyData := PermitDenyData{
+		PDMode:     int(pdMode),
+		PermitList: permitUsers,
+		DenyList:   denyUsers,
+	}
+	response := BaseResponse{}
+	response.Response.StatusCode = 200
+	response.Response.StatusText = "OK"
+	response.Response.Data = permitDenyData
+	SendResponse(w, r, response, h.Logger)
+}
+
+// SetPreferences handles GET /preference/set requests to update user preferences.
+func (h *PreferenceHandler) SetPreferences(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	// get session ID from parameters
+	aimsid := r.URL.Query().Get("aimsid")
+	if aimsid == "" {
+		h.sendError(w, http.StatusBadRequest, "missing aimsid parameter")
+		return
+	}
+
+	// get session
+	session, err := h.SessionManager.GetSession(r.Context(), aimsid)
+	if err != nil {
+		h.sendError(w, http.StatusUnauthorized, "invalid or expired session")
+		return
+	}
+
+	// update session activity
+	if err := h.SessionManager.TouchSession(r.Context(), aimsid); err != nil {
+		h.Logger.WarnContext(ctx, "failed to touch session", "aimsid", aimsid, "error", err)
+	}
+
+	// parse preferences from query parameters
+	prefs := make(map[string]interface{})
+	// common preference keys from the Web AIM API spec
+	prefKeys := []string{
+		"statusMsg", "awayMsg", "profileMsg", "buddyIcon",
+		"soundsOn", "alertsOn", "typingStatus", "idleTime",
+		"pdMode", "invisibleTo", "visibleTo", "blockList",
+		"allowList", "language", "timeZone", "dateFormat",
+		"showTimestamps", "fontSize", "fontFamily", "theme",
+		"autoResponse", "saveHistory", "encryptMessages",
+	}
+
+	// extract preferences from query parameters
+	for _, key := range prefKeys {
+		if val := r.URL.Query().Get(key); val != "" {
+			// try to parse as boolean
+			if val == "true" || val == "false" {
+				prefs[key] = val == "true"
+			} else if num, err := strconv.Atoi(val); err == nil {
+				// try to parse as integer
+				prefs[key] = num
+			} else {
+				// store as string
+				prefs[key] = val
+			}
+		}
+	}
+
+	// allow any other parameters starting with "pref_" for extensibility
+	for key, values := range r.URL.Query() {
+		if strings.HasPrefix(key, "pref_") && len(values) > 0 {
+			actualKey := strings.TrimPrefix(key, "pref_")
+			prefs[actualKey] = values[0]
+		}
+	}
+
+	// save preferences
+	if err := h.PreferenceManager.SetPreferences(ctx, session.ScreenName.IdentScreenName(), prefs); err != nil {
+		h.Logger.ErrorContext(ctx, "failed to set preferences", "err", err.Error())
+		h.sendError(w, http.StatusInternalServerError, "failed to save preferences")
+		return
+	}
+
+	h.Logger.DebugContext(ctx, "preferences updated", "screenName", session.ScreenName.String(), "prefCount", len(prefs))
+	// send success response
 	response := BaseResponse{}
 	response.Response.StatusCode = 200
 	response.Response.StatusText = "OK"

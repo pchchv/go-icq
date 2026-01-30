@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
@@ -30,4 +31,12 @@ type PermitDenyManager interface {
 	RemovePermitBuddy(ctx context.Context, me state.IdentScreenName, them state.IdentScreenName) error
 	AddDenyBuddy(ctx context.Context, me state.IdentScreenName, them state.IdentScreenName) error
 	RemoveDenyBuddy(ctx context.Context, me state.IdentScreenName, them state.IdentScreenName) error
+}
+
+// PreferenceHandler handles Web AIM API preference-related endpoints.
+type PreferenceHandler struct {
+	PreferenceManager PreferenceManager
+	PermitDenyManager PermitDenyManager
+	SessionManager    *state.WebAPISessionManager
+	Logger            *slog.Logger
 }

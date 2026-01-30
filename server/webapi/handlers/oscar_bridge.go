@@ -7,3 +7,10 @@ type CookieBaker interface {
 	// Crack verifies and decodes an authentication cookie.
 	Crack(data []byte) ([]byte, error)
 }
+
+// StartOSCARSessionRequest represents the request parameters for startOSCARSession.
+type StartOSCARSessionRequest struct {
+	AimSID   string // WebAPI session ID
+	UseSSL   bool   // Whether to use SSL for the OSCAR connection
+	Compress bool   // Whether to use compression (not implemented)
+}

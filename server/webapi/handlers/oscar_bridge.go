@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/xml"
 	"log/slog"
 	"net/http"
@@ -118,4 +119,42 @@ func (h *OSCARBridgeHandler) hasOSCARBridgeCapability(apiKey *state.WebAPIKey) b
 func (h *OSCARBridgeHandler) sendError(w http.ResponseWriter, _ *http.Request, statusCode int, message string) {
 	// SendError already detects format from Content-Type header.
 	SendError(w, statusCode, message)
+}
+
+// buildResponse constructs the response object.
+func (h *OSCARBridgeHandler) buildResponse(host string, port int, cookie []byte, useSSL, compress bool) *StartOSCARSessionResponse {
+	resp := &StartOSCARSessionResponse{}
+	resp.Response.StatusCode = 200
+	resp.Response.StatusText = "OK"
+	resp.Response.Data.Host = host
+	resp.Response.Data.Port = port
+	resp.Response.Data.Cookie = hex.EncodeToString(cookie) // hex encode the cookie
+	resp.Response.Data.UseSSL = useSSL
+
+	// add encryption info if SSL is used
+	if useSSL {
+		resp.Response.Data.Encryption = "TLS"
+	}
+
+	// add compression info if requested (not implemented)
+	if compress {
+		resp.Response.Data.Compression = "none" // Compression not implemented
+	}
+
+	// duplicate data for XML format
+	resp.StatusCode = resp.Response.StatusCode
+	resp.StatusText = resp.Response.StatusText
+	resp.Data.Host = resp.Response.Data.Host
+	resp.Data.Port = resp.Response.Data.Port
+	resp.Data.Cookie = resp.Response.Data.Cookie
+	resp.Data.UseSSL = resp.Response.Data.UseSSL
+	resp.Data.Encryption = resp.Response.Data.Encryption
+	resp.Data.Compression = resp.Response.Data.Compression
+	return resp
+}
+
+// sendResponse sends the response in the requested format.
+func (h *OSCARBridgeHandler) sendResponse(w http.ResponseWriter, r *http.Request, resp *StartOSCARSessionResponse) {
+	// Use the centralized SendResponse function which handles all formats.
+	SendResponse(w, r, resp, h.Logger)
 }

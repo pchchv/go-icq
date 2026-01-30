@@ -56,3 +56,13 @@ type OSCARConfig interface {
 	// IsAuthDisabled returns whether authentication is disabled.
 	IsAuthDisabled() bool
 }
+
+// OSCARBridgeStore manages the persistence of OSCAR bridge sessions.
+type OSCARBridgeStore interface {
+	// SaveBridgeSession stores the mapping between WebAPI and OSCAR sessions.
+	SaveBridgeSession(ctx context.Context, webSessionID string, oscarCookie []byte, bosHost string, bosPort int) error
+	// GetBridgeSession retrieves bridge session details.
+	GetBridgeSession(ctx context.Context, webSessionID string) (*state.OSCARBridgeSession, error)
+	// DeleteBridgeSession removes a bridge session.
+	DeleteBridgeSession(ctx context.Context, webSessionID string) error
+}

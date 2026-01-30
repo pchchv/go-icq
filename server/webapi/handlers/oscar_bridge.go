@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"encoding/xml"
+	"log/slog"
+	"net/http"
 
 	"github.com/pchchv/go-icq/state"
 )
@@ -93,4 +95,27 @@ type OSCARBridgeHandler struct {
 	BridgeStore      OSCARBridgeStore
 	Config           OSCARConfig
 	Logger           *slog.Logger
+}
+
+// hasOSCARBridgeCapability checks if the API key has permission to create OSCAR bridges.
+func (h *OSCARBridgeHandler) hasOSCARBridgeCapability(apiKey *state.WebAPIKey) bool {
+	if len(apiKey.Capabilities) == 0 {
+		// no restrictions if capabilities not specified
+		return true
+	}
+
+	// check if OSCAR bridge is explicitly enabled
+	for _, cap := range apiKey.Capabilities {
+		if cap == "oscar_bridge" || cap == "*" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// sendError sends an error response in the appropriate format.
+func (h *OSCARBridgeHandler) sendError(w http.ResponseWriter, _ *http.Request, statusCode int, message string) {
+	// SendError already detects format from Content-Type header.
+	SendError(w, statusCode, message)
 }

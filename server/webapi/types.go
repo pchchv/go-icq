@@ -51,3 +51,10 @@ type BuddyService interface {
 	DelBuddies(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x03_0x05_BuddyDelBuddies) error
 	RightsQuery(ctx context.Context, inFrame wire.SNACFrame) wire.SNACMessage
 }
+
+// BuddyListRegistry is the interface for keeping track of users with active buddy lists.
+// Once registered, a user becomes visible to other users' buddy lists and vice versa.
+type BuddyListRegistry interface {
+	RegisterBuddyList(ctx context.Context, user state.IdentScreenName) error
+	UnregisterBuddyList(ctx context.Context, user state.IdentScreenName) error
+}

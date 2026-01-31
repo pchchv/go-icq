@@ -88,3 +88,9 @@ type AuthService interface {
 type AdminService interface {
 	InfoChangeRequest(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x07_0x04_AdminInfoChangeRequest) (wire.SNACMessage, error)
 }
+
+// SessionRetriever provides methods to retrieve OSCAR sessions.
+type SessionRetriever interface {
+	AllSessions() []*state.Session
+	RetrieveSession(screenName state.IdentScreenName) *state.Session
+}

@@ -84,3 +84,7 @@ type AuthService interface {
 	Signout(ctx context.Context, instance *state.SessionInstance)
 	SignoutChat(ctx context.Context, instance *state.SessionInstance)
 }
+
+type AdminService interface {
+	InfoChangeRequest(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x07_0x04_AdminInfoChangeRequest) (wire.SNACMessage, error)
+}

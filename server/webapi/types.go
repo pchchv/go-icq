@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/pchchv/go-icq/state"
+	"github.com/pchchv/go-icq/wire"
 )
 
 // OSCARConfig provides configuration for OSCAR services.
@@ -20,4 +21,8 @@ type OSCARBridgeStore interface {
 	SaveBridgeSessionWithDetails(ctx context.Context, session *state.OSCARBridgeSession) error
 	GetBridgeSession(ctx context.Context, webSessionID string) (*state.OSCARBridgeSession, error)
 	DeleteBridgeSession(ctx context.Context, webSessionID string) error
+}
+
+type ChatService interface {
+	ChannelMsgToHost(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x0E_0x05_ChatChannelMsgToHost) (*wire.SNACMessage, error)
 }

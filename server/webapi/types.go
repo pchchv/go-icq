@@ -66,3 +66,9 @@ type FeedbagManager interface {
 	UpdateItem(ctx context.Context, screenName state.IdentScreenName, item wire.FeedbagItem) error
 	DeleteItem(ctx context.Context, screenName state.IdentScreenName, item wire.FeedbagItem) error
 }
+
+// FeedbagRetriever provides methods to retrieve buddy list data.
+type FeedbagRetriever interface {
+	RetrieveFeedbag(ctx context.Context, screenName state.IdentScreenName) ([]wire.FeedbagItem, error)
+	RelationshipsByUser(ctx context.Context, screenName state.IdentScreenName) ([]state.IdentScreenName, error)
+}

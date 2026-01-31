@@ -102,3 +102,9 @@ type TOCConfigStore interface {
 	SetTOCConfig(ctx context.Context, user state.IdentScreenName, config string) error
 	User(ctx context.Context, screenName state.IdentScreenName) (*state.User, error)
 }
+
+type OServiceService interface {
+	ClientOnline(ctx context.Context, service uint16, inBody wire.SNAC_0x01_0x02_OServiceClientOnline, instance *state.SessionInstance) error
+	IdleNotification(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x01_0x11_OServiceIdleNotification) error
+	ServiceRequest(ctx context.Context, service uint16, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x01_0x04_OServiceServiceRequest, listener config.Listener) (wire.SNACMessage, error)
+}

@@ -116,3 +116,7 @@ type ICBMService interface {
 	ParameterQuery(ctx context.Context, inFrame wire.SNACFrame) wire.SNACMessage
 	ClientErr(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x04_0x0B_ICBMClientErr) error
 }
+
+type DirSearchService interface {
+	InfoQuery(ctx context.Context, inFrame wire.SNACFrame, inBody wire.SNAC_0x0F_0x02_InfoQuery) (wire.SNACMessage, error)
+}

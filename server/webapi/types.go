@@ -186,3 +186,8 @@ type BuddyBroadcaster interface {
 	BroadcastBuddyArrived(ctx context.Context, screenName state.IdentScreenName, userInfo wire.TLVUserInfo) error
 	BroadcastBuddyDeparted(ctx context.Context, instance *state.SessionInstance) error
 }
+
+// MessageRelayer relays messages between users.
+type MessageRelayer interface {
+	RelayToScreenName(ctx context.Context, recipient state.IdentScreenName, msg wire.SNACMessage)
+}

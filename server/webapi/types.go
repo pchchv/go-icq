@@ -135,3 +135,9 @@ type PermitDenyService interface {
 	DelPermListEntries(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x09_0x06_PermitDenyDelPermListEntries) error
 	RightsQuery(ctx context.Context, inFrame wire.SNACFrame) wire.SNACMessage
 }
+
+// PreferenceManager provides methods to manage user preferences.
+type PreferenceManager interface {
+	SetPreferences(ctx context.Context, screenName state.IdentScreenName, prefs map[string]interface{}) error
+	GetPreferences(ctx context.Context, screenName state.IdentScreenName) (map[string]interface{}, error)
+}

@@ -94,3 +94,11 @@ type SessionRetriever interface {
 	AllSessions() []*state.Session
 	RetrieveSession(screenName state.IdentScreenName) *state.Session
 }
+
+type TOCConfigStore interface {
+	// SetTOCConfig sets the user's TOC config.
+	// The TOC config is the server-side buddy list functionality for TOC.
+	// This configuration is not available to OSCAR clients.
+	SetTOCConfig(ctx context.Context, user state.IdentScreenName, config string) error
+	User(ctx context.Context, screenName state.IdentScreenName) (*state.User, error)
+}

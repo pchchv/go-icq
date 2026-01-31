@@ -2,7 +2,10 @@ package webapi
 
 import (
 	"context"
+	"time"
 
+	"github.com/google/uuid"
+	"github.com/pchchv/go-icq/config"
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 )
@@ -190,4 +193,10 @@ type BuddyBroadcaster interface {
 // MessageRelayer relays messages between users.
 type MessageRelayer interface {
 	RelayToScreenName(ctx context.Context, recipient state.IdentScreenName, msg wire.SNACMessage)
+}
+
+// ProfileManager manages user profiles.
+type ProfileManager interface {
+	SetProfile(ctx context.Context, screenName state.IdentScreenName, profile state.UserProfile) error
+	Profile(ctx context.Context, screenName state.IdentScreenName) (state.UserProfile, error)
 }

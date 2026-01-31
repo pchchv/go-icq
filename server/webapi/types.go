@@ -153,3 +153,13 @@ type PermitDenyManager interface {
 	AddDenyBuddy(ctx context.Context, me state.IdentScreenName, them state.IdentScreenName) error
 	RemoveDenyBuddy(ctx context.Context, me state.IdentScreenName, them state.IdentScreenName) error
 }
+
+// UserManager defines methods for user authentication.
+type UserManager interface {
+	// AuthenticateUser verifies username and password
+	AuthenticateUser(ctx context.Context, username, password string) (*state.User, error)
+	// FindUserByScreenName finds a user by their screen name
+	FindUserByScreenName(ctx context.Context, screenName state.IdentScreenName) (*state.User, error)
+	// InsertUser creates a new user (for DISABLE_AUTH mode)
+	InsertUser(ctx context.Context, u state.User) error
+}

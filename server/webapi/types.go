@@ -180,3 +180,9 @@ type OfflineMessageManager interface {
 	RetrieveMessages(ctx context.Context, recipient state.IdentScreenName) ([]state.OfflineMessage, error)
 	DeleteMessages(ctx context.Context, recipient state.IdentScreenName) error
 }
+
+// BuddyBroadcaster broadcasts buddy presence updates.
+type BuddyBroadcaster interface {
+	BroadcastBuddyArrived(ctx context.Context, screenName state.IdentScreenName, userInfo wire.TLVUserInfo) error
+	BroadcastBuddyDeparted(ctx context.Context, instance *state.SessionInstance) error
+}

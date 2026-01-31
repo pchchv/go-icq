@@ -33,3 +33,14 @@ type ChatNavService interface {
 	RequestChatRights(ctx context.Context, inFrame wire.SNACFrame) wire.SNACMessage
 	RequestRoomInfo(ctx context.Context, inFrame wire.SNACFrame, inBody wire.SNAC_0x0D_0x04_ChatNavRequestRoomInfo) (wire.SNACMessage, error)
 }
+
+// CookieBaker defines methods for issuing and verifying AIM authentication tokens ("cookies").
+// These tokens are used for authenticating client sessions with AIM services.
+type CookieBaker interface {
+	// Crack verifies and decodes a previously issued authentication token.
+	// Returns the original payload if the token is valid.
+	Crack(data []byte) ([]byte, error)
+	// Issue creates a new authentication token from the given payload.
+	// The resulting token can later be verified using Crack.
+	Issue(data []byte) ([]byte, error)
+}

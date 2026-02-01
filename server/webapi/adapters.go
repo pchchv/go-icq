@@ -11,6 +11,12 @@ import (
 	"github.com/pchchv/go-icq/wire"
 )
 
+// FeedbagAdapter wraps SQLiteUserStore to implement
+// FeedbagRetriever and FeedbagManager interfaces.
+type FeedbagAdapter struct {
+	Store *state.SQLiteUserStore
+}
+
 // TypingNotificationToWebAPIEvent converts an OSCAR typing notification to a WebAPI event.
 func TypingNotificationToWebAPIEvent(notification wire.SNAC_0x04_0x14_ICBMClientEvent) types.Event {
 	typing := false

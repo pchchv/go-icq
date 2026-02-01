@@ -112,3 +112,29 @@ func WebAPIToICBM(sender state.IdentScreenName, recipient string, message string
 
 	return icbmMsg, nil
 }
+
+// PresenceUpdateToWebAPIEvent converts OSCAR buddy arrival/departure to WebAPI event.
+func PresenceUpdateToWebAPIEvent(screenName string, online bool, awayMsg string, statusBitmask uint32) types.Event {
+	stateStr := "offline"
+	if online {
+		if statusBitmask&wire.OServiceUserStatusAway != 0 {
+			stateStr = "away"
+		} else if statusBitmask&wire.OServiceUserStatusDND != 0 {
+			stateStr = "dnd"
+		} else if statusBitmask&wire.OServiceUserStatusInvisible != 0 {
+			stateStr = "invisible"
+		} else {
+			stateStr = "online"
+		}
+	}
+
+	return types.Event{
+		Type:      types.EventTypePresence,
+		Timestamp: time.Now().Unix(),
+		Data: types.PresenceEvent{
+			AimID:   screenName,
+			State:   stateStr,
+			AwayMsg: awayMsg,
+		},
+	}
+}

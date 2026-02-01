@@ -17,3 +17,18 @@ func NewOSCARConfigAdapter(cfg config.Config) *OSCARConfigAdapter {
 		listeners: listeners,
 	}
 }
+
+// IsSSLAvailable checks if any listener has SSL configured.
+func (a *OSCARConfigAdapter) IsSSLAvailable() bool {
+	for _, listener := range a.listeners {
+		if listener.HasSSL {
+			return true
+		}
+	}
+	return false
+}
+
+// IsAuthDisabled returns whether authentication is disabled.
+func (a *OSCARConfigAdapter) IsAuthDisabled() bool {
+	return a.cfg.DisableAuth
+}

@@ -36,6 +36,36 @@ func (f *FeedbagAdapter) DeleteItem(ctx context.Context, screenName state.IdentS
 	return f.Store.FeedbagDelete(ctx, screenName, []wire.FeedbagItem{item})
 }
 
+// RelationshipsByUser implements FeedbagRetriever interface.
+// Returns the list of users who have this user in their buddy list.
+func (f *FeedbagAdapter) RelationshipsByUser(ctx context.Context, screenName state.IdentScreenName) ([]state.IdentScreenName, error) {
+	// get all relationships where this user is involved
+	relationships, err := f.Store.AllRelationships(ctx, screenName, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// extract unique screen names from relationships
+	uniqueUsers := make(map[state.IdentScreenName]bool)
+	for _, rel := range relationships {
+		// add the user from the relationship
+		uniqueUsers[rel.User] = true
+	}
+
+	// convert map to slice
+	users := make([]state.IdentScreenName, 0, len(uniqueUsers))
+	for user := range uniqueUsers {
+		users = append(users, user)
+	}
+
+	return users, nil
+}
+
+// RetrieveFeedbag implements FeedbagRetriever interface.
+func (f *FeedbagAdapter) RetrieveFeedbag(ctx context.Context, screenName state.IdentScreenName) ([]wire.FeedbagItem, error) {
+	return f.Store.Feedbag(ctx, screenName)
+}
+
 // TypingNotificationToWebAPIEvent converts an OSCAR typing notification to a WebAPI event.
 func TypingNotificationToWebAPIEvent(notification wire.SNAC_0x04_0x14_ICBMClientEvent) types.Event {
 	typing := false

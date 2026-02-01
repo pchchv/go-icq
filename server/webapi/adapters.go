@@ -2,6 +2,7 @@ package webapi
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/binary"
 	"time"
@@ -15,6 +16,24 @@ import (
 // FeedbagRetriever and FeedbagManager interfaces.
 type FeedbagAdapter struct {
 	Store *state.SQLiteUserStore
+}
+
+// InsertItem implements FeedbagManager interface.
+func (f *FeedbagAdapter) InsertItem(ctx context.Context, screenName state.IdentScreenName, item wire.FeedbagItem) error {
+	// use FeedbagUpsert to insert a new item
+	return f.Store.FeedbagUpsert(ctx, screenName, []wire.FeedbagItem{item})
+}
+
+// UpdateItem implements FeedbagManager interface.
+func (f *FeedbagAdapter) UpdateItem(ctx context.Context, screenName state.IdentScreenName, item wire.FeedbagItem) error {
+	// use FeedbagUpsert to update an existing item
+	return f.Store.FeedbagUpsert(ctx, screenName, []wire.FeedbagItem{item})
+}
+
+// DeleteItem implements FeedbagManager interface.
+func (f *FeedbagAdapter) DeleteItem(ctx context.Context, screenName state.IdentScreenName, item wire.FeedbagItem) error {
+	// use FeedbagDelete to remove an item
+	return f.Store.FeedbagDelete(ctx, screenName, []wire.FeedbagItem{item})
 }
 
 // TypingNotificationToWebAPIEvent converts an OSCAR typing notification to a WebAPI event.

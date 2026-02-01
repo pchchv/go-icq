@@ -1,9 +1,13 @@
 package webapi
 
 import (
+	"bytes"
+	"crypto/rand"
+	"encoding/binary"
 	"time"
 
 	"github.com/pchchv/go-icq/server/webapi/types"
+	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 )
 
@@ -64,4 +68,47 @@ func ICBMToWebAPIEvent(icbm wire.SNAC_0x04_0x07_ICBMChannelMsgToClient) (types.E
 	}
 
 	return event, nil
+}
+
+// WebAPIToICBM converts a Web API message to OSCAR ICBM format.
+func WebAPIToICBM(sender state.IdentScreenName, recipient string, message string, autoResponse bool) (wire.SNAC_0x04_0x06_ICBMChannelMsgToHost, error) {
+	// generate message cookie
+	var cookie [8]byte
+	if _, err := rand.Read(cookie[:]); err != nil {
+		return wire.SNAC_0x04_0x06_ICBMChannelMsgToHost{}, err
+	}
+
+	cookieUint64 := binary.BigEndian.Uint64(cookie[:])
+	// create ICBM fragment list for the message
+	frags, err := wire.ICBMFragmentList(message)
+	if err != nil {
+		return wire.SNAC_0x04_0x06_ICBMChannelMsgToHost{}, err
+	}
+
+	// marshal the fragments
+	buf := &bytes.Buffer{}
+	for _, frag := range frags {
+		if err := wire.MarshalBE(frag, buf); err != nil {
+			return wire.SNAC_0x04_0x06_ICBMChannelMsgToHost{}, err
+		}
+	}
+
+	// build ICBM message
+	icbmMsg := wire.SNAC_0x04_0x06_ICBMChannelMsgToHost{
+		Cookie:     cookieUint64,
+		ChannelID:  wire.ICBMChannelIM,
+		ScreenName: recipient,
+		TLVRestBlock: wire.TLVRestBlock{
+			TLVList: wire.TLVList{
+				wire.NewTLVBE(wire.ICBMTLVAOLIMData, buf.Bytes()),
+			},
+		},
+	}
+
+	// add auto-response flag if applicable
+	if autoResponse {
+		icbmMsg.Append(wire.NewTLVBE(wire.ICBMTLVAutoResponse, []byte{}))
+	}
+
+	return icbmMsg, nil
 }

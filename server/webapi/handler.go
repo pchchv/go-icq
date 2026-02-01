@@ -2,7 +2,9 @@ package webapi
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"net/http"
 
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
@@ -51,7 +53,7 @@ type Handler struct {
 	ChatManager *state.WebAPIChatManager
 }
 
-// func (h Handler) GetHelloWorldHandler(w http.ResponseWriter, r *http.Request) {
-// 	h.Logger.Info("got a request to the root endpoint", "method", r.Method, "path", r.URL.Path)
-// 	_, _ = fmt.Fprintf(w, "WebAPI Server Running\n")
-// }
+func (h Handler) GetHelloWorldHandler(w http.ResponseWriter, r *http.Request) {
+	h.Logger.Info("got a request to the root endpoint", "method", r.Method, "path", r.URL.Path)
+	_, _ = fmt.Fprintf(w, "WebAPI Server Running\n")
+}

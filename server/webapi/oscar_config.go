@@ -1,6 +1,8 @@
 package webapi
 
 import (
+	"net"
+	"strconv"
 	"strings"
 
 	"github.com/pchchv/go-icq/config"
@@ -35,6 +37,78 @@ func (a *OSCARConfigAdapter) IsSSLAvailable() bool {
 // IsAuthDisabled returns whether authentication is disabled.
 func (a *OSCARConfigAdapter) IsAuthDisabled() bool {
 	return a.cfg.DisableAuth
+}
+
+// GetSSLBOSAddress returns the SSL-enabled BOS server address for client connections.
+func (a *OSCARConfigAdapter) GetSSLBOSAddress() (host string, port int) {
+	// default to first listener configuration with SSL
+	for _, listener := range a.listeners {
+		if listener.HasSSL && listener.BOSAdvertisedHostSSL != "" {
+			host, portStr := splitHostPort(listener.BOSAdvertisedHostSSL)
+			if portStr != "" {
+				if p, err := strconv.Atoi(portStr); err == nil {
+					port = p
+				}
+			}
+
+			if port == 0 {
+				port = 5190 // default OSCAR SSL port (could be different)
+			}
+
+			return host, port
+		}
+	}
+
+	// fall back to plain address if no SSL configured
+	return a.GetBOSAddress()
+}
+
+// GetBOSAddress returns the plain (non-SSL) BOS server address for client connections.
+// This parses the configured BOS advertised host to extract the hostname and port.
+func (a *OSCARConfigAdapter) GetBOSAddress() (host string, port int) {
+	// default to first listener configuration
+	if len(a.listeners) == 0 {
+		return "localhost", 5190 // default OSCAR port
+	}
+
+	listener := a.listeners[0]
+	// parse the advertised host for plain connections
+	if listener.BOSAdvertisedHostPlain != "" {
+		host, portStr := splitHostPort(listener.BOSAdvertisedHostPlain)
+		if portStr != "" {
+			if p, err := strconv.Atoi(portStr); err == nil {
+				port = p
+			}
+		}
+
+		if port == 0 {
+			port = 5190 // default OSCAR port
+		}
+
+		return host, port
+	}
+
+	// fall back to parsing the listen address
+	if listener.BOSListenAddress != "" {
+		host, portStr, err := net.SplitHostPort(listener.BOSListenAddress)
+		if err == nil {
+			if host == "" {
+				host = "localhost"
+			}
+
+			if p, err := strconv.Atoi(portStr); err == nil {
+				port = p
+			}
+		}
+
+		if port == 0 {
+			port = 5190
+		}
+		
+		return host, port
+	}
+
+	return "localhost", 5190
 }
 
 // splitHostPort splits a host:port string, handling IPv6 addresses correctly.

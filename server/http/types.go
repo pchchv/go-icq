@@ -90,6 +90,21 @@ type FeedbagManager interface {
 	FeedbagDelete(ctx context.Context, screenName state.IdentScreenName, items []wire.FeedbagItem) error
 }
 
+// UserManager defines methods for accessing and inserting AIM user records.
+type UserManager interface {
+	// AllUsers returns all registered users.
+	AllUsers(ctx context.Context) ([]state.User, error)
+	// DeleteUser removes a user from the system by screen name.
+	DeleteUser(ctx context.Context, screenName state.IdentScreenName) error
+	// InsertUser inserts a new user into the system.
+	// Return state.ErrDupUser if a user with the same screen name already exists.
+	InsertUser(ctx context.Context, u state.User) error
+	// SetUserPassword sets the user's password hashes and auth key.
+	SetUserPassword(ctx context.Context, screenName state.IdentScreenName, newPassword string) error
+	// User returns all attributes for a user.
+	User(ctx context.Context, screenName state.IdentScreenName) (*state.User, error)
+}
+
 type aimChatUserHandle struct {
 	ID         string `json:"id"`
 	ScreenName string `json:"screen_name"`

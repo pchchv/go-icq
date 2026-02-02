@@ -56,3 +56,11 @@ type chatRoom struct {
 	CreateTime   time.Time           `json:"create_time"`
 	Participants []aimChatUserHandle `json:"participants"`
 }
+
+type chatRoomCreate struct {
+	Name string `json:"name"`
+}
+
+type chatRoomDelete struct {
+	Names []string `json:"names"`
+}

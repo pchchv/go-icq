@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"net/mail"
 	"time"
 
 	"github.com/pchchv/go-icq/state"
@@ -49,6 +50,25 @@ type BuddyBroadcaster interface {
 	// BroadcastVisibility sends presence updates to the specified filter list.
 	// If sendDepartures is true, departure events are sent as well.
 	BroadcastVisibility(ctx context.Context, you *state.SessionInstance, filter []state.IdentScreenName, sendDepartures bool) error
+}
+
+// AccountManager defines methods for managing user account attributes such as email,
+// confirmation status, registration status, and suspension.
+type AccountManager interface {
+	// ConfirmStatus returns whether a user account has been confirmed.
+	ConfirmStatus(ctx context.Context, screenName state.IdentScreenName) (bool, error)
+	// EmailAddress looks up a user's email address by screen name.
+	EmailAddress(ctx context.Context, screenName state.IdentScreenName) (*mail.Address, error)
+	// RegStatus looks up a user's registration status by screen name.
+	// It returns one of the following values:
+	//   - wire.AdminInfoRegStatusFullDisclosure
+	//   - wire.AdminInfoRegStatusLimitDisclosure
+	//   - wire.AdminInfoRegStatusNoDisclosure
+	RegStatus(ctx context.Context, screenName state.IdentScreenName) (uint16, error)
+	// UpdateSuspendedStatus updates the suspension status of a user account.
+	UpdateSuspendedStatus(ctx context.Context, suspendedStatus uint16, screenName state.IdentScreenName) error
+	// SetBotStatus updates the flag that indicates whether the user is a bot.
+	SetBotStatus(ctx context.Context, isBot bool, screenName state.IdentScreenName) error
 }
 
 type aimChatUserHandle struct {

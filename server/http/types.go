@@ -227,3 +227,8 @@ type sessionHandle struct {
 type messageBody struct {
 	Message string `json:"message"`
 }
+
+type directoryKeyword struct {
+	ID   uint8  `json:"id"`
+	Name string `json:"name"`
+}

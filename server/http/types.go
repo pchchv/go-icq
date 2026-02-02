@@ -111,6 +111,17 @@ type ProfileRetriever interface {
 	Profile(ctx context.Context, screenName state.IdentScreenName) (state.UserProfile, error)
 }
 
+// SessionRetriever defines methods for retrieving active sessions,
+// either all of them or by screen name.
+type SessionRetriever interface {
+	// AllSessions returns all active user sessions.
+	AllSessions() []*state.Session
+	// RetrieveSession returns the session associated with the given screen name,
+	// or nil if no active session exists.
+	// Returns the Session object if there are active instances with complete signon.
+	RetrieveSession(screenName state.IdentScreenName) *state.Session
+}
+
 type aimChatUserHandle struct {
 	ID         string `json:"id"`
 	ScreenName string `json:"screen_name"`

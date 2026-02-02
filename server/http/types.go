@@ -150,3 +150,8 @@ type userAccountPatch struct {
 	IsBot               *bool   `json:"is_bot"`
 	SuspendedStatusText *string `json:"suspended_status"`
 }
+
+type userWithPassword struct {
+	ScreenName string `json:"screen_name"`
+	Password   string `json:"password,omitempty"`
+}

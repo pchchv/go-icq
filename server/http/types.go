@@ -122,6 +122,12 @@ type SessionRetriever interface {
 	RetrieveSession(screenName state.IdentScreenName) *state.Session
 }
 
+// MessageRelayer defines a method for sending a SNAC message to a specific screen name.
+type MessageRelayer interface {
+	// RelayToScreenName sends the given SNAC message to the specified screen name.
+	RelayToScreenName(ctx context.Context, screenName state.IdentScreenName, msg wire.SNACMessage)
+}
+
 type aimChatUserHandle struct {
 	ID         string `json:"id"`
 	ScreenName string `json:"screen_name"`

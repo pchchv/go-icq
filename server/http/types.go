@@ -211,6 +211,12 @@ type instanceHandle struct {
 	RemotePort  int    `json:"remote_port"`
 }
 
+type instantMessage struct {
+	To   string `json:"to"`
+	From string `json:"from"`
+	Text string `json:"text"`
+}
+
 type sessionHandle struct {
 	ID            string           `json:"id"`
 	IsICQ         bool             `json:"is_icq"`

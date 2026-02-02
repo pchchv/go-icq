@@ -206,3 +206,7 @@ type sessionHandle struct {
 	InstanceCount int              `json:"instance_count"`
 	Instances     []instanceHandle `json:"instances"`
 }
+
+type messageBody struct {
+	Message string `json:"message"`
+}

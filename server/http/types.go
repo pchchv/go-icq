@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pchchv/go-icq/state"
+	"github.com/pchchv/go-icq/wire"
 )
 
 // BARTAssetManager defines methods for managing BART (Buddy ART) assets.
@@ -69,6 +70,13 @@ type AccountManager interface {
 	UpdateSuspendedStatus(ctx context.Context, suspendedStatus uint16, screenName state.IdentScreenName) error
 	// SetBotStatus updates the flag that indicates whether the user is a bot.
 	SetBotStatus(ctx context.Context, isBot bool, screenName state.IdentScreenName) error
+}
+
+// FeedBagRetriever defines methods for retrieving buddy list metadata.
+type FeedBagRetriever interface {
+	// BuddyIconMetadata retrieves a user's buddy icon metadata.
+	// It returns nil if the user does not have a buddy icon.
+	BuddyIconMetadata(ctx context.Context, screenName state.IdentScreenName) (*wire.BARTID, error)
 }
 
 type aimChatUserHandle struct {

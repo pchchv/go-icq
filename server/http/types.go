@@ -30,3 +30,9 @@ type ChatRoomCreator interface {
 	// CreateChatRoom creates a new chat room.
 	CreateChatRoom(ctx context.Context, chatRoom *state.ChatRoom) error
 }
+
+// ChatRoomRetriever defines a method for retrieving all chat rooms under a specific exchange.
+type ChatRoomRetriever interface {
+	// AllChatRooms returns all chat rooms associated with the given exchange ID.
+	AllChatRooms(ctx context.Context, exchange uint16) ([]state.ChatRoom, error)
+}

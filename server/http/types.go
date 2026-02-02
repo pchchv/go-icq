@@ -24,3 +24,9 @@ type ChatSessionRetriever interface {
 	// AllSessions returns all active sessions in the chat room identified by cookie.
 	AllSessions(cookie string) []*state.Session
 }
+
+// ChatRoomCreator defines a method for creating a new chat room.
+type ChatRoomCreator interface {
+	// CreateChatRoom creates a new chat room.
+	CreateChatRoom(ctx context.Context, chatRoom *state.ChatRoom) error
+}

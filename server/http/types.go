@@ -42,3 +42,8 @@ type ChatRoomDeleter interface {
 	// DeleteChatRooms deletes chat rooms by their names under a specific exchange.
 	DeleteChatRooms(ctx context.Context, exchange uint16, names []string) error
 }
+
+type aimChatUserHandle struct {
+	ID         string `json:"id"`
+	ScreenName string `json:"screen_name"`
+}

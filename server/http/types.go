@@ -173,6 +173,11 @@ type userWithPassword struct {
 	Password   string `json:"password,omitempty"`
 }
 
+type onlineUsers struct {
+	Count    int             `json:"count"`
+	Sessions []sessionHandle `json:"sessions"`
+}
+
 type instanceHandle struct {
 	Num         int    `json:"num"`
 	IsAway      bool   `json:"is_away"`

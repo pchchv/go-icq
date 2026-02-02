@@ -105,6 +105,12 @@ type UserManager interface {
 	User(ctx context.Context, screenName state.IdentScreenName) (*state.User, error)
 }
 
+// ProfileRetriever defines a method for retrieving a user's free-form profile.
+type ProfileRetriever interface {
+	// Profile returns the user's profile information for the given screen name.
+	Profile(ctx context.Context, screenName state.IdentScreenName) (state.UserProfile, error)
+}
+
 type aimChatUserHandle struct {
 	ID         string `json:"id"`
 	ScreenName string `json:"screen_name"`

@@ -79,6 +79,17 @@ type FeedBagRetriever interface {
 	BuddyIconMetadata(ctx context.Context, screenName state.IdentScreenName) (*wire.BARTID, error)
 }
 
+// FeedbagManager defines methods for managing feedbag (buddy list) entries.
+// This interface matches foodgroup.FeedbagManager and is implemented by state.SQLiteUserStore.
+type FeedbagManager interface {
+	// Feedbag retrieves all feedbag items for a user.
+	Feedbag(ctx context.Context, screenName state.IdentScreenName) ([]wire.FeedbagItem, error)
+	// FeedbagUpsert inserts or updates feedbag items.
+	FeedbagUpsert(ctx context.Context, screenName state.IdentScreenName, items []wire.FeedbagItem) error
+	// FeedbagDelete deletes feedbag items.
+	FeedbagDelete(ctx context.Context, screenName state.IdentScreenName, items []wire.FeedbagItem) error
+}
+
 type aimChatUserHandle struct {
 	ID         string `json:"id"`
 	ScreenName string `json:"screen_name"`

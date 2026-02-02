@@ -36,3 +36,9 @@ type ChatRoomRetriever interface {
 	// AllChatRooms returns all chat rooms associated with the given exchange ID.
 	AllChatRooms(ctx context.Context, exchange uint16) ([]state.ChatRoom, error)
 }
+
+// ChatRoomDeleter defines a method for deleting chat rooms.
+type ChatRoomDeleter interface {
+	// DeleteChatRooms deletes chat rooms by their names under a specific exchange.
+	DeleteChatRooms(ctx context.Context, exchange uint16, names []string) error
+}

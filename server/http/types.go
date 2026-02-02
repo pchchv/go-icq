@@ -128,6 +128,23 @@ type MessageRelayer interface {
 	RelayToScreenName(ctx context.Context, screenName state.IdentScreenName, msg wire.SNACMessage)
 }
 
+// DirectoryManager defines methods for managing interest categories and
+// keywords used in user profiles and directory listings.
+type DirectoryManager interface {
+	// Categories returns all existing directory categories.
+	Categories(ctx context.Context) ([]state.Category, error)
+	// CreateCategory adds a new directory category.
+	CreateCategory(ctx context.Context, name string) (state.Category, error)
+	// CreateKeyword adds a new keyword to the specified category.
+	CreateKeyword(ctx context.Context, name string, categoryID uint8) (state.Keyword, error)
+	// DeleteCategory removes a directory category by ID.
+	DeleteCategory(ctx context.Context, categoryID uint8) error
+	// DeleteKeyword removes a keyword by ID.
+	DeleteKeyword(ctx context.Context, id uint8) error
+	// KeywordsByCategory returns all keywords under the specified category.
+	KeywordsByCategory(ctx context.Context, categoryID uint8) ([]state.Keyword, error)
+}
+
 type aimChatUserHandle struct {
 	ID         string `json:"id"`
 	ScreenName string `json:"screen_name"`

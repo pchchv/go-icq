@@ -232,3 +232,8 @@ type directoryKeyword struct {
 	ID   uint8  `json:"id"`
 	Name string `json:"name"`
 }
+
+type directoryKeywordCreate struct {
+	CategoryID uint8  `json:"category_id"`
+	Name       string `json:"name"`
+}

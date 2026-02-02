@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"time"
 
 	"github.com/pchchv/go-icq/state"
 )
@@ -46,4 +47,12 @@ type ChatRoomDeleter interface {
 type aimChatUserHandle struct {
 	ID         string `json:"id"`
 	ScreenName string `json:"screen_name"`
+}
+
+type chatRoom struct {
+	URL          string              `json:"url"`
+	Name         string              `json:"name"`
+	CreatorID    string              `json:"creator_id,omitempty"`
+	CreateTime   time.Time           `json:"create_time"`
+	Participants []aimChatUserHandle `json:"participants"`
 }

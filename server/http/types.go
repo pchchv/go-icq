@@ -161,3 +161,13 @@ type userWithPassword struct {
 	ScreenName string `json:"screen_name"`
 	Password   string `json:"password,omitempty"`
 }
+
+type instanceHandle struct {
+	Num         int    `json:"num"`
+	IsAway      bool   `json:"is_away"`
+	IdleSeconds int    `json:"idle_seconds"`
+	AwayMessage string `json:"away_message"`
+	IsInvisible bool   `json:"is_invisible"`
+	RemoteAddr  string `json:"remote_addr"`
+	RemotePort  int    `json:"remote_port"`
+}

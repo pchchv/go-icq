@@ -17,3 +17,10 @@ type BARTAssetManager interface {
 	// DeleteBARTItem deletes a BART asset by hash.
 	DeleteBARTItem(ctx context.Context, hash []byte) error
 }
+
+// ChatSessionRetriever defines a method for
+// retrieving all sessions associated with a specific chat room.
+type ChatSessionRetriever interface {
+	// AllSessions returns all active sessions in the chat room identified by cookie.
+	AllSessions(cookie string) []*state.Session
+}

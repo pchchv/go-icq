@@ -133,3 +133,20 @@ type userHandle struct {
 	ScreenName      string `json:"screen_name"`
 	SuspendedStatus string `json:"suspended_status"`
 }
+
+type userAccountHandle struct {
+	ID              string `json:"id"`
+	IsBot           bool   `json:"is_bot"`
+	IsICQ           bool   `json:"is_icq"`
+	Profile         string `json:"profile"`
+	RegStatus       uint16 `json:"reg_status"`
+	Confirmed       bool   `json:"confirmed"`
+	ScreenName      string `json:"screen_name"`
+	EmailAddress    string `json:"email_address"`
+	SuspendedStatus string `json:"suspended_status"`
+}
+
+type userAccountPatch struct {
+	IsBot               *bool   `json:"is_bot"`
+	SuspendedStatusText *string `json:"suspended_status"`
+}

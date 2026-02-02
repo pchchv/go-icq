@@ -182,3 +182,16 @@ type instanceHandle struct {
 	RemoteAddr  string `json:"remote_addr"`
 	RemotePort  int    `json:"remote_port"`
 }
+
+type sessionHandle struct {
+	ID            string           `json:"id"`
+	IsICQ         bool             `json:"is_icq"`
+	IsAway        bool             `json:"is_away"`
+	ScreenName    string           `json:"screen_name"`
+	OnlineSeconds int              `json:"online_seconds"`
+	AwayMessage   string           `json:"away_message"`
+	IdleSeconds   int              `json:"idle_seconds"`
+	IsInvisible   bool             `json:"is_invisible"`
+	InstanceCount int              `json:"instance_count"`
+	Instances     []instanceHandle `json:"instances"`
+}

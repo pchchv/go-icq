@@ -44,6 +44,13 @@ type ChatRoomDeleter interface {
 	DeleteChatRooms(ctx context.Context, exchange uint16, names []string) error
 }
 
+// BuddyBroadcaster defines a method for broadcasting presence updates.
+type BuddyBroadcaster interface {
+	// BroadcastVisibility sends presence updates to the specified filter list.
+	// If sendDepartures is true, departure events are sent as well.
+	BroadcastVisibility(ctx context.Context, you *state.SessionInstance, filter []state.IdentScreenName, sendDepartures bool) error
+}
+
 type aimChatUserHandle struct {
 	ID         string `json:"id"`
 	ScreenName string `json:"screen_name"`

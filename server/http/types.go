@@ -125,3 +125,11 @@ type chatRoomCreate struct {
 type chatRoomDelete struct {
 	Names []string `json:"names"`
 }
+
+type userHandle struct {
+	ID              string `json:"id"`
+	IsICQ           bool   `json:"is_icq"`
+	IsBot           bool   `json:"is_bot"`
+	ScreenName      string `json:"screen_name"`
+	SuspendedStatus string `json:"suspended_status"`
+}

@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -25,4 +26,12 @@ func (s *Server) ListenAndServe() error {
 func (s *Server) Shutdown(ctx context.Context) error {
 	defer s.logger.Info("shutdown complete")
 	return s.server.Shutdown(ctx)
+}
+
+func userFromBody(r *http.Request) (u userWithPassword, err error) {
+	u = userWithPassword{}
+	if err = json.NewDecoder(r.Body).Decode(&u); err != nil {
+		return userWithPassword{}, errors.New("malformed input")
+	}
+	return
 }

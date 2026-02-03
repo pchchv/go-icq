@@ -238,6 +238,68 @@ func putUserPasswordHandler(w http.ResponseWriter, r *http.Request, userManager 
 	_, _ = fmt.Fprintln(w, "Password successfully reset.")
 }
 
+// patchUserAccountHandler handles the PATCH /user/{screenname}/account endpoint.
+func patchUserAccountHandler(w http.ResponseWriter, r *http.Request, userManager UserManager, a AccountManager, logger *slog.Logger) {
+	w.Header().Set("Content-Type", "application/json")
+	screenName := r.PathValue("screenname")
+	user, err := userManager.User(r.Context(), state.NewIdentScreenName(screenName))
+	if err != nil {
+		logger.Error("error in PATCH /user/{screenname}/account", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	} else if user == nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	input := userAccountPatch{}
+	d := json.NewDecoder(r.Body)
+	d.DisallowUnknownFields()
+	if err := d.Decode(&input); err != nil {
+		errorMsg(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var modifiedUser bool
+	if input.SuspendedStatusText != nil {
+		switch *input.SuspendedStatusText {
+		case "", "deleted", "expired", "suspended", "suspended_age":
+			suspendedStatus, err := getSuspendedStatusTextToErrCode(*input.SuspendedStatusText)
+			if err != nil {
+				logger.Error("error in PATCH /user/{screenname}/account", "err", err.Error())
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				return
+			} else if suspendedStatus != user.SuspendedStatus {
+				if err := a.UpdateSuspendedStatus(r.Context(), suspendedStatus, user.IdentScreenName); err != nil {
+					logger.Error("error in PATCH /user/{screenname}/account", "err", err.Error())
+					http.Error(w, "internal server error", http.StatusInternalServerError)
+					return
+				}
+				modifiedUser = true
+			}
+		default:
+			errorMsg(w, "suspended_status must be empty str or one of deleted,expired,suspended,suspended_age", http.StatusBadRequest)
+			return
+		}
+	}
+
+	if input.IsBot != nil && user.IsBot != *input.IsBot {
+		if err := a.SetBotStatus(r.Context(), *input.IsBot, user.IdentScreenName); err != nil {
+			logger.Error("error in PATCH /user/{screenname}/account", "err", err.Error())
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		modifiedUser = true
+	}
+
+	if !modifiedUser {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // deleteUserHandler handles the DELETE /user endpoint.
 func deleteUserHandler(w http.ResponseWriter, r *http.Request, manager UserManager, logger *slog.Logger) {
 	user, err := userFromBody(r)

@@ -2,13 +2,11 @@ package http
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/pchchv/go-icq/state"
@@ -77,6 +75,139 @@ func postUserHandler(w http.ResponseWriter, r *http.Request, userManager UserMan
 
 	w.WriteHeader(http.StatusCreated)
 	_, _ = fmt.Fprintln(w, "User account created successfully.")
+}
+
+// getUserHandler handles the GET /user endpoint.
+func getUserHandler(w http.ResponseWriter, r *http.Request, userManager UserManager, logger *slog.Logger) {
+	w.Header().Set("Content-Type", "application/json")
+	users, err := userManager.AllUsers(r.Context())
+	if err != nil {
+		logger.Error("error in GET /user", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	out := make([]userHandle, len(users))
+	for i, u := range users {
+		suspendedStatus, err := getSuspendedStatusErrCodeToText(u.SuspendedStatus)
+		if err != nil {
+			logger.Error("error getting suspended status in GET /user", "err", err.Error())
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		out[i] = userHandle{
+			ID:              u.IdentScreenName.String(),
+			ScreenName:      u.DisplayScreenName.String(),
+			IsICQ:           u.IsICQ,
+			SuspendedStatus: suspendedStatus,
+			IsBot:           u.IsBot,
+		}
+	}
+
+	if err := json.NewEncoder(w).Encode(out); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+// getUserBuddyIconHandler handles the GET /user/{screenname}/icon endpoint.
+func getUserBuddyIconHandler(w http.ResponseWriter, r *http.Request, u UserManager, f FeedBagRetriever, b BARTAssetManager, logger *slog.Logger) {
+	screenName := state.NewIdentScreenName(r.PathValue("screenname"))
+	user, err := u.User(r.Context(), screenName)
+	if err != nil {
+		logger.Error("error retrieving user", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	} else if user == nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	iconRef, err := f.BuddyIconMetadata(r.Context(), screenName)
+	if err != nil {
+		logger.Error("error retrieving buddy icon ref", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	} else if iconRef == nil || iconRef.HasClearIconHash() {
+		http.Error(w, "icon not found", http.StatusNotFound)
+		return
+	}
+
+	icon, err := b.BARTItem(r.Context(), iconRef.Hash)
+	if err != nil {
+		logger.Error("error retrieving buddy icon bart item", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", http.DetectContentType(icon))
+	w.Write(icon)
+}
+
+// getUserAccountHandler handles the GET /user/{screenname}/account endpoint.
+func getUserAccountHandler(w http.ResponseWriter, r *http.Request, userManager UserManager, a AccountManager, p ProfileRetriever, logger *slog.Logger) {
+	w.Header().Set("Content-Type", "application/json")
+	screenName := r.PathValue("screenname")
+	user, err := userManager.User(r.Context(), state.NewIdentScreenName(screenName))
+	if err != nil {
+		logger.Error("error in GET /user/{screenname}/account", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	} else if user == nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	var emailAddress string
+	email, err := a.EmailAddress(r.Context(), user.IdentScreenName)
+	if err != nil {
+		emailAddress = ""
+	} else {
+		emailAddress = email.String()
+	}
+
+	regStatus, err := a.RegStatus(r.Context(), user.IdentScreenName)
+	if err != nil {
+		logger.Error("error in GET /user/*/account RegStatus", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	confirmStatus, err := a.ConfirmStatus(r.Context(), user.IdentScreenName)
+	if err != nil {
+		logger.Error("error in GET /user/*/account ConfirmStatus", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	profile, err := p.Profile(r.Context(), user.IdentScreenName)
+	if err != nil {
+		logger.Error("error in GET /user/*/account Profile", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	suspendedStatusText, err := getSuspendedStatusErrCodeToText(user.SuspendedStatus)
+	if err != nil {
+		logger.Error("error in GET /user/{screenname}/account", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+	}
+
+	out := userAccountHandle{
+		ID:              user.IdentScreenName.String(),
+		ScreenName:      user.DisplayScreenName.String(),
+		EmailAddress:    emailAddress,
+		RegStatus:       regStatus,
+		Confirmed:       confirmStatus,
+		Profile:         profile.ProfileText,
+		IsICQ:           user.IsICQ,
+		SuspendedStatus: suspendedStatusText,
+		IsBot:           user.IsBot,
+	}
+	if err := json.NewEncoder(w).Encode(out); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func userFromBody(r *http.Request) (u userWithPassword, err error) {

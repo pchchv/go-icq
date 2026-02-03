@@ -2,14 +2,17 @@ package http
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/pchchv/go-icq/state"
+	"github.com/pchchv/go-icq/wire"
 )
 
 type Server struct {
@@ -82,4 +85,20 @@ func userFromBody(r *http.Request) (u userWithPassword, err error) {
 		return userWithPassword{}, errors.New("malformed input")
 	}
 	return
+}
+
+// getSuspendedStatusErrCodeToText maps the given suspendedStatus to the appropriate text, or "" for none.
+func getSuspendedStatusErrCodeToText(suspendedStatus uint16) (string, error) {
+	suspendedStatusTextMap := map[uint16]string{
+		0x0:                              "",
+		wire.LoginErrDeletedAccount:      "deleted",
+		wire.LoginErrExpiredAccount:      "expired",
+		wire.LoginErrSuspendedAccount:    "suspended",
+		wire.LoginErrSuspendedAccountAge: "suspended_age",
+	}
+	if st, ok := suspendedStatusTextMap[suspendedStatus]; !ok {
+		return "", errors.New("unable to map error code to suspendedText")
+	} else {
+		return st, nil
+	}
 }

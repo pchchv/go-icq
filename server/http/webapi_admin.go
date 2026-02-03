@@ -98,3 +98,71 @@ func postWebAPIKeyHandler(w http.ResponseWriter, r *http.Request, keyManager Web
 		logger.Error("failed to encode response", "err", err.Error())
 	}
 }
+
+// getWebAPIKeyHandler handles GET /admin/webapi/keys/{id} requests.
+func getWebAPIKeyHandler(w http.ResponseWriter, r *http.Request, keyManager WebAPIKeyManager, logger *slog.Logger) {
+	devID := r.PathValue("id")
+	if devID == "" {
+		http.Error(w, "missing developer ID", http.StatusBadRequest)
+		return
+	}
+
+	key, err := keyManager.GetAPIKeyByDevID(r.Context(), devID)
+	if err != nil {
+		if err == state.ErrNoAPIKey {
+			http.Error(w, "API key not found", http.StatusNotFound)
+			return
+		}
+
+		logger.Error("failed to get API key", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// convert to response format (without dev_key)
+	resp := webAPIKeyResponse{
+		DevID:          key.DevID,
+		AppName:        key.AppName,
+		CreatedAt:      key.CreatedAt,
+		LastUsed:       key.LastUsed,
+		IsActive:       key.IsActive,
+		RateLimit:      key.RateLimit,
+		AllowedOrigins: key.AllowedOrigins,
+		Capabilities:   key.Capabilities,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		logger.Error("failed to encode response", "err", err.Error())
+	}
+}
+
+// getWebAPIKeysHandler handles GET /admin/webapi/keys requests.
+func getWebAPIKeysHandler(w http.ResponseWriter, r *http.Request, keyManager WebAPIKeyManager, logger *slog.Logger) {
+	keys, err := keyManager.ListAPIKeys(r.Context())
+	if err != nil {
+		logger.Error("failed to list API keys", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// convert to response format (without dev_key)
+	resp := make([]webAPIKeyResponse, 0, len(keys))
+	for _, key := range keys {
+		resp = append(resp, webAPIKeyResponse{
+			DevID:          key.DevID,
+			AppName:        key.AppName,
+			CreatedAt:      key.CreatedAt,
+			LastUsed:       key.LastUsed,
+			IsActive:       key.IsActive,
+			RateLimit:      key.RateLimit,
+			AllowedOrigins: key.AllowedOrigins,
+			Capabilities:   key.Capabilities,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		logger.Error("failed to encode response", "err", err.Error())
+	}
+}

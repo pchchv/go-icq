@@ -252,3 +252,15 @@ type directoryCategory struct {
 type directoryCategoryCreate struct {
 	Name string `json:"name"`
 }
+
+type webAPIKeyResponse struct {
+	DevID          string     `json:"dev_id"`
+	DevKey         string     `json:"dev_key,omitempty"` // Only shown on creation
+	AppName        string     `json:"app_name"`
+	CreatedAt      time.Time  `json:"created_at"`
+	LastUsed       *time.Time `json:"last_used,omitempty"`
+	IsActive       bool       `json:"is_active"`
+	RateLimit      int        `json:"rate_limit"`
+	Capabilities   []string   `json:"capabilities,omitempty"`
+	AllowedOrigins []string   `json:"allowed_origins,omitempty"`
+}

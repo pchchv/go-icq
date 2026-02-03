@@ -210,6 +210,34 @@ func getUserAccountHandler(w http.ResponseWriter, r *http.Request, userManager U
 	}
 }
 
+// putUserPasswordHandler handles the PUT /user/password endpoint.
+func putUserPasswordHandler(w http.ResponseWriter, r *http.Request, userManager UserManager, logger *slog.Logger) {
+	input, err := userFromBody(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	sn := state.NewIdentScreenName(input.ScreenName)
+	if err := userManager.SetUserPassword(r.Context(), sn, input.Password); err != nil {
+		switch {
+		case errors.Is(err, state.ErrNoUser):
+			http.Error(w, "user does not exist", http.StatusNotFound)
+			return
+		case errors.Is(err, state.ErrPasswordInvalid):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		default:
+			logger.Error("error updating user password PUT /user/password", "err", err.Error())
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+	_, _ = fmt.Fprintln(w, "Password successfully reset.")
+}
+
 func userFromBody(r *http.Request) (u userWithPassword, err error) {
 	u = userWithPassword{}
 	if err = json.NewDecoder(r.Body).Decode(&u); err != nil {

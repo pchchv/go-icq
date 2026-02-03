@@ -166,3 +166,62 @@ func getWebAPIKeysHandler(w http.ResponseWriter, r *http.Request, keyManager Web
 		logger.Error("failed to encode response", "err", err.Error())
 	}
 }
+
+// putWebAPIKeyHandler handles PUT /admin/webapi/keys/{id} requests.
+func putWebAPIKeyHandler(w http.ResponseWriter, r *http.Request, keyManager WebAPIKeyManager, logger *slog.Logger) {
+	devID := r.PathValue("id")
+	if devID == "" {
+		http.Error(w, "missing developer ID", http.StatusBadRequest)
+		return
+	}
+
+	var req updateWebAPIKeyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed request body", http.StatusBadRequest)
+		return
+	}
+
+	// convert request to update struct
+	updates := state.WebAPIKeyUpdate{
+		AppName:        req.AppName,
+		IsActive:       req.IsActive,
+		RateLimit:      req.RateLimit,
+		AllowedOrigins: req.AllowedOrigins,
+		Capabilities:   req.Capabilities,
+	}
+	// update the key
+	if err := keyManager.UpdateAPIKey(r.Context(), devID, updates); err != nil {
+		if err == state.ErrNoAPIKey {
+			http.Error(w, "API key not found", http.StatusNotFound)
+			return
+		}
+
+		logger.Error("failed to update API key", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// retrieve the updated key to return
+	key, err := keyManager.GetAPIKeyByDevID(r.Context(), devID)
+	if err != nil {
+		logger.Error("failed to retrieve updated API key", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// convert to response format (without dev_key)
+	resp := webAPIKeyResponse{
+		DevID:          key.DevID,
+		AppName:        key.AppName,
+		CreatedAt:      key.CreatedAt,
+		LastUsed:       key.LastUsed,
+		IsActive:       key.IsActive,
+		RateLimit:      key.RateLimit,
+		AllowedOrigins: key.AllowedOrigins,
+		Capabilities:   key.Capabilities,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		logger.Error("failed to encode response", "err", err.Error())
+	}
+}

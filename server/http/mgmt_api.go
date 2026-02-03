@@ -300,3 +300,12 @@ func getSuspendedStatusTextToErrCode(suspendedStatusText string) (uint16, error)
 		return suspendedStatus, nil
 	}
 }
+
+// errorMsg sends an error response message and code.
+func errorMsg(w http.ResponseWriter, error string, code int) {
+	msg := messageBody{Message: error}
+	w.WriteHeader(code)
+	if err := json.NewEncoder(w).Encode(msg); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}

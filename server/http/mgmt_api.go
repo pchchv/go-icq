@@ -238,6 +238,29 @@ func putUserPasswordHandler(w http.ResponseWriter, r *http.Request, userManager 
 	_, _ = fmt.Fprintln(w, "Password successfully reset.")
 }
 
+// deleteUserHandler handles the DELETE /user endpoint.
+func deleteUserHandler(w http.ResponseWriter, r *http.Request, manager UserManager, logger *slog.Logger) {
+	user, err := userFromBody(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = manager.DeleteUser(r.Context(), state.NewIdentScreenName(user.ScreenName))
+	switch {
+	case errors.Is(err, state.ErrNoUser):
+		http.Error(w, "user does not exist", http.StatusNotFound)
+		return
+	case err != nil:
+		logger.Error("error deleting user DELETE /user", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+	_, _ = fmt.Fprintln(w, "User account successfully deleted.")
+}
+
 func userFromBody(r *http.Request) (u userWithPassword, err error) {
 	u = userWithPassword{}
 	if err = json.NewDecoder(r.Body).Decode(&u); err != nil {

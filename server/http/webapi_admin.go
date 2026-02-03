@@ -225,3 +225,25 @@ func putWebAPIKeyHandler(w http.ResponseWriter, r *http.Request, keyManager WebA
 		logger.Error("failed to encode response", "err", err.Error())
 	}
 }
+
+// deleteWebAPIKeyHandler handles DELETE /admin/webapi/keys/{id} requests.
+func deleteWebAPIKeyHandler(w http.ResponseWriter, r *http.Request, keyManager WebAPIKeyManager, logger *slog.Logger) {
+	devID := r.PathValue("id")
+	if devID == "" {
+		http.Error(w, "missing developer ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := keyManager.DeleteAPIKey(r.Context(), devID); err != nil {
+		if err == state.ErrNoAPIKey {
+			http.Error(w, "API key not found", http.StatusNotFound)
+			return
+		}
+
+		logger.Error("failed to delete API key", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}

@@ -2,7 +2,15 @@ package http
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/pchchv/go-icq/state"
 )
 
@@ -18,4 +26,75 @@ type WebAPIKeyManager interface {
 	UpdateAPIKey(ctx context.Context, devID string, updates state.WebAPIKeyUpdate) error
 	// DeleteAPIKey removes a Web API key.
 	DeleteAPIKey(ctx context.Context, devID string) error
+}
+
+// postWebAPIKeyHandler handles POST /admin/webapi/keys requests.
+func postWebAPIKeyHandler(w http.ResponseWriter, r *http.Request, keyManager WebAPIKeyManager, newUUID func() uuid.UUID, logger *slog.Logger) {
+	var req createWebAPIKeyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed request body", http.StatusBadRequest)
+		return
+	}
+
+	// validate required fields
+	if req.AppName == "" {
+		http.Error(w, "app_name is required", http.StatusBadRequest)
+		return
+	}
+
+	// set defaults
+	if req.RateLimit <= 0 {
+		req.RateLimit = 60 // default rate limit
+	}
+
+	// generate secure API key
+	keyBytes := make([]byte, 32) // 256 bits
+	if _, err := rand.Read(keyBytes); err != nil {
+		logger.Error("failed to generate API key", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	devKey := hex.EncodeToString(keyBytes)
+
+	// generate developer ID
+	devID := fmt.Sprintf("dev_%s", newUUID().String())
+	// create the API key record
+	apiKey := state.WebAPIKey{
+		DevID:          devID,
+		DevKey:         devKey,
+		AppName:        req.AppName,
+		CreatedAt:      time.Now(),
+		IsActive:       true,
+		RateLimit:      req.RateLimit,
+		AllowedOrigins: req.AllowedOrigins,
+		Capabilities:   req.Capabilities,
+	}
+	// save to database
+	if err := keyManager.CreateAPIKey(r.Context(), apiKey); err != nil {
+		if err == state.ErrDupAPIKey {
+			http.Error(w, "API key already exists", http.StatusConflict)
+			return
+		}
+
+		logger.Error("failed to create API key", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// return the created key (including the dev_key which is only shown once)
+	resp := webAPIKeyResponse{
+		DevID:          apiKey.DevID,
+		DevKey:         apiKey.DevKey, // only shown on creation
+		AppName:        apiKey.AppName,
+		CreatedAt:      apiKey.CreatedAt,
+		IsActive:       apiKey.IsActive,
+		RateLimit:      apiKey.RateLimit,
+		Capabilities:   apiKey.Capabilities,
+		AllowedOrigins: apiKey.AllowedOrigins,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		logger.Error("failed to encode response", "err", err.Error())
+	}
 }

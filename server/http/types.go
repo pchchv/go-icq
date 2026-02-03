@@ -264,3 +264,10 @@ type webAPIKeyResponse struct {
 	Capabilities   []string   `json:"capabilities,omitempty"`
 	AllowedOrigins []string   `json:"allowed_origins,omitempty"`
 }
+
+type createWebAPIKeyRequest struct {
+	AppName        string   `json:"app_name"`
+	RateLimit      int      `json:"rate_limit,omitempty"`
+	Capabilities   []string `json:"capabilities,omitempty"`
+	AllowedOrigins []string `json:"allowed_origins,omitempty"`
+}

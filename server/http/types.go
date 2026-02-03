@@ -271,3 +271,11 @@ type createWebAPIKeyRequest struct {
 	Capabilities   []string `json:"capabilities,omitempty"`
 	AllowedOrigins []string `json:"allowed_origins,omitempty"`
 }
+
+type updateWebAPIKeyRequest struct {
+	AppName        *string   `json:"app_name,omitempty"`
+	IsActive       *bool     `json:"is_active,omitempty"`
+	RateLimit      *int      `json:"rate_limit,omitempty"`
+	Capabilities   *[]string `json:"capabilities,omitempty"`
+	AllowedOrigins *[]string `json:"allowed_origins,omitempty"`
+}

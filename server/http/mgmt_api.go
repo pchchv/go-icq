@@ -284,3 +284,19 @@ func getSuspendedStatusErrCodeToText(suspendedStatus uint16) (string, error) {
 		return st, nil
 	}
 }
+
+// getSuspendedStatusTextToErrCode maps the given suspendedStatusText to the appropriate error code, or 0x0 for none.
+func getSuspendedStatusTextToErrCode(suspendedStatusText string) (uint16, error) {
+	suspendedStatusTextMap := map[string]uint16{
+		"":              0x0,
+		"deleted":       wire.LoginErrDeletedAccount,
+		"expired":       wire.LoginErrExpiredAccount,
+		"suspended":     wire.LoginErrSuspendedAccount,
+		"suspended_age": wire.LoginErrSuspendedAccountAge,
+	}
+	if suspendedStatus, ok := suspendedStatusTextMap[suspendedStatusText]; !ok {
+		return 0x0, errors.New("unable to map suspendedText to error code")
+	} else {
+		return suspendedStatus, nil
+	}
+}

@@ -413,6 +413,43 @@ func deleteSessionHandler(w http.ResponseWriter, r *http.Request, sessionRetriev
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// postInstantMessageHandler handles the POST /instant-message endpoint.
+func postInstantMessageHandler(w http.ResponseWriter, r *http.Request, messageRelayer MessageRelayer, logger *slog.Logger) {
+	input := instantMessage{}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "malformed input", http.StatusBadRequest)
+		return
+	}
+
+	tlv, err := wire.ICBMFragmentList(input.Text)
+	if err != nil {
+		logger.Error("error sending message POST /instant-message", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	msg := wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.ICBM,
+			SubGroup:  wire.ICBMChannelMsgToClient,
+		},
+		Body: wire.SNAC_0x04_0x07_ICBMChannelMsgToClient{
+			ChannelID: 1,
+			TLVUserInfo: wire.TLVUserInfo{
+				ScreenName: input.From,
+			},
+			TLVRestBlock: wire.TLVRestBlock{
+				TLVList: wire.TLVList{
+					wire.NewTLVBE(wire.ICBMTLVAOLIMData, tlv),
+				},
+			},
+		},
+	}
+	messageRelayer.RelayToScreenName(context.Background(), state.NewIdentScreenName(input.To), msg)
+	w.WriteHeader(http.StatusOK)
+	_, _ = fmt.Fprintln(w, "Message sent successfully.")
+}
+
 func userFromBody(r *http.Request) (u userWithPassword, err error) {
 	u = userWithPassword{}
 	if err = json.NewDecoder(r.Body).Decode(&u); err != nil {

@@ -572,6 +572,40 @@ func deleteDirectoryCategoryHandler(w http.ResponseWriter, r *http.Request, mana
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// postDirectoryKeywordHandler handles the POST /directory/keyword endpoint.
+func postDirectoryKeywordHandler(w http.ResponseWriter, r *http.Request, manager DirectoryManager, logger *slog.Logger) {
+	w.Header().Set("Content-Type", "application/json")
+	input := directoryKeywordCreate{}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		errorMsg(w, "malformed input", http.StatusBadRequest)
+		return
+	}
+
+	kw, err := manager.CreateKeyword(r.Context(), input.Name, input.CategoryID)
+	switch err {
+	case state.ErrKeywordCategoryNotFound:
+		errorMsg(w, "category not found", http.StatusNotFound)
+		return
+	case state.ErrKeywordExists:
+		errorMsg(w, "keyword already exists", http.StatusConflict)
+		return
+	case nil:
+		w.WriteHeader(http.StatusCreated)
+		dc := directoryKeyword{
+			ID:   kw.ID,
+			Name: kw.Name,
+		}
+		if err := json.NewEncoder(w).Encode(dc); err != nil {
+			errorMsg(w, err.Error(), http.StatusBadRequest)
+		}
+		return
+	default:
+		logger.Error("error in POST /directory/keyword", "err", err.Error())
+		errorMsg(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+}
+
 func userFromBody(r *http.Request) (u userWithPassword, err error) {
 	u = userWithPassword{}
 	if err = json.NewDecoder(r.Body).Decode(&u); err != nil {

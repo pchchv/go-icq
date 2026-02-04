@@ -722,6 +722,39 @@ func deletePublicChatHandler(w http.ResponseWriter, r *http.Request, chatRoomDel
 	_, _ = fmt.Fprintln(w, "Chat rooms deleted successfully.")
 }
 
+// getPrivateChatHandler handles the GET /chat/room/private endpoint.
+func getPrivateChatHandler(w http.ResponseWriter, r *http.Request, chatRoomRetriever ChatRoomRetriever, chatSessionRetriever ChatSessionRetriever, logger *slog.Logger) {
+	w.Header().Set("Content-Type", "application/json")
+	rooms, err := chatRoomRetriever.AllChatRooms(r.Context(), state.PrivateExchange)
+	if err != nil {
+		logger.Error("error in GET /chat/rooms/private", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	out := make([]chatRoom, len(rooms))
+	for i, room := range rooms {
+		sessions := chatSessionRetriever.AllSessions(room.Cookie())
+		cr := chatRoom{
+			CreateTime:   room.CreateTime(),
+			CreatorID:    room.Creator().String(),
+			Name:         room.Name(),
+			Participants: make([]aimChatUserHandle, len(sessions)),
+			URL:          room.URL().String(),
+		}
+		for j, sess := range sessions {
+			cr.Participants[j] = aimChatUserHandle{
+				ID:         sess.IdentScreenName().String(),
+				ScreenName: sess.DisplayScreenName().String(),
+			}
+		}
+
+		out[i] = cr
+	}
+
+	writeUnescapeChatURL(w, out)
+}
+
 func userFromBody(r *http.Request) (u userWithPassword, err error) {
 	u = userWithPassword{}
 	if err = json.NewDecoder(r.Body).Decode(&u); err != nil {

@@ -546,6 +546,32 @@ func getDirectoryCategoryKeywordHandler(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
+// deleteDirectoryCategoryHandler handles the DELETE /directory/category/{id} endpoint.
+func deleteDirectoryCategoryHandler(w http.ResponseWriter, r *http.Request, manager DirectoryManager, logger *slog.Logger) {
+	categoryID, err := strconv.ParseUint(r.PathValue("id"), 10, 8)
+	if err != nil {
+		http.Error(w, "invalid category ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := manager.DeleteCategory(r.Context(), uint8(categoryID)); err != nil {
+		switch err {
+		case state.ErrKeywordCategoryNotFound:
+			errorMsg(w, "category not found", http.StatusNotFound)
+			return
+		case state.ErrKeywordInUse:
+			errorMsg(w, "can't delete because category in use by a user", http.StatusConflict)
+			return
+		default:
+			logger.Error("error in DELETE /directory/category/{id}", "err", err.Error())
+			errorMsg(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func userFromBody(r *http.Request) (u userWithPassword, err error) {
 	u = userWithPassword{}
 	if err = json.NewDecoder(r.Body).Decode(&u); err != nil {

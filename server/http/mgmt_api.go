@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -630,6 +631,38 @@ func deleteDirectoryKeywordHandler(w http.ResponseWriter, r *http.Request, manag
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// postPublicChatHandler handles the POST /chat/room/public endpoint.
+func postPublicChatHandler(w http.ResponseWriter, r *http.Request, chatRoomCreator ChatRoomCreator, logger *slog.Logger) {
+	input := chatRoomCreate{}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "invalid input", http.StatusBadRequest)
+		return
+	}
+
+	input.Name = strings.TrimSpace(input.Name)
+	if input.Name == "" || len(input.Name) > 50 {
+		http.Error(w, "chat room name must be between 1 and 50 characters", http.StatusBadRequest)
+		return
+	}
+
+	cr := state.NewChatRoom(input.Name, state.NewIdentScreenName("system"), state.PublicExchange)
+	err := chatRoomCreator.CreateChatRoom(r.Context(), &cr)
+	switch err {
+	case state.ErrDupChatRoom:
+		http.Error(w, "Chat room already exists.", http.StatusConflict)
+		return
+	default:
+		if err != nil {
+			logger.Error("error inserting chat room POST /chat/room/public", "err", err.Error())
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	_, _ = fmt.Fprintln(w, "Chat room created successfully.")
 }
 
 func userFromBody(r *http.Request) (u userWithPassword, err error) {

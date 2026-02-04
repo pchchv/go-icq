@@ -666,6 +666,62 @@ func postPublicChatHandler(w http.ResponseWriter, r *http.Request, chatRoomCreat
 	_, _ = fmt.Fprintln(w, "Chat room created successfully.")
 }
 
+// getPublicChatHandler handles the GET /chat/room/public endpoint.
+func getPublicChatHandler(w http.ResponseWriter, r *http.Request, chatRoomRetriever ChatRoomRetriever, chatSessionRetriever ChatSessionRetriever, logger *slog.Logger) {
+	w.Header().Set("Content-Type", "application/json")
+	rooms, err := chatRoomRetriever.AllChatRooms(r.Context(), state.PublicExchange)
+	if err != nil {
+		logger.Error("error in GET /chat/rooms/public", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	out := make([]chatRoom, len(rooms))
+	for i, room := range rooms {
+		sessions := chatSessionRetriever.AllSessions(room.Cookie())
+		cr := chatRoom{
+			CreateTime:   room.CreateTime(),
+			Name:         room.Name(),
+			Participants: make([]aimChatUserHandle, len(sessions)),
+			URL:          room.URL().String(),
+		}
+		for j, sess := range sessions {
+			cr.Participants[j] = aimChatUserHandle{
+				ID:         sess.IdentScreenName().String(),
+				ScreenName: sess.DisplayScreenName().String(),
+			}
+		}
+
+		out[i] = cr
+	}
+
+	writeUnescapeChatURL(w, out)
+}
+
+// deletePublicChatHandler handles the DELETE /chat/room/public endpoint.41
+func deletePublicChatHandler(w http.ResponseWriter, r *http.Request, chatRoomDeleter ChatRoomDeleter, logger *slog.Logger) {
+	input := chatRoomDelete{}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "malformed input", http.StatusBadRequest)
+		return
+	}
+
+	if len(input.Names) == 0 {
+		http.Error(w, "no chat room names provided", http.StatusBadRequest)
+		return
+	}
+
+	err := chatRoomDeleter.DeleteChatRooms(r.Context(), state.PublicExchange, input.Names)
+	if err != nil {
+		logger.Error("error deleting public chat rooms DELETE /chat/room/public", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+	_, _ = fmt.Fprintln(w, "Chat rooms deleted successfully.")
+}
+
 func userFromBody(r *http.Request) (u userWithPassword, err error) {
 	u = userWithPassword{}
 	if err = json.NewDecoder(r.Body).Decode(&u); err != nil {

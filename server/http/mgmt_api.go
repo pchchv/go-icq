@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/pchchv/go-icq/state"
@@ -321,6 +322,81 @@ func deleteUserHandler(w http.ResponseWriter, r *http.Request, manager UserManag
 
 	w.WriteHeader(http.StatusNoContent)
 	_, _ = fmt.Fprintln(w, "User account successfully deleted.")
+}
+
+// getSessionHandler handles GET /session endpoint.
+func getSessionHandler(w http.ResponseWriter, r *http.Request, sessionRetriever SessionRetriever, nowFn func() time.Time) {
+	var allSessions []*state.Session
+	w.Header().Set("Content-Type", "application/json")
+	if screenName := r.PathValue("screenname"); screenName != "" {
+		session := sessionRetriever.RetrieveSession(state.NewIdentScreenName(screenName))
+		if session == nil {
+			http.Error(w, "session not found", http.StatusNotFound)
+			return
+		}
+
+		allSessions = append(allSessions, session)
+	} else {
+		allSessions = sessionRetriever.AllSessions()
+	}
+
+	ou := onlineUsers{
+		Count:    len(allSessions),
+		Sessions: make([]sessionHandle, len(allSessions)),
+	}
+	for i, s := range allSessions {
+		instances := s.Instances()
+		instanceHandles := make([]instanceHandle, len(instances))
+		for j, inst := range instances {
+			instanceIdleSeconds := 0
+			if inst.Idle() {
+				instanceIdleSeconds = int(nowFn().Sub(inst.IdleTime()).Seconds())
+			}
+
+			awayMsg, _ := inst.AwayMessage()
+			instanceHandles[j] = instanceHandle{
+				Num:         int(inst.Num()),
+				IdleSeconds: instanceIdleSeconds,
+				IsAway:      inst.Away(),
+				AwayMessage: awayMsg,
+				IsInvisible: inst.Invisible(),
+			}
+			ra := inst.RemoteAddr()
+			if ra != nil {
+				instanceHandles[j].RemoteAddr = ra.Addr().String()
+				instanceHandles[j].RemotePort = int(ra.Port())
+			}
+		}
+
+		var sessionIdleSeconds int
+		if s.Idle() {
+			sessionIdleSeconds = int(nowFn().Sub(s.IdleTime()).Seconds())
+		}
+
+		var awayMessage string
+		allAway := s.Away()
+		if allAway {
+			awayMessage = s.AwayMessage()
+		}
+
+		ou.Sessions[i] = sessionHandle{
+			ID:            s.IdentScreenName().String(),
+			ScreenName:    s.DisplayScreenName().String(),
+			OnlineSeconds: int(nowFn().Sub(s.SignonTime()).Seconds()),
+			IsAway:        allAway,
+			AwayMessage:   awayMessage,
+			IdleSeconds:   sessionIdleSeconds,
+			IsInvisible:   s.Invisible(),
+			IsICQ:         s.UIN() > 0,
+			InstanceCount: s.InstanceCount(),
+			Instances:     instanceHandles,
+		}
+	}
+
+	if err := json.NewEncoder(w).Encode(ou); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func userFromBody(r *http.Request) (u userWithPassword, err error) {

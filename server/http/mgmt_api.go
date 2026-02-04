@@ -399,6 +399,20 @@ func getSessionHandler(w http.ResponseWriter, r *http.Request, sessionRetriever 
 	}
 }
 
+// deleteSessionHandler handles DELETE /session/{screenname}
+func deleteSessionHandler(w http.ResponseWriter, r *http.Request, sessionRetriever SessionRetriever) {
+	w.Header().Set("Content-Type", "application/json")
+	if screenName := r.PathValue("screenname"); screenName != "" {
+		session := sessionRetriever.RetrieveSession(state.NewIdentScreenName(screenName))
+		if session == nil {
+			errorMsg(w, "session not found", http.StatusNotFound)
+			return
+		}
+		session.CloseSession()
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func userFromBody(r *http.Request) (u userWithPassword, err error) {
 	u = userWithPassword{}
 	if err = json.NewDecoder(r.Body).Decode(&u); err != nil {

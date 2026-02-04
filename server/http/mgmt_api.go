@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -486,6 +487,62 @@ func postDirectoryCategoryHandler(w http.ResponseWriter, r *http.Request, manage
 	}
 	if err := json.NewEncoder(w).Encode(dc); err != nil {
 		errorMsg(w, err.Error(), http.StatusBadRequest)
+	}
+}
+
+// getDirectoryCategoryHandler handles the GET /directory/category endpoint.
+func getDirectoryCategoryHandler(w http.ResponseWriter, r *http.Request, manager DirectoryManager, logger *slog.Logger) {
+	w.Header().Set("Content-Type", "application/json")
+	categories, err := manager.Categories(r.Context())
+	if err != nil {
+		logger.Error("error in GET /directory/category", "err", err.Error())
+		errorMsg(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	out := make([]directoryCategory, len(categories))
+	for i, category := range categories {
+		out[i] = directoryCategory{
+			ID:   category.ID,
+			Name: category.Name,
+		}
+	}
+
+	if err := json.NewEncoder(w).Encode(out); err != nil {
+		errorMsg(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// getDirectoryCategoryKeywordHandler handles the GET /directory/category/{id}/keyword endpoint.
+func getDirectoryCategoryKeywordHandler(w http.ResponseWriter, r *http.Request, manager DirectoryManager, logger *slog.Logger) {
+	w.Header().Set("Content-Type", "application/json")
+	categoryID, err := strconv.ParseUint(r.PathValue("id"), 10, 8)
+	if err != nil {
+		errorMsg(w, "invalid category ID", http.StatusBadRequest)
+		return
+	}
+
+	categories, err := manager.KeywordsByCategory(r.Context(), uint8(categoryID))
+	if err != nil {
+		if errors.Is(err, state.ErrKeywordCategoryNotFound) {
+			errorMsg(w, "category not found", http.StatusNotFound)
+		} else {
+			logger.Error("error in GET /directory/category/{id}/keyword", "err", err.Error())
+			errorMsg(w, "internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	out := make([]directoryCategory, len(categories))
+	for i, category := range categories {
+		out[i] = directoryCategory{
+			ID:   category.ID,
+			Name: category.Name,
+		}
+	}
+
+	if err := json.NewEncoder(w).Encode(out); err != nil {
+		errorMsg(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 

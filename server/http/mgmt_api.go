@@ -460,6 +460,35 @@ func getVersionHandler(w http.ResponseWriter, bld config.Build) {
 	}
 }
 
+// postDirectoryCategoryHandler handles the POST /directory/category endpoint.
+func postDirectoryCategoryHandler(w http.ResponseWriter, r *http.Request, manager DirectoryManager, logger *slog.Logger) {
+	input := directoryCategoryCreate{}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		errorMsg(w, "malformed input", http.StatusBadRequest)
+		return
+	}
+
+	category, err := manager.CreateCategory(r.Context(), input.Name)
+	if err != nil {
+		if errors.Is(err, state.ErrKeywordCategoryExists) {
+			errorMsg(w, "category already exists", http.StatusConflict)
+		} else {
+			logger.Error("error in POST /directory/category", "err", err.Error())
+			errorMsg(w, "internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	dc := directoryCategory{
+		ID:   category.ID,
+		Name: category.Name,
+	}
+	if err := json.NewEncoder(w).Encode(dc); err != nil {
+		errorMsg(w, err.Error(), http.StatusBadRequest)
+	}
+}
+
 func userFromBody(r *http.Request) (u userWithPassword, err error) {
 	u = userWithPassword{}
 	if err = json.NewDecoder(r.Body).Decode(&u); err != nil {

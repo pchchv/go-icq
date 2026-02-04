@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pchchv/go-icq/config"
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 )
@@ -448,6 +449,15 @@ func postInstantMessageHandler(w http.ResponseWriter, r *http.Request, messageRe
 	messageRelayer.RelayToScreenName(context.Background(), state.NewIdentScreenName(input.To), msg)
 	w.WriteHeader(http.StatusOK)
 	_, _ = fmt.Fprintln(w, "Message sent successfully.")
+}
+
+// getVersionHandler handles the GET /version endpoint.
+func getVersionHandler(w http.ResponseWriter, bld config.Build) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(bld); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func userFromBody(r *http.Request) (u userWithPassword, err error) {

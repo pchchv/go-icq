@@ -987,6 +987,89 @@ func putFeedbagBuddyHandler(w http.ResponseWriter, r *http.Request, buddyBroadca
 	}
 }
 
+// deleteFeedbagBuddyHandler handles the DELETE /feedbag/{screen_name}/group/{group_id}/buddy/{buddy_screen_name} endpoint.
+func deleteFeedbagBuddyHandler(w http.ResponseWriter, r *http.Request, buddyBroadcaster BuddyBroadcaster, feedbagManager FeedbagManager, sessionRetriever SessionRetriever, messageRelayer MessageRelayer, logger *slog.Logger) {
+	gid, err := strconv.ParseUint(r.PathValue("group_id"), 10, 16)
+	if err != nil {
+		errorMsg(w, "invalid group_id", http.StatusBadRequest)
+		return
+	}
+
+	groupID := uint16(gid)
+	if groupID == 0 {
+		errorMsg(w, "can't add buddies to root group", http.StatusBadRequest)
+		return
+	}
+
+	screenName := r.PathValue("screen_name")
+	if screenName == "" {
+		errorMsg(w, "screen_name is required", http.StatusBadRequest)
+		return
+	}
+
+	me := state.NewIdentScreenName(screenName)
+	buddyScreenName := r.PathValue("buddy_screen_name")
+	if buddyScreenName == "" {
+		errorMsg(w, "buddy_screen_name is required", http.StatusBadRequest)
+		return
+	}
+
+	deleteBuddy := state.NewIdentScreenName(buddyScreenName)
+	items, err := feedbagManager.Feedbag(r.Context(), me)
+	if err != nil {
+		logger.Error("error retrieving feedbag", "err", err.Error())
+		errorMsg(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	var groupFound bool
+	var itemToDelete *wire.FeedbagItem
+	for _, item := range items {
+		switch {
+		case item.ClassID == wire.FeedbagClassIdGroup && item.GroupID == groupID:
+			groupFound = true
+		case item.ClassID == wire.FeedbagClassIdBuddy && item.Name == buddyScreenName && item.GroupID == groupID:
+			itemToDelete = &item
+		}
+	}
+
+	switch {
+	case !groupFound:
+		errorMsg(w, "group not found", http.StatusNotFound)
+		return
+	case itemToDelete == nil:
+		errorMsg(w, "buddy not found", http.StatusNotFound)
+		return
+	}
+
+	if err := feedbagManager.FeedbagDelete(r.Context(), me, []wire.FeedbagItem{*itemToDelete}); err != nil {
+		logger.Error("error deleting feedbag item", "err", err.Error())
+		errorMsg(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	session := sessionRetriever.RetrieveSession(me)
+	if session != nil {
+		messageRelayer.RelayToScreenName(r.Context(), me, wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.Feedbag,
+				SubGroup:  wire.FeedbagDeleteItem,
+				RequestID: wire.ReqIDFromServer,
+			},
+			Body: wire.SNAC_0x13_0x0A_FeedbagDeleteItem{
+				Items: []wire.FeedbagItem{*itemToDelete},
+			},
+		})
+		instances := session.Instances()
+		if len(instances) > 0 {
+			if err := buddyBroadcaster.BroadcastVisibility(r.Context(), instances[0], []state.IdentScreenName{deleteBuddy}, true); err != nil {
+				logger.Error("error broadcasting visibility", "err", err.Error())
+			}
+		}
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func userFromBody(r *http.Request) (u userWithPassword, err error) {
 	u = userWithPassword{}
 	if err = json.NewDecoder(r.Body).Decode(&u); err != nil {

@@ -755,6 +755,74 @@ func getPrivateChatHandler(w http.ResponseWriter, r *http.Request, chatRoomRetri
 	writeUnescapeChatURL(w, out)
 }
 
+// getFeedbagBuddyHandler handles the GET /feedbag/{screen_name}/group endpoint.
+func getFeedbagBuddyHandler(w http.ResponseWriter, r *http.Request, feedbagManager FeedbagManager, logger *slog.Logger) {
+	w.Header().Set("Content-Type", "application/json")
+	screenName := r.PathValue("screen_name")
+	if screenName == "" {
+		errorMsg(w, "screen_name is required", http.StatusBadRequest)
+		return
+	}
+
+	items, err := feedbagManager.Feedbag(r.Context(), state.NewIdentScreenName(screenName))
+	if err != nil {
+		logger.Error("error retrieving feedbag", "err", err.Error())
+		errorMsg(w, "internal server error", http.StatusInternalServerError)
+		return
+	} else if len(items) == 0 {
+		errorMsg(w, "feedbag not found", http.StatusNotFound)
+		return
+	}
+
+	buddyMap := make(map[uint16][]*wire.FeedbagItem)
+	for _, item := range items {
+		switch item.ClassID {
+		case wire.FeedbagClassIdBuddy:
+			buddyMap[item.GroupID] = append(buddyMap[item.GroupID], &item)
+		}
+	}
+
+	type buddyItem struct {
+		Name   string `json:"name"`
+		ItemID uint16 `json:"item_id"`
+	}
+
+	type groupItem struct {
+		GroupID   uint16      `json:"group_id"`
+		GroupName string      `json:"group_name"`
+		Buddies   []buddyItem `json:"buddies"`
+	}
+
+	response := make([]groupItem, 0)
+	for _, item := range items {
+		switch item.ClassID {
+		case wire.FeedbagClassIdGroup:
+			if item.GroupID == 0 {
+				// can't add buddies to the root group
+				continue
+			}
+
+			group := groupItem{
+				GroupID:   item.GroupID,
+				GroupName: item.Name,
+				Buddies:   make([]buddyItem, 0, len(buddyMap[item.GroupID])),
+			}
+			for _, buddy := range buddyMap[item.GroupID] {
+				group.Buddies = append(group.Buddies, buddyItem{
+					Name:   buddy.Name,
+					ItemID: buddy.ItemID,
+				})
+			}
+
+			response = append(response, group)
+		}
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.Error("error encoding response", "err", err.Error())
+	}
+}
+
 func userFromBody(r *http.Request) (u userWithPassword, err error) {
 	u = userWithPassword{}
 	if err = json.NewDecoder(r.Body).Decode(&u); err != nil {

@@ -824,6 +824,169 @@ func getFeedbagBuddyHandler(w http.ResponseWriter, r *http.Request, feedbagManag
 	}
 }
 
+// putFeedbagBuddyHandler handles the PUT /feedbag/{screen_name}/group/{group_id}/buddy/{buddy_screen_name} endpoint.
+func putFeedbagBuddyHandler(w http.ResponseWriter, r *http.Request, buddyBroadcaster BuddyBroadcaster, feedbagManager FeedbagManager, sessionRetriever SessionRetriever, messageRelayer MessageRelayer, logger *slog.Logger, randInt func(n int) int) {
+	w.Header().Set("Content-Type", "application/json")
+	gid, err := strconv.ParseUint(r.PathValue("group_id"), 10, 16)
+	if err != nil {
+		errorMsg(w, "invalid group_id", http.StatusBadRequest)
+		return
+	}
+	groupID := uint16(gid)
+
+	if groupID == 0 {
+		errorMsg(w, "can't add buddies to root group", http.StatusBadRequest)
+		return
+	}
+
+	screenName := r.PathValue("screen_name")
+	if screenName == "" {
+		errorMsg(w, "screen_name is required", http.StatusBadRequest)
+		return
+	}
+	me := state.NewIdentScreenName(screenName)
+
+	buddyScreenName := r.PathValue("buddy_screen_name")
+	if buddyScreenName == "" {
+		errorMsg(w, "buddy_screen_name is required", http.StatusBadRequest)
+		return
+	}
+
+	newBuddy := state.DisplayScreenName(buddyScreenName)
+	if newBuddy.IsUIN() {
+		if err := newBuddy.ValidateUIN(); err != nil {
+			errorMsg(w, fmt.Sprintf("invalid uin: %s", err), http.StatusBadRequest)
+			return
+		}
+	} else {
+		if err := newBuddy.ValidateAIMHandle(); err != nil {
+			errorMsg(w, fmt.Sprintf("invalid screen name: %s", err), http.StatusBadRequest)
+			return
+		}
+	}
+
+	items, err := feedbagManager.Feedbag(r.Context(), me)
+	if err != nil {
+		logger.Error("error retrieving feedbag", "err", err.Error())
+		errorMsg(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	var count int
+	var group *wire.FeedbagItem
+	for _, item := range items {
+		switch {
+		case item.ClassID == wire.FeedbagClassIdGroup && item.GroupID == groupID:
+			group = &item
+		case item.ClassID == wire.FeedbagClassIdBuddy && item.GroupID == groupID:
+			count++
+			if item.Name == newBuddy.IdentScreenName().String() {
+				response := struct {
+					Name    string `json:"name"`
+					GroupID uint16 `json:"group_id"`
+					ItemID  uint16 `json:"item_id"`
+				}{
+					Name:    buddyScreenName,
+					GroupID: groupID,
+					ItemID:  item.ItemID,
+				}
+				w.WriteHeader(http.StatusOK)
+				if err := json.NewEncoder(w).Encode(response); err != nil {
+					logger.Error("error encoding response", "err", err.Error())
+				}
+				return
+			}
+		}
+	}
+
+	if count >= 30 {
+		errorMsg(w, "too many buddies in group. max: 30", http.StatusBadRequest)
+		return
+	}
+
+	if group == nil {
+		errorMsg(w, "group not found", http.StatusNotFound)
+		return
+	}
+
+	buddyItem := wire.FeedbagItem{
+		Name:    buddyScreenName,
+		GroupID: groupID,
+		ItemID:  randItemID(randInt, items),
+		ClassID: wire.FeedbagClassIdBuddy,
+	}
+	if buddyItem.ItemID == 0 {
+		errorMsg(w, "maximum items reached", http.StatusConflict)
+		return
+	}
+
+	if order, hasOrder := group.Bytes(wire.FeedbagAttributesOrder); hasOrder {
+		var memberIDs []uint16
+		if err := wire.UnmarshalBE(&memberIDs, bytes.NewReader(order)); err != nil {
+			logger.Error("error decoding order TLV", "err", err.Error())
+			errorMsg(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		group.Replace(wire.NewTLVBE(wire.FeedbagAttributesOrder, append(memberIDs, buddyItem.ItemID)))
+	} else {
+		group.Append(wire.NewTLVBE(wire.FeedbagAttributesOrder, []uint16{buddyItem.ItemID}))
+	}
+
+	updates := []wire.FeedbagItem{
+		buddyItem,
+		*group,
+	}
+	if err := feedbagManager.FeedbagUpsert(r.Context(), me, updates); err != nil {
+		logger.Error("error inserting feedbag item", "err", err.Error())
+		errorMsg(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	session := sessionRetriever.RetrieveSession(me)
+	if session != nil {
+		messageRelayer.RelayToScreenName(r.Context(), me, wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.Feedbag,
+				SubGroup:  wire.FeedbagInsertItem,
+				RequestID: wire.ReqIDFromServer,
+			},
+			Body: wire.SNAC_0x13_0x09_FeedbagUpdateItem{
+				Items: []wire.FeedbagItem{buddyItem},
+			},
+		})
+		messageRelayer.RelayToScreenName(r.Context(), me, wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.Feedbag,
+				SubGroup:  wire.FeedbagUpdateItem,
+				RequestID: wire.ReqIDFromServer,
+			},
+			Body: wire.SNAC_0x13_0x09_FeedbagUpdateItem{
+				Items: []wire.FeedbagItem{*group},
+			},
+		})
+		instances := session.Instances()
+		if len(instances) > 0 {
+			if err := buddyBroadcaster.BroadcastVisibility(r.Context(), instances[0], []state.IdentScreenName{newBuddy.IdentScreenName()}, false); err != nil {
+				logger.Error("error broadcasting visibility", "err", err.Error())
+			}
+		}
+	}
+
+	response := struct {
+		Name    string `json:"name"`
+		GroupID uint16 `json:"group_id"`
+		ItemID  uint16 `json:"item_id"`
+	}{
+		Name:    buddyItem.Name,
+		GroupID: buddyItem.GroupID,
+		ItemID:  buddyItem.ItemID,
+	}
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		logger.Error("error encoding response", "err", err.Error())
+	}
+}
+
 func userFromBody(r *http.Request) (u userWithPassword, err error) {
 	u = userWithPassword{}
 	if err = json.NewDecoder(r.Body).Decode(&u); err != nil {

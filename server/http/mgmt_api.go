@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -892,4 +893,27 @@ func writeUnescapeChatURL(w http.ResponseWriter, out []chatRoom) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func randItemID(randInt func(n int) int, items []wire.FeedbagItem) uint16 {
+	num := uint16(randInt(math.MaxUint16))
+	for itemID := num; itemID != num-1; itemID++ {
+		if itemID == 0 {
+			continue
+		}
+
+		var exists bool
+		for _, item := range items {
+			if item.GroupID == itemID || item.ItemID == itemID {
+				exists = true
+				break
+			}
+		}
+
+		if !exists {
+			return itemID
+		}
+	}
+
+	return 0
 }

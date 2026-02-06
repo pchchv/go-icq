@@ -168,6 +168,36 @@ func getBARTHandler(w http.ResponseWriter, r *http.Request, bartAssetManager BAR
 	w.Write(body)
 }
 
+// deleteBARTHandler handles the DELETE /bart/{hash} endpoint.
+func deleteBARTHandler(w http.ResponseWriter, r *http.Request, bartAssetManager BARTAssetManager, logger *slog.Logger) {
+	w.Header().Set("Content-Type", "application/json")
+	// extract hash from URL path
+	hashStr := r.PathValue("hash")
+	if hashStr == "" {
+		errorMsg(w, "hash path parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	hashBytes, err := hex.DecodeString(hashStr)
+	if err != nil {
+		errorMsg(w, "invalid hash format", http.StatusBadRequest)
+		return
+	}
+
+	if err := bartAssetManager.DeleteBARTItem(r.Context(), hashBytes); err != nil {
+		if errors.Is(err, state.ErrBARTItemNotFound) {
+			errorMsg(w, "BART asset not found", http.StatusNotFound)
+		} else {
+			logger.Error("error in DELETE /bart", "err", err.Error())
+			errorMsg(w, "internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	msg := messageBody{Message: "BART asset deleted successfully."}
+	json.NewEncoder(w).Encode(msg)
+}
+
 // postUserHandler handles the POST /user endpoint.
 func postUserHandler(w http.ResponseWriter, r *http.Request, userManager UserManager, newUUID func() uuid.UUID, logger *slog.Logger) {
 	input, err := userFromBody(r)

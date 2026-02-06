@@ -236,3 +236,12 @@ type deleteKeywordParams []struct {
 	id  uint8
 	err error
 }
+
+type directoryManagerParams struct {
+	categoriesParams
+	deleteCategoryParams
+	createCategoryParams
+	keywordsByCategoryParams
+	deleteKeywordParams
+	createKeywordParams
+}

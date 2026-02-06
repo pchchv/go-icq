@@ -17,3 +17,19 @@ type ConfirmStatusParams []struct {
 	result     bool
 	err        error
 }
+
+// updateSuspendedStatus is the list of parameters passed at
+// the mock accountManager.updateSuspendedStatus call site.
+type updateSuspendedStatusParams []struct {
+	suspendedStatus uint16
+	screenName      state.IdentScreenName
+	err             error
+}
+
+// setBotStatusParams is the list of parameters passed at
+// the mock accountManager.SetBotStatus call site
+type setBotStatusParams []struct {
+	isBot      bool
+	screenName state.IdentScreenName
+	err        error
+}

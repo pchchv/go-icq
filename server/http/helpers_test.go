@@ -190,3 +190,18 @@ type sessionRetrieverParams struct {
 	sessionRetrieverAllSessionsParams
 	retrieveSessionByNameParams
 }
+
+// categoriesParams is the list of parameters passed at
+// the mock DirectoryManager.Categories call site.
+type categoriesParams []struct {
+	result []state.Category
+	err    error
+}
+
+// createCategoryParams is the list of parameters passed at
+// the mock DirectoryManager.CreateCategory call site.
+type createCategoryParams []struct {
+	result state.Category
+	name   string
+	err    error
+}

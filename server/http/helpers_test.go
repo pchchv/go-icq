@@ -158,3 +158,13 @@ type deleteUserParams []struct {
 	screenName state.IdentScreenName
 	err        error
 }
+
+// userManagerParams is a helper struct that
+// contains mock parameters for UserManager methods.
+type userManagerParams struct {
+	getUserParams
+	allUsersParams
+	deleteUserParams
+	insertUserParams
+	setUserPasswordParams
+}

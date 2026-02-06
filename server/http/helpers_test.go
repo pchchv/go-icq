@@ -121,3 +121,18 @@ type buddyIconMetadataParams []struct {
 	result     *wire.BARTID
 	err        error
 }
+
+// allUsersParams is the list of parameters passed at
+// the mock UserManager.AllUsers call site.
+type allUsersParams []struct {
+	result []state.User
+	err    error
+}
+
+// getUserParams is the list of parameters passed at
+// the mock UserManager.User call site.
+type getUserParams []struct {
+	screenName state.IdentScreenName
+	result     *state.User
+	err        error
+}

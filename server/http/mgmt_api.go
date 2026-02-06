@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"math"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
@@ -30,6 +31,158 @@ type BARTAsset struct {
 type Server struct {
 	server http.Server
 	logger *slog.Logger
+}
+
+func NewManagementAPI(bld config.Build, listener string, userManager UserManager, sessionRetriever SessionRetriever, buddyBroadcaster BuddyBroadcaster, chatRoomRetriever ChatRoomRetriever, chatRoomCreator ChatRoomCreator, chatRoomDeleter ChatRoomDeleter, chatSessionRetriever ChatSessionRetriever, directoryManager DirectoryManager, messageRelayer MessageRelayer, bartAssetManager BARTAssetManager, feedbagRetriever FeedBagRetriever, feedbagManager FeedbagManager, accountManager AccountManager, profileRetriever ProfileRetriever, webAPIKeyManager WebAPIKeyManager, logger *slog.Logger) *Server {
+	mux := http.NewServeMux()
+	// handlers for '/user' route
+	mux.HandleFunc("DELETE /user", func(w http.ResponseWriter, r *http.Request) {
+		deleteUserHandler(w, r, userManager, logger)
+	})
+	mux.HandleFunc("GET /user", func(w http.ResponseWriter, r *http.Request) {
+		getUserHandler(w, r, userManager, logger)
+	})
+	mux.HandleFunc("POST /user", func(w http.ResponseWriter, r *http.Request) {
+		postUserHandler(w, r, userManager, uuid.New, logger)
+	})
+
+	// handlers for '/user/password' route
+	mux.HandleFunc("PUT /user/password", func(w http.ResponseWriter, r *http.Request) {
+		putUserPasswordHandler(w, r, userManager, logger)
+	})
+
+	// handlers for '/user/{screenname}/account' route
+	mux.HandleFunc("GET /user/{screenname}/account", func(w http.ResponseWriter, r *http.Request) {
+		getUserAccountHandler(w, r, userManager, accountManager, profileRetriever, logger)
+	})
+	mux.HandleFunc("PATCH /user/{screenname}/account", func(w http.ResponseWriter, r *http.Request) {
+		patchUserAccountHandler(w, r, userManager, accountManager, logger)
+	})
+
+	// handlers for '/user/{screenname}/icon' route
+	mux.HandleFunc("GET /user/{screenname}/icon", func(w http.ResponseWriter, r *http.Request) {
+		getUserBuddyIconHandler(w, r, userManager, feedbagRetriever, bartAssetManager, logger)
+	})
+
+	// handlers for '/session' route
+	mux.HandleFunc("GET /session", func(w http.ResponseWriter, r *http.Request) {
+		getSessionHandler(w, r, sessionRetriever, time.Now)
+	})
+
+	// handlers for '/session/{screenname}' route
+	mux.HandleFunc("GET /session/{screenname}", func(w http.ResponseWriter, r *http.Request) {
+		getSessionHandler(w, r, sessionRetriever, time.Now)
+	})
+	mux.HandleFunc("DELETE /session/{screenname}", func(w http.ResponseWriter, r *http.Request) {
+		deleteSessionHandler(w, r, sessionRetriever)
+	})
+
+	// handlers for '/chat/room/public' route
+	mux.HandleFunc("GET /chat/room/public", func(w http.ResponseWriter, r *http.Request) {
+		getPublicChatHandler(w, r, chatRoomRetriever, chatSessionRetriever, logger)
+	})
+	mux.HandleFunc("POST /chat/room/public", func(w http.ResponseWriter, r *http.Request) {
+		postPublicChatHandler(w, r, chatRoomCreator, logger)
+	})
+	mux.HandleFunc("DELETE /chat/room/public", func(w http.ResponseWriter, r *http.Request) {
+		deletePublicChatHandler(w, r, chatRoomDeleter, logger)
+	})
+
+	// handlers for '/chat/room/private' route
+	mux.HandleFunc("GET /chat/room/private", func(w http.ResponseWriter, r *http.Request) {
+		getPrivateChatHandler(w, r, chatRoomRetriever, chatSessionRetriever, logger)
+	})
+
+	// handlers for '/instant-message' route
+	mux.HandleFunc("POST /instant-message", func(w http.ResponseWriter, r *http.Request) {
+		postInstantMessageHandler(w, r, messageRelayer, logger)
+	})
+
+	// handlers for '/version' route
+	mux.HandleFunc("GET /version", func(w http.ResponseWriter, r *http.Request) {
+		getVersionHandler(w, bld)
+	})
+
+	// handlers for '/admin/webapi/keys' route - Web API key management
+	mux.HandleFunc("POST /admin/webapi/keys", func(w http.ResponseWriter, r *http.Request) {
+		postWebAPIKeyHandler(w, r, webAPIKeyManager, uuid.New, logger)
+	})
+	mux.HandleFunc("GET /admin/webapi/keys", func(w http.ResponseWriter, r *http.Request) {
+		getWebAPIKeysHandler(w, r, webAPIKeyManager, logger)
+	})
+	mux.HandleFunc("GET /admin/webapi/keys/{id}", func(w http.ResponseWriter, r *http.Request) {
+		getWebAPIKeyHandler(w, r, webAPIKeyManager, logger)
+	})
+	mux.HandleFunc("PUT /admin/webapi/keys/{id}", func(w http.ResponseWriter, r *http.Request) {
+		putWebAPIKeyHandler(w, r, webAPIKeyManager, logger)
+	})
+	mux.HandleFunc("DELETE /admin/webapi/keys/{id}", func(w http.ResponseWriter, r *http.Request) {
+		deleteWebAPIKeyHandler(w, r, webAPIKeyManager, logger)
+	})
+
+	// handlers for '/directory/category' route
+	mux.HandleFunc("GET /directory/category", func(w http.ResponseWriter, r *http.Request) {
+		getDirectoryCategoryHandler(w, r, directoryManager, logger)
+	})
+	mux.HandleFunc("POST /directory/category", func(w http.ResponseWriter, r *http.Request) {
+		postDirectoryCategoryHandler(w, r, directoryManager, logger)
+	})
+
+	// handlers for '/directory/category/{id}' route
+	mux.HandleFunc("DELETE /directory/category/{id}", func(w http.ResponseWriter, r *http.Request) {
+		deleteDirectoryCategoryHandler(w, r, directoryManager, logger)
+	})
+
+	// handlers for '/directory/category/{id}/keyword' route
+	mux.HandleFunc("GET /directory/category/{id}/keyword", func(w http.ResponseWriter, r *http.Request) {
+		getDirectoryCategoryKeywordHandler(w, r, directoryManager, logger)
+	})
+
+	// handlers for '/directory/keyword' route
+	mux.HandleFunc("POST /directory/keyword", func(w http.ResponseWriter, r *http.Request) {
+		postDirectoryKeywordHandler(w, r, directoryManager, logger)
+	})
+
+	// handlers for '/directory/keyword/{id}' route
+	mux.HandleFunc("DELETE /directory/keyword/{id}", func(w http.ResponseWriter, r *http.Request) {
+		deleteDirectoryKeywordHandler(w, r, directoryManager, logger)
+	})
+
+	// handlers for '/bart' route
+	mux.HandleFunc("GET /bart", func(w http.ResponseWriter, r *http.Request) {
+		getBARTByTypeHandler(w, r, bartAssetManager, logger)
+	})
+
+	// handlers for '/bart/{hash}' route
+	mux.HandleFunc("GET /bart/{hash}", func(w http.ResponseWriter, r *http.Request) {
+		getBARTHandler(w, r, bartAssetManager, logger)
+	})
+	mux.HandleFunc("POST /bart/{hash}", func(w http.ResponseWriter, r *http.Request) {
+		postBARTHandler(w, r, bartAssetManager, logger)
+	})
+	mux.HandleFunc("DELETE /bart/{hash}", func(w http.ResponseWriter, r *http.Request) {
+		deleteBARTHandler(w, r, bartAssetManager, logger)
+	})
+
+	// handlers for '/feedbag/{screen_name}/group' route
+	mux.HandleFunc("GET /feedbag/{screen_name}/group", func(w http.ResponseWriter, r *http.Request) {
+		getFeedbagBuddyHandler(w, r, feedbagManager, logger)
+	})
+
+	// handlers for '/feedbag/{screen_name}/group/{group_id}/buddy/{buddy_screen_name}' route
+	mux.HandleFunc("PUT /feedbag/{screen_name}/group/{group_id}/buddy/{buddy_screen_name}", func(w http.ResponseWriter, r *http.Request) {
+		putFeedbagBuddyHandler(w, r, buddyBroadcaster, feedbagManager, sessionRetriever, messageRelayer, logger, rand.Intn)
+	})
+	mux.HandleFunc("DELETE /feedbag/{screen_name}/group/{group_id}/buddy/{buddy_screen_name}", func(w http.ResponseWriter, r *http.Request) {
+		deleteFeedbagBuddyHandler(w, r, buddyBroadcaster, feedbagManager, sessionRetriever, messageRelayer, logger)
+	})
+	return &Server{
+		server: http.Server{
+			Addr:    listener,
+			Handler: mux,
+		},
+		logger: logger,
+	}
 }
 
 func (s *Server) ListenAndServe() error {

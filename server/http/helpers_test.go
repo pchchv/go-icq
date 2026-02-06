@@ -183,3 +183,10 @@ type retrieveSessionByNameParams []struct {
 	screenName state.IdentScreenName
 	result     *state.Session
 }
+
+// sessionRetrieverParams is a helper struct that
+// contains mock parameters for SessionRetriever methods.
+type sessionRetrieverParams struct {
+	sessionRetrieverAllSessionsParams
+	retrieveSessionByNameParams
+}

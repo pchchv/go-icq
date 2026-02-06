@@ -106,3 +106,9 @@ type broadcastVisibilityParams []struct {
 	err            error
 	sendDepartures bool
 }
+
+// buddyBroadcasterParams is a helper struct that
+// contains mock parameters for BuddyBroadcaster methods.
+type buddyBroadcasterParams struct {
+	broadcastVisibilityParams
+}

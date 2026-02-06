@@ -63,3 +63,9 @@ type allChatRoomsParams []struct {
 	result   []state.ChatRoom
 	err      error
 }
+
+// chatRoomRetrieverParams is a helper struct that
+// contains mock parameters for ChatRoomRetriever methods
+type chatRoomRetrieverParams struct {
+	allChatRoomsParams
+}

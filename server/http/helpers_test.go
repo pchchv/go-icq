@@ -77,3 +77,9 @@ type deleteChatRoomsParams []struct {
 	names    []string
 	err      error
 }
+
+// chatRoomDeleterParams is a helper struct that
+// contains mock parameters for ChatRoomDeleter methods
+type chatRoomDeleterParams struct {
+	deleteChatRoomsParams
+}

@@ -168,3 +168,18 @@ type userManagerParams struct {
 	insertUserParams
 	setUserPasswordParams
 }
+
+// sessionRetrieverAllSessionsParams is
+// the list of parameters passed at
+// the mock SessionRetriever.AllSessions call site.
+type sessionRetrieverAllSessionsParams []struct {
+	result []*state.Session
+}
+
+// retrieveSessionByNameParams is
+// the list of parameters passed at
+// the mock SessionRetriever.RetrieveSession call site.
+type retrieveSessionByNameParams []struct {
+	screenName state.IdentScreenName
+	result     *state.Session
+}

@@ -99,6 +99,75 @@ func postBARTHandler(w http.ResponseWriter, r *http.Request, bartAssetManager BA
 	json.NewEncoder(w).Encode(response)
 }
 
+// getBARTByTypeHandler handles the GET /bart endpoint.
+func getBARTByTypeHandler(w http.ResponseWriter, r *http.Request, bartAssetManager BARTAssetManager, logger *slog.Logger) {
+	w.Header().Set("Content-Type", "application/json")
+	// get type from query parameter (required)
+	typeStr := r.URL.Query().Get("type")
+	if typeStr == "" {
+		errorMsg(w, "type query parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	typeVal, err := strconv.ParseUint(typeStr, 10, 16)
+	if err != nil {
+		errorMsg(w, "invalid type ID", http.StatusBadRequest)
+		return
+	}
+
+	itemType := uint16(typeVal)
+	// get BART items, filtered by type
+	items, err := bartAssetManager.ListBARTItems(r.Context(), itemType)
+	if err != nil {
+		logger.Error("error listing BART items", "err", err.Error())
+		errorMsg(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// convert to BARTAsset format
+	assets := make([]BARTAsset, 0, len(items))
+	for _, item := range items {
+		assets = append(assets, BARTAsset{
+			Hash: item.Hash,
+			Type: item.Type,
+		})
+	}
+
+	if err := json.NewEncoder(w).Encode(assets); err != nil {
+		logger.Error("error encoding response", "err", err.Error())
+	}
+}
+
+// getBARTHandler handles the GET /bart/{hash} endpoint.
+func getBARTHandler(w http.ResponseWriter, r *http.Request, bartAssetManager BARTAssetManager, logger *slog.Logger) {
+	hashStr := r.PathValue("hash")
+	if hashStr == "" {
+		errorMsg(w, "hash is required", http.StatusBadRequest)
+		return
+	}
+
+	hashBytes, err := hex.DecodeString(hashStr)
+	if err != nil {
+		errorMsg(w, "invalid hash format", http.StatusBadRequest)
+		return
+	}
+
+	body, err := bartAssetManager.BARTItem(r.Context(), hashBytes)
+	if err != nil {
+		logger.Error("error retrieving BART asset", "err", err.Error())
+		errorMsg(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if len(body) == 0 {
+		errorMsg(w, "BART asset not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Write(body)
+}
+
 // postUserHandler handles the POST /user endpoint.
 func postUserHandler(w http.ResponseWriter, r *http.Request, userManager UserManager, newUUID func() uuid.UUID, logger *slog.Logger) {
 	input, err := userFromBody(r)

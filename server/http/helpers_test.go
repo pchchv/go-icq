@@ -69,3 +69,11 @@ type allChatRoomsParams []struct {
 type chatRoomRetrieverParams struct {
 	allChatRoomsParams
 }
+
+// deleteChatRoomsParams is the list of parameters passed at
+// the mock ChatRoomDeleter.DeleteChatRooms call site
+type deleteChatRoomsParams []struct {
+	exchange uint16
+	names    []string
+	err      error
+}

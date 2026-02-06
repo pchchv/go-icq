@@ -136,3 +136,25 @@ type getUserParams []struct {
 	result     *state.User
 	err        error
 }
+
+// setUserPasswordParams is the list of parameters passed at
+// the mock UserManager.SetUserPassword call site.
+type setUserPasswordParams []struct {
+	screenName  state.IdentScreenName
+	newPassword string
+	err         error
+}
+
+// insertUserParams is the list of parameters passed at
+// the mock UserManager.InsertUser call site.
+type insertUserParams []struct {
+	u   state.User
+	err error
+}
+
+// deleteUserParams is the list of parameters passed at
+// the mock UserManager.DeleteUser call site.
+type deleteUserParams []struct {
+	screenName state.IdentScreenName
+	err        error
+}

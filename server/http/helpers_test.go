@@ -91,3 +91,9 @@ type chatSessionRetrieverAllSessionsParams []struct {
 	cookie string
 	result []*state.Session
 }
+
+// chatSessionRetrieverParams is a helper struct that
+// contains mock parameters for ChatSessionRetriever methods.
+type chatSessionRetrieverParams struct {
+	chatSessionRetrieverAllSessionsParams
+}

@@ -55,3 +55,11 @@ type accountManagerParams struct {
 	setBotStatusParams
 	updateSuspendedStatusParams
 }
+
+// allChatRoomsParams is the list of parameters passed at
+// the mock ChatRoomRetriever.AllChatRooms call site
+type allChatRoomsParams []struct {
+	exchange uint16
+	result   []state.ChatRoom
+	err      error
+}

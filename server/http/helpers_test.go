@@ -4,6 +4,7 @@ import (
 	"net/mail"
 
 	"github.com/pchchv/go-icq/state"
+	"github.com/pchchv/go-icq/wire"
 )
 
 // RegStatusParams is the list of parameters passed at
@@ -111,4 +112,12 @@ type broadcastVisibilityParams []struct {
 // contains mock parameters for BuddyBroadcaster methods.
 type buddyBroadcasterParams struct {
 	broadcastVisibilityParams
+}
+
+// buddyIconMetadataParams is the list of parameters passed at the
+// mock FeedBagRetriever.BuddyIconMetadataParams call site.
+type buddyIconMetadataParams []struct {
+	screenName state.IdentScreenName
+	result     *wire.BARTID
+	err        error
 }

@@ -19,6 +19,12 @@ import (
 	"github.com/pchchv/go-icq/wire"
 )
 
+// BARTAsset represents a BART asset entry.
+type BARTAsset struct {
+	Hash string `json:"hash"`
+	Type uint16 `json:"type"`
+}
+
 type Server struct {
 	server http.Server
 	logger *slog.Logger

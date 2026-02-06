@@ -23,7 +23,7 @@ type ConfirmStatusParams []struct {
 }
 
 // EmailAddressParams is the list of parameters passed at
-// the mock accountManager.EmailAddress call site
+// the mock accountManager.EmailAddress call site.
 type EmailAddressParams []struct {
 	screenName state.IdentScreenName
 	result     *mail.Address
@@ -39,7 +39,7 @@ type updateSuspendedStatusParams []struct {
 }
 
 // setBotStatusParams is the list of parameters passed at
-// the mock accountManager.SetBotStatus call site
+// the mock accountManager.SetBotStatus call site.
 type setBotStatusParams []struct {
 	isBot      bool
 	screenName state.IdentScreenName
@@ -57,7 +57,7 @@ type accountManagerParams struct {
 }
 
 // allChatRoomsParams is the list of parameters passed at
-// the mock ChatRoomRetriever.AllChatRooms call site
+// the mock ChatRoomRetriever.AllChatRooms call site.
 type allChatRoomsParams []struct {
 	exchange uint16
 	result   []state.ChatRoom
@@ -65,13 +65,13 @@ type allChatRoomsParams []struct {
 }
 
 // chatRoomRetrieverParams is a helper struct that
-// contains mock parameters for ChatRoomRetriever methods
+// contains mock parameters for ChatRoomRetriever methods.
 type chatRoomRetrieverParams struct {
 	allChatRoomsParams
 }
 
 // deleteChatRoomsParams is the list of parameters passed at
-// the mock ChatRoomDeleter.DeleteChatRooms call site
+// the mock ChatRoomDeleter.DeleteChatRooms call site.
 type deleteChatRoomsParams []struct {
 	exchange uint16
 	names    []string
@@ -79,7 +79,15 @@ type deleteChatRoomsParams []struct {
 }
 
 // chatRoomDeleterParams is a helper struct that
-// contains mock parameters for ChatRoomDeleter methods
+// contains mock parameters for ChatRoomDeleter methods.
 type chatRoomDeleterParams struct {
 	deleteChatRoomsParams
+}
+
+// chatSessionRetrieverAllSessionsParams is
+// the list of parameters passed at the
+// mock ChatSessionRetriever.AllSessions call site.
+type chatSessionRetrieverAllSessionsParams []struct {
+	cookie string
+	result []*state.Session
 }

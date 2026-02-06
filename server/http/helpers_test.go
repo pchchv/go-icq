@@ -1,6 +1,10 @@
 package http
 
-import "github.com/pchchv/go-icq/state"
+import (
+	"net/mail"
+
+	"github.com/pchchv/go-icq/state"
+)
 
 // RegStatusParams is the list of parameters passed at
 // the mock accountManager.RegStatus call site.
@@ -15,6 +19,14 @@ type RegStatusParams []struct {
 type ConfirmStatusParams []struct {
 	screenName state.IdentScreenName
 	result     bool
+	err        error
+}
+
+// EmailAddressParams is the list of parameters passed at
+// the mock accountManager.EmailAddress call site
+type EmailAddressParams []struct {
+	screenName state.IdentScreenName
+	result     *mail.Address
 	err        error
 }
 

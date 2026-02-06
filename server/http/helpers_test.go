@@ -45,3 +45,13 @@ type setBotStatusParams []struct {
 	screenName state.IdentScreenName
 	err        error
 }
+
+// accountManagerParams is a helper struct that
+// contains mock parameters for accountManager methods.
+type accountManagerParams struct {
+	RegStatusParams
+	EmailAddressParams
+	ConfirmStatusParams
+	setBotStatusParams
+	updateSuspendedStatusParams
+}

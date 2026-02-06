@@ -97,3 +97,12 @@ type chatSessionRetrieverAllSessionsParams []struct {
 type chatSessionRetrieverParams struct {
 	chatSessionRetrieverAllSessionsParams
 }
+
+// broadcastVisibilityParams is the list of parameters passed at
+// the mock BuddyBroadcaster.BroadcastVisibility call site.
+type broadcastVisibilityParams []struct {
+	filter         []state.IdentScreenName
+	you            *state.SessionInstance
+	err            error
+	sendDepartures bool
+}

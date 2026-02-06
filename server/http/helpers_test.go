@@ -9,3 +9,11 @@ type RegStatusParams []struct {
 	result     uint16
 	err        error
 }
+
+// ConfirmStatusParams is the list of parameters passed at
+// the mock accountManager.ConfirmStatus call site.
+type ConfirmStatusParams []struct {
+	screenName state.IdentScreenName
+	result     bool
+	err        error
+}

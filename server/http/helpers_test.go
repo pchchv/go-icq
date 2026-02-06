@@ -206,6 +206,13 @@ type createCategoryParams []struct {
 	err    error
 }
 
+// deleteCategoryParams is the list of parameters passed at
+// the mock DirectoryManager.DeleteCategory call site.
+type deleteCategoryParams []struct {
+	categoryID uint8
+	err        error
+}
+
 // createKeywordParams is the list of parameters passed at
 // the mock DirectoryManager.CreateKeyword call site.
 type createKeywordParams []struct {
@@ -221,4 +228,11 @@ type keywordsByCategoryParams []struct {
 	categoryID uint8
 	result     []state.Keyword
 	err        error
+}
+
+// deleteKeywordParams is the list of parameters passed at
+// the mock DirectoryManager.DeleteKeyword call site.
+type deleteKeywordParams []struct {
+	id  uint8
+	err error
 }

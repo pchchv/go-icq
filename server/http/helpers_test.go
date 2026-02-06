@@ -205,3 +205,20 @@ type createCategoryParams []struct {
 	name   string
 	err    error
 }
+
+// createKeywordParams is the list of parameters passed at
+// the mock DirectoryManager.CreateKeyword call site.
+type createKeywordParams []struct {
+	name       string
+	categoryID uint8
+	result     state.Keyword
+	err        error
+}
+
+// keywordsByCategoryParams is the list of parameters passed at
+// the mock DirectoryManager.KeywordsByCategory call site.
+type keywordsByCategoryParams []struct {
+	categoryID uint8
+	result     []state.Keyword
+	err        error
+}

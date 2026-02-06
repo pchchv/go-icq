@@ -3,9 +3,11 @@ package http
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
 	"net/http"
@@ -42,6 +44,59 @@ func (s *Server) ListenAndServe() error {
 func (s *Server) Shutdown(ctx context.Context) error {
 	defer s.logger.Info("shutdown complete")
 	return s.server.Shutdown(ctx)
+}
+
+// postBARTHandler handles the POST /bart endpoint.
+func postBARTHandler(w http.ResponseWriter, r *http.Request, bartAssetManager BARTAssetManager, logger *slog.Logger) {
+	w.Header().Set("Content-Type", "application/json")
+	// extract hash from URL path
+	hashStr := r.PathValue("hash")
+	if hashStr == "" {
+		errorMsg(w, "hash path parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	hashBytes, err := hex.DecodeString(hashStr)
+	if err != nil {
+		errorMsg(w, "invalid hash format", http.StatusBadRequest)
+		return
+	}
+
+	typeStr := r.URL.Query().Get("type")
+	if typeStr == "" {
+		errorMsg(w, "type query parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	typeVal, err := strconv.ParseUint(typeStr, 10, 16)
+	if err != nil {
+		errorMsg(w, "invalid type ID", http.StatusBadRequest)
+		return
+	}
+
+	bartType := uint16(typeVal)
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		errorMsg(w, "failed to read request body", http.StatusBadRequest)
+		return
+	}
+
+	if err := bartAssetManager.InsertBARTItem(r.Context(), hashBytes, data, bartType); err != nil {
+		if errors.Is(err, state.ErrBARTItemExists) {
+			errorMsg(w, "BART asset already exists", http.StatusConflict)
+		} else {
+			logger.Error("error in POST /bart", "err", err.Error())
+			errorMsg(w, "internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	response := BARTAsset{
+		Hash: hex.EncodeToString(hashBytes),
+		Type: bartType,
+	}
+	json.NewEncoder(w).Encode(response)
 }
 
 // postUserHandler handles the POST /user endpoint.

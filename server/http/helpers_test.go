@@ -351,3 +351,19 @@ type bartAssetManagerParams struct {
 	insertBARTItemParams
 	deleteBARTItemParams
 }
+
+type mockParams struct {
+	userManagerParams
+	accountManagerParams
+	feedbagManagerParams
+	messageRelayerParams
+	chatRoomDeleterParams
+	bartAssetManagerParams
+	buddyBroadcasterParams
+	directoryManagerParams
+	feedBagRetrieverParams
+	profileRetrieverParams
+	sessionRetrieverParams
+	chatRoomRetrieverParams
+	chatSessionRetrieverParams
+}

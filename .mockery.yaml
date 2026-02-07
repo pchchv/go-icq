@@ -1,0 +1,50 @@
+dir: '{{.InterfaceDir}}'
+structname: mock{{.InterfaceName}}
+template: testify
+template-data:
+  unroll-variadic: true
+packages:
+  github.com/pchchv/go-icq/server/http:
+    interfaces:
+      AccountManager:
+        config:
+          filename: "mock_account_manager_test.go"
+      BARTAssetManager:
+        config:
+          filename: "mock_bart_asset_manager_test.go"
+      BuddyBroadcaster:
+        config:
+          filename: "mock_buddy_broadcaster_test.go"
+      ChatRoomCreator:
+        config:
+          filename: "mock_chat_room_creator_test.go"
+      ChatRoomRetriever:
+        config:
+          filename: "mock_chat_room_retriever_test.go"
+      ChatSessionRetriever:
+        config:
+          filename: "mock_chat_session_retriever_test.go"
+      DirectoryManager:
+        config:
+          filename: "mock_directory_manager_test.go"
+      FeedBagRetriever:
+        config:
+          filename: "mock_feedbag_retriever_test.go"
+      MessageRelayer:
+        config:
+          filename: "mock_message_relayer_test.go"
+      ProfileRetriever:
+        config:
+          filename: "mock_profile_retriever_test.go"
+      SessionRetriever:
+        config:
+          filename: "mock_session_retriever_test.go"
+      UserManager:
+        config:
+          filename: "mock_user_manager_test.go"
+      FeedbagManager:
+        config:
+          filename: "mock_feedbag_manager_test.go"
+      ChatRoomRegistry:
+        config:
+          filename: "mock_chat_room_registry_test.go"

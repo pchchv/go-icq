@@ -279,6 +279,38 @@ type feedBagRetrieverParams struct {
 	buddyIconMetadataParams
 }
 
+// feedbagUpsertParams is the list of parameters passed at
+// the mock FeedbagManager.FeedbagUpsert call site.
+type feedbagUpsertParams []struct {
+	screenName state.IdentScreenName
+	items      []wire.FeedbagItem
+	err        error
+}
+
+// feedbagDeleteParams is the list of parameters passed at
+// the mock FeedbagManager.FeedbagDelete call site.
+type feedbagDeleteParams []struct {
+	screenName state.IdentScreenName
+	items      []wire.FeedbagItem
+	err        error
+}
+
+// feedbagParams is the list of parameters passed at
+// the mock FeedbagManager.Feedbag call site.
+type feedbagParams []struct {
+	screenName state.IdentScreenName
+	result     []wire.FeedbagItem
+	err        error
+}
+
+// feedbagManagerParams is a helper struct that
+// contains mock parameters for FeedbagManager methods.
+type feedbagManagerParams struct {
+	feedbagParams
+	feedbagUpsertParams
+	feedbagDeleteParams
+}
+
 // bartItemParams is the list of parameters passed at the mock
 // BARTAssetManager.BARTItem call site
 type bartItemParams []struct {
@@ -311,34 +343,11 @@ type deleteBARTItemParams []struct {
 	err  error
 }
 
-// feedbagUpsertParams is the list of parameters passed at
-// the mock FeedbagManager.FeedbagUpsert call site.
-type feedbagUpsertParams []struct {
-	screenName state.IdentScreenName
-	items      []wire.FeedbagItem
-	err        error
-}
-
-// feedbagDeleteParams is the list of parameters passed at
-// the mock FeedbagManager.FeedbagDelete call site.
-type feedbagDeleteParams []struct {
-	screenName state.IdentScreenName
-	items      []wire.FeedbagItem
-	err        error
-}
-
-// feedbagParams is the list of parameters passed at
-// the mock FeedbagManager.Feedbag call site.
-type feedbagParams []struct {
-	screenName state.IdentScreenName
-	result     []wire.FeedbagItem
-	err        error
-}
-
-// feedbagManagerParams is a helper struct that
-// contains mock parameters for FeedbagManager methods.
-type feedbagManagerParams struct {
-	feedbagParams
-	feedbagUpsertParams
-	feedbagDeleteParams
+// bartAssetManagerParams is a helper struct that
+// contains mock parameters for BARTAssetManager methods.
+type bartAssetManagerParams struct {
+	bartItemParams
+	listBARTItemsParams
+	insertBARTItemParams
+	deleteBARTItemParams
 }

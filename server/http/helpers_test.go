@@ -252,3 +252,9 @@ type relayToScreenNameParams []struct {
 	screenName state.IdentScreenName
 	msg        wire.SNACMessage
 }
+
+// messageRelayerParams is a helper struct that
+// contains mock parameters for MessageRelayer methods.
+type messageRelayerParams struct {
+	relayToScreenNameParams
+}

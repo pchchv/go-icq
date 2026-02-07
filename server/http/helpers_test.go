@@ -266,3 +266,9 @@ type retrieveProfileParams []struct {
 	result     state.UserProfile
 	err        error
 }
+
+// profileRetrieverParams is a helper struct that
+// contains mock parameters for ProfileRetriever methods.
+type profileRetrieverParams struct {
+	retrieveProfileParams
+}

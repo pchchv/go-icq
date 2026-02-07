@@ -245,3 +245,10 @@ type directoryManagerParams struct {
 	deleteKeywordParams
 	createKeywordParams
 }
+
+// relayToScreenNameParams is the list of parameters passed at
+// the mock MessageRelayer.RelayToScreenName call site.
+type relayToScreenNameParams []struct {
+	screenName state.IdentScreenName
+	msg        wire.SNACMessage
+}

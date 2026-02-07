@@ -2754,6 +2754,146 @@ func TestBARTHandler_DELETE(t *testing.T) {
 	}
 }
 
+func TestBARTHandler_POST(t *testing.T) {
+	tt := []struct {
+		name           string
+		hash           string
+		queryParams    string
+		requestBody    string
+		wantStatusCode int
+		wantResponse   string
+		mockParams     mockParams
+	}{
+		{
+			name:           "success with valid data",
+			hash:           "2B000001E4",
+			queryParams:    "?type=1",
+			requestBody:    "binary data",
+			wantStatusCode: http.StatusCreated,
+			wantResponse:   `{"hash":"2b000001e4","type":1}`,
+			mockParams: mockParams{
+				bartAssetManagerParams: bartAssetManagerParams{
+					insertBARTItemParams: insertBARTItemParams{
+						{
+							hash:     []byte{0x2B, 0x00, 0x00, 0x01, 0xE4},
+							blob:     []byte("binary data"),
+							itemType: 1,
+							err:      nil,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:           "missing hash parameter",
+			hash:           "",
+			queryParams:    "?type=1",
+			requestBody:    "binary data",
+			wantStatusCode: http.StatusBadRequest,
+			wantResponse:   `{"message":"hash path parameter is required"}`,
+		},
+		{
+			name:           "invalid hash format",
+			hash:           "invalid-hex",
+			queryParams:    "?type=1",
+			requestBody:    "binary data",
+			wantStatusCode: http.StatusBadRequest,
+			wantResponse:   `{"message":"invalid hash format"}`,
+		},
+		{
+			name:           "missing type parameter",
+			hash:           "2B000001E4",
+			queryParams:    "",
+			requestBody:    "binary data",
+			wantStatusCode: http.StatusBadRequest,
+			wantResponse:   `{"message":"type query parameter is required"}`,
+		},
+		{
+			name:           "invalid type parameter",
+			hash:           "2B000001E4",
+			queryParams:    "?type=invalid",
+			requestBody:    "binary data",
+			wantStatusCode: http.StatusBadRequest,
+			wantResponse:   `{"message":"invalid type ID"}`,
+		},
+		{
+			name:           "failed to read request body",
+			hash:           "2B000001E4",
+			queryParams:    "?type=1",
+			requestBody:    "", // This will cause an error when reading
+			wantStatusCode: http.StatusBadRequest,
+			wantResponse:   `{"message":"failed to read request body"}`,
+		},
+		{
+			name:           "asset already exists",
+			hash:           "2B000001E4",
+			queryParams:    "?type=1",
+			requestBody:    "binary data",
+			wantStatusCode: http.StatusConflict,
+			wantResponse:   `{"message":"BART asset already exists"}`,
+			mockParams: mockParams{
+				bartAssetManagerParams: bartAssetManagerParams{
+					insertBARTItemParams: insertBARTItemParams{
+						{
+							hash:     []byte{0x2B, 0x00, 0x00, 0x01, 0xE4},
+							blob:     []byte("binary data"),
+							itemType: 1,
+							err:      state.ErrBARTItemExists,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:           "internal server error",
+			hash:           "2B000001E4",
+			queryParams:    "?type=1",
+			requestBody:    "binary data",
+			wantStatusCode: http.StatusInternalServerError,
+			wantResponse:   `{"message":"internal server error"}`,
+			mockParams: mockParams{
+				bartAssetManagerParams: bartAssetManagerParams{
+					insertBARTItemParams: insertBARTItemParams{
+						{
+							hash:     []byte{0x2B, 0x00, 0x00, 0x01, 0xE4},
+							blob:     []byte("binary data"),
+							itemType: 1,
+							err:      errors.New("database error"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			var requestBody io.Reader
+			if tc.requestBody != "" {
+				requestBody = strings.NewReader(tc.requestBody)
+			} else {
+				requestBody = &errorReader{}
+			}
+
+			request := httptest.NewRequest(http.MethodPost, "/bart/"+tc.hash+tc.queryParams, requestBody)
+			// set the path value manually for testing
+			if tc.hash != "" {
+				request.SetPathValue("hash", tc.hash)
+			}
+
+			responseRecorder := httptest.NewRecorder()
+			mockBARTManager := newMockBARTAssetManager(t)
+			for _, params := range tc.mockParams.bartAssetManagerParams.insertBARTItemParams {
+				mockBARTManager.EXPECT().InsertBARTItem(matchContext(), params.hash, params.blob, params.itemType).Return(params.err)
+			}
+
+			postBARTHandler(responseRecorder, request, mockBARTManager, slog.Default())
+			assert.Equal(t, tc.wantStatusCode, responseRecorder.Code)
+			assert.JSONEq(t, tc.wantResponse, responseRecorder.Body.String())
+		})
+	}
+}
+
 func TestFeedbagBuddyHandler_GET(t *testing.T) {
 	tt := []struct {
 		name           string

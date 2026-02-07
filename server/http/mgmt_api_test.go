@@ -23,6 +23,14 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+// errorReader is a helper type that
+// always returns an error when reading.
+type errorReader struct{}
+
+func (er *errorReader) Read(p []byte) (n int, err error) {
+	return 0, errors.New("read error")
+}
+
 func TestVersionHandler_GET(t *testing.T) {
 	tt := []struct {
 		name       string

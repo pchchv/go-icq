@@ -272,3 +272,9 @@ type retrieveProfileParams []struct {
 type profileRetrieverParams struct {
 	retrieveProfileParams
 }
+
+// feedBagRetrieverParams is a helper struct that
+// contains mock parameters for FeedBagRetriever methods.
+type feedBagRetrieverParams struct {
+	buddyIconMetadataParams
+}

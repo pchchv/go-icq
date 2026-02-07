@@ -1,10 +1,12 @@
 package http
 
 import (
+	"context"
 	"net/mail"
 
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
+	"github.com/stretchr/testify/mock"
 )
 
 // RegStatusParams is the list of parameters passed at
@@ -366,4 +368,12 @@ type mockParams struct {
 	sessionRetrieverParams
 	chatRoomRetrieverParams
 	chatSessionRetrieverParams
+}
+
+// matchContext matches any instance of Context interface.
+func matchContext() interface{} {
+	return mock.MatchedBy(func(ctx any) bool {
+		_, ok := ctx.(context.Context)
+		return ok
+	})
 }

@@ -294,3 +294,19 @@ type feedbagDeleteParams []struct {
 	items      []wire.FeedbagItem
 	err        error
 }
+
+// feedbagParams is the list of parameters passed at
+// the mock FeedbagManager.Feedbag call site.
+type feedbagParams []struct {
+	screenName state.IdentScreenName
+	result     []wire.FeedbagItem
+	err        error
+}
+
+// feedbagManagerParams is a helper struct that
+// contains mock parameters for FeedbagManager methods.
+type feedbagManagerParams struct {
+	feedbagParams
+	feedbagUpsertParams
+	feedbagDeleteParams
+}

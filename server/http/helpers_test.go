@@ -278,3 +278,19 @@ type profileRetrieverParams struct {
 type feedBagRetrieverParams struct {
 	buddyIconMetadataParams
 }
+
+// feedbagUpsertParams is the list of parameters passed at
+// the mock FeedbagManager.FeedbagUpsert call site.
+type feedbagUpsertParams []struct {
+	screenName state.IdentScreenName
+	items      []wire.FeedbagItem
+	err        error
+}
+
+// feedbagDeleteParams is the list of parameters passed at
+// the mock FeedbagManager.FeedbagDelete call site.
+type feedbagDeleteParams []struct {
+	screenName state.IdentScreenName
+	items      []wire.FeedbagItem
+	err        error
+}

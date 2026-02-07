@@ -3710,10 +3710,10 @@ func TestFeedbagBuddyHandler_PUT(t *testing.T) {
 			for _, params := range tc.mockParams.buddyBroadcasterParams.broadcastVisibilityParams {
 				// use mock.MatchedBy to match any SessionInstance, since we're mainly verifying filter and sendDepartures
 				buddyBroadcaster.EXPECT().BroadcastVisibility(
-						matchContext(),
-						mock.AnythingOfType("*state.SessionInstance"),
-						params.filter,
-						params.sendDepartures,
+					matchContext(),
+					mock.AnythingOfType("*state.SessionInstance"),
+					params.filter,
+					params.sendDepartures,
 				).Return(params.err)
 			}
 
@@ -4217,10 +4217,10 @@ func TestFeedbagBuddyHandler_DELETE(t *testing.T) {
 
 			for _, params := range tc.mockParams.buddyBroadcasterParams.broadcastVisibilityParams {
 				buddyBroadcaster.EXPECT().BroadcastVisibility(
-						matchContext(),
-						mock.AnythingOfType("*state.SessionInstance"),
-						params.filter,
-						params.sendDepartures,
+					matchContext(),
+					mock.AnythingOfType("*state.SessionInstance"),
+					params.filter,
+					params.sendDepartures,
 				).Return(params.err)
 			}
 

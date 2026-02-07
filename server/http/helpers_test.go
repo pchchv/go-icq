@@ -258,3 +258,11 @@ type relayToScreenNameParams []struct {
 type messageRelayerParams struct {
 	relayToScreenNameParams
 }
+
+// retrieveProfileParams is the list of parameters passed at
+// the mock ProfileRetriever.Profile call site.
+type retrieveProfileParams []struct {
+	screenName state.IdentScreenName
+	result     state.UserProfile
+	err        error
+}

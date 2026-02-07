@@ -278,6 +278,15 @@ type profileRetrieverParams struct {
 type feedBagRetrieverParams struct {
 	buddyIconMetadataParams
 }
+
+// bartItemParams is the list of parameters passed at the mock
+// BARTAssetManager.BARTItem call site
+type bartItemParams []struct {
+	hash   []byte
+	result []byte
+	err    error
+}
+
 // insertBARTItemParams is the list of parameters passed at
 // the mock BARTAssetManager.InsertBARTItem call site.
 type insertBARTItemParams []struct {
@@ -293,6 +302,13 @@ type listBARTItemsParams []struct {
 	result   []state.BARTItem
 	itemType uint16
 	err      error
+}
+
+// deleteBARTItemParams is the list of parameters passed at the mock
+// BARTAssetManager.DeleteBARTItem call site
+type deleteBARTItemParams []struct {
+	hash []byte
+	err  error
 }
 
 // feedbagUpsertParams is the list of parameters passed at

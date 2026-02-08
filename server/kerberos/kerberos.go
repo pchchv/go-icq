@@ -7,8 +7,13 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/pchchv/go-icq/wire"
 	"golang.org/x/sync/errgroup"
 )
+
+type AuthService interface {
+	KerberosLogin(ctx context.Context, inBody wire.SNAC_0x050C_0x0002_KerberosLoginRequest, advertisedHost string) (wire.SNACMessage, error)
+}
 
 // Server hosts an HTTP endpoint capable of
 // handling AIM-style Kerberos authentication.

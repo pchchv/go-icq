@@ -48,3 +48,8 @@ packages:
       ChatRoomRegistry:
         config:
           filename: "mock_chat_room_registry_test.go"
+  github.com/pchchv/go-icq/server/kerberos:
+    interfaces:
+      AuthService:
+        config:
+          filename: "mock_auth_test.go"

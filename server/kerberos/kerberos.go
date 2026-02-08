@@ -1,9 +1,11 @@
 package kuberos
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -55,4 +57,53 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		s.logger.Info("shutdown complete")
 	}
 	return nil
+}
+
+// postHandler handles AIM-style Kerberos authentication for AIM 6.0+.
+func postHandler(w http.ResponseWriter, r *http.Request, authService AuthService, logger *slog.Logger, listenAddress string) {
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "unable to read HTTP body", http.StatusBadRequest)
+		return
+	}
+
+	var header wire.SNACFrame
+	reader := bytes.NewReader(b)
+	if err := wire.UnmarshalBE(&header, reader); err != nil {
+		http.Error(w, "unable to read kerberos login SNAC header", http.StatusBadRequest)
+		return
+	}
+
+	if header.FoodGroup != wire.Kerberos || header.SubGroup != wire.KerberosLoginRequest {
+		http.Error(w, "unexpected SNAC type", http.StatusBadRequest)
+		return
+	}
+
+	var body wire.SNAC_0x050C_0x0002_KerberosLoginRequest
+	if err := wire.UnmarshalBE(&body, reader); err != nil {
+		http.Error(w, "unable to read kerberos login SNAC body", http.StatusBadRequest)
+		return
+	}
+
+	response, err := authService.KerberosLogin(r.Context(), body, listenAddress)
+	if err != nil {
+		logger.Error("authService.KerberosLogin", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	logger = logger.With("ip", r.RemoteAddr)
+	switch v := response.Body.(type) {
+	case wire.SNAC_0x050C_0x0003_KerberosLoginSuccessResponse:
+		logger.InfoContext(r.Context(), "successful kerberos login", "screen_name", v.ClientPrincipal, "redirect_to", listenAddress)
+	case wire.SNAC_0x050C_0x0004_KerberosLoginErrResponse:
+		logger.InfoContext(r.Context(), "failed kerberos login", "screen_name", v.ScreenName)
+	}
+
+	w.Header().Set("Content-Type", "application/x-snac")
+	if err := wire.MarshalBE(response, w); err != nil {
+		logger.Error("unable to marshal SNAC response", "err", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
 }

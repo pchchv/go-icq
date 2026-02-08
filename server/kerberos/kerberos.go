@@ -1,4 +1,4 @@
-package kuberos
+package kerberos
 
 import (
 	"bytes"

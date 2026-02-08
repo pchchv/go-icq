@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/pchchv/go-icq/config"
 	"github.com/pchchv/go-icq/wire"
 	"golang.org/x/sync/errgroup"
 )
@@ -23,6 +24,27 @@ type AuthService interface {
 type Server struct {
 	servers []*http.Server
 	logger  *slog.Logger
+}
+
+func NewKerberosServer(listeners []config.Listener, logger *slog.Logger, authService AuthService) *Server {
+	servers := make([]*http.Server, 0, len(listeners))
+	for _, l := range listeners {
+		if l.KerberosListenAddress != "" {
+			mux := http.NewServeMux()
+			mux.HandleFunc("POST /", func(writer http.ResponseWriter, request *http.Request) {
+				postHandler(writer, request, authService, logger, l.BOSAdvertisedHostSSL)
+			})
+			servers = append(servers, &http.Server{
+				Addr:    l.KerberosListenAddress,
+				Handler: mux,
+			})
+		}
+	}
+
+	return &Server{
+		servers: servers,
+		logger:  logger,
+	}
 }
 
 func (s *Server) ListenAndServe() error {

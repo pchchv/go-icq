@@ -29,3 +29,35 @@ func NewChatRegistry() *ChatRegistry {
 		m:        sync.RWMutex{},
 	}
 }
+
+// Add registers metadata for a newly joined chat room and
+// returns a unique identifier for it.
+// If the room is already registered, it returns the existing ID.
+func (c *ChatRegistry) Add(room wire.ICBMRoomInfo) int {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	for chatID, r := range c.lookup {
+		if r == room {
+			return chatID
+		}
+	}
+
+	id := c.nextID
+	c.lookup[id] = room
+	c.nextID++
+	return id
+}
+
+// Sessions retrieves all the chat sessions.
+func (c *ChatRegistry) Sessions() []*state.SessionInstance {
+	c.m.RLock()
+	defer c.m.RUnlock()
+
+	sessions := make([]*state.SessionInstance, 0, len(c.sessions))
+	for _, s := range c.sessions {
+		sessions = append(sessions, s)
+	}
+
+	return sessions
+}

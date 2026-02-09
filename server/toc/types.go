@@ -91,3 +91,14 @@ type ICBMService interface {
 	ParameterQuery(ctx context.Context, inFrame wire.SNACFrame) wire.SNACMessage
 	ClientErr(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x04_0x0B_ICBMClientErr) error
 }
+
+// CookieBaker defines methods for issuing and verifying AIM authentication tokens ("cookies").
+// These tokens are used for authenticating client sessions with AIM services.
+type CookieBaker interface {
+	// Crack verifies and decodes a previously issued authentication token.
+	// Returns the original payload if the token is valid.
+	Crack(data []byte) ([]byte, error)
+	// Issue creates a new authentication token from the given payload.
+	// The resulting token can later be verified using Crack.
+	Issue(data []byte) ([]byte, error)
+}

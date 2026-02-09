@@ -135,6 +135,103 @@ type OSCARProxy struct {
 	HTTPIPRateLimiter *IPRateLimiter
 }
 
+// AddBuddy handles the toc_add_buddy TOC command.
+//
+// From the TiK documentation: Add buddies to your buddy list. This does not change your saved config.
+// Command syntax: toc_add_buddy <Buddy User 1> [<Buddy User2> [<Buddy User 3> [...]]]
+func (s OSCARProxy) AddBuddy(ctx context.Context, me *state.SessionInstance, args []byte) string {
+	if msg, isLimited := s.checkRateLimit(ctx, me, wire.Buddy, wire.BuddyAddBuddies); isLimited {
+		return msg
+	}
+
+	users, err := parseArgs(args)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	snac := wire.SNAC_0x03_0x04_BuddyAddBuddies{}
+	for _, sn := range users {
+		snac.Buddies = append(snac.Buddies, struct {
+			ScreenName string `oscar:"len_prefix=uint8"`
+		}{ScreenName: sn})
+	}
+
+	if err := s.BuddyService.AddBuddies(ctx, me, snac); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("BuddyService.AddBuddies: %w", err))
+	}
+
+	return ""
+}
+
+// AddPermit handles the toc_add_permit TOC command.
+//
+// From the TiK documentation:
+//
+//	ADD the following people to your permit mode.
+//	If you are in deny mode it	will switch you to permit mode first.
+//	With no arguments and in deny mode	this will switch you to permit none.
+//	If already in permit mode,
+//	no arguments does nothing and your permit list remains the same.
+//
+// Command syntax: toc_add_permit [ <User 1> [<User 2> [...]]]
+func (s OSCARProxy) AddPermit(ctx context.Context, me *state.SessionInstance, args []byte) string {
+	if msg, isLimited := s.checkRateLimit(ctx, me, wire.PermitDeny, wire.PermitDenyAddDenyListEntries); isLimited {
+		return msg
+	}
+
+	users, err := parseArgs(args)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	snac := wire.SNAC_0x09_0x05_PermitDenyAddPermListEntries{}
+	for _, sn := range users {
+		snac.Users = append(snac.Users, struct {
+			ScreenName string `oscar:"len_prefix=uint8"`
+		}{ScreenName: sn})
+	}
+
+	if err := s.PermitDenyService.AddPermListEntries(ctx, me, snac); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("PermitDenyService.AddPermListEntries: %w", err))
+	}
+
+	return ""
+}
+
+// AddDeny handles the toc_add_deny TOC command.
+//
+// From the TiK documentation:
+//
+//	ADD the following people to your deny mode.
+//	If you are in permit mode it will switch you to deny mode first.
+//	With no arguments and in permit mode, this will switch you to deny none.
+//	If already in deny mode, no arguments does nothing and your deny list remains unchanged.
+//
+// Command syntax: toc_add_deny [ <User 1> [<User 2> [...]]]
+func (s OSCARProxy) AddDeny(ctx context.Context, me *state.SessionInstance, args []byte) string {
+	if msg, isLimited := s.checkRateLimit(ctx, me, wire.PermitDeny, wire.PermitDenyAddDenyListEntries); isLimited {
+		return msg
+	}
+
+	users, err := parseArgs(args)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	snac := wire.SNAC_0x09_0x07_PermitDenyAddDenyListEntries{}
+	for _, sn := range users {
+		snac.Users = append(snac.Users, struct {
+			ScreenName string `oscar:"len_prefix=uint8"`
+		}{ScreenName: sn})
+	}
+
+	if err := s.PermitDenyService.AddDenyListEntries(ctx, me, snac); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("PermitDenyService.AddDenyListEntries: %w", err))
+	}
+
+	return ""
+}
+
 func (s OSCARProxy) checkRateLimit(ctx context.Context, sender *state.SessionInstance, foodGroup uint16, subGroup uint16) (string, bool) {
 	rateClassID, ok := s.SNACRateLimits.RateClassLookup(foodGroup, subGroup)
 	if !ok {

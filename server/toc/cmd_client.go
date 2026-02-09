@@ -1,6 +1,7 @@
 package toc
 
 import (
+	"log/slog"
 	"sync"
 
 	"github.com/pchchv/go-icq/state"
@@ -97,4 +98,33 @@ func (c *ChatRegistry) LookupRoom(chatID int) (room wire.ICBMRoomInfo, found boo
 
 	room, found = c.lookup[chatID]
 	return
+}
+
+// OSCARProxy acts as a bridge between TOC clients and the OSCAR server,
+// translating protocol messages between the two.
+//
+// It performs the following functions:
+//   - Receives TOC messages from the client, converts them into SNAC messages,
+//     and forwards them to the OSCAR server.
+//     The SNAC response is then converted back into a TOC response for the client.
+//   - Receives incoming messages from the
+//     OSCAR server and translates them into TOC responses for the client.
+type OSCARProxy struct {
+	AdminService      AdminService
+	AuthService       AuthService
+	BuddyListRegistry BuddyListRegistry
+	BuddyService      BuddyService
+	ChatNavService    ChatNavService
+	ChatService       ChatService
+	CookieBaker       CookieBaker
+	DirSearchService  DirSearchService
+	ICBMService       ICBMService
+	LocateService     LocateService
+	Logger            *slog.Logger
+	OServiceService   OServiceService
+	PermitDenyService PermitDenyService
+	TOCConfigStore    TOCConfigStore
+	SessionRetriever  SessionRetriever
+	SNACRateLimits    wire.SNACRateLimits
+	HTTPIPRateLimiter *IPRateLimiter
 }

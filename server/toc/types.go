@@ -33,3 +33,10 @@ type BuddyListRegistry interface {
 	RegisterBuddyList(ctx context.Context, user state.IdentScreenName) error
 	UnregisterBuddyList(ctx context.Context, user state.IdentScreenName) error
 }
+
+type BuddyService interface {
+	AddBuddies(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x03_0x04_BuddyAddBuddies) error
+	BroadcastBuddyDeparted(ctx context.Context, instance *state.SessionInstance) error
+	DelBuddies(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x03_0x05_BuddyDelBuddies) error
+	RightsQuery(ctx context.Context, inFrame wire.SNACFrame) wire.SNACMessage
+}

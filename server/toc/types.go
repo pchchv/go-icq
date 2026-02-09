@@ -26,3 +26,10 @@ type SessionRetriever interface {
 	// Returns the Session object if there are active instances with complete signon.
 	RetrieveSession(screenName state.IdentScreenName) *state.Session
 }
+
+// BuddyListRegistry is the interface for keeping track of users with active buddy lists.
+// Once registered, a user becomes visible to other users' buddy lists and vice versa.
+type BuddyListRegistry interface {
+	RegisterBuddyList(ctx context.Context, user state.IdentScreenName) error
+	UnregisterBuddyList(ctx context.Context, user state.IdentScreenName) error
+}

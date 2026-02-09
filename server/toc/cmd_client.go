@@ -1,8 +1,10 @@
 package toc
 
 import (
+	"context"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
@@ -127,4 +129,33 @@ type OSCARProxy struct {
 	SessionRetriever  SessionRetriever
 	SNACRateLimits    wire.SNACRateLimits
 	HTTPIPRateLimiter *IPRateLimiter
+}
+
+func (s OSCARProxy) checkRateLimit(ctx context.Context, sender *state.SessionInstance, foodGroup uint16, subGroup uint16) (string, bool) {
+	rateClassID, ok := s.SNACRateLimits.RateClassLookup(foodGroup, subGroup)
+	if !ok {
+		s.Logger.ErrorContext(ctx, "rate limit not found, allowing request through")
+		return "", false
+	}
+
+	if status := sender.Session().EvaluateRateLimit(time.Now(), rateClassID); status != wire.RateLimitStatusLimited {
+		return "", false
+	}
+
+	s.Logger.DebugContext(
+		ctx,
+		"(toc) rate limit exceeded, dropping SNAC",
+		"foodgroup",
+		wire.FoodGroupName(foodGroup),
+		"subgroup",
+		wire.SubGroupName(foodGroup, subGroup),
+	)
+	return rateLimitExceededErr, true
+}
+
+// runtimeErr is a convenience function that logs an
+// error and returns a TOC internal server error.
+func (s OSCARProxy) runtimeErr(ctx context.Context, err error) string {
+	s.Logger.ErrorContext(ctx, "internal service error", "err", err.Error())
+	return cmdInternalSvcErr
 }

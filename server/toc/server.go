@@ -26,3 +26,17 @@ func NewIPRateLimiter(rate rate.Limit, burst int, ttl time.Duration) *IPRateLimi
 		burst: burst,
 	}
 }
+
+// Allow returns true if the request from the
+// given IP is allowed under its rate limit.
+// If no limiter exists for the IP,
+// one is created and tracked in the cache.
+func (l *IPRateLimiter) Allow(ip string) (allowed bool) {
+	limiter, found := l.cache.Get(ip)
+	if !found {
+		limiter = rate.NewLimiter(l.rate, l.burst)
+		l.cache.Set(ip, limiter, cache.DefaultExpiration)
+	}
+
+	return limiter.(*rate.Limiter).Allow()
+}

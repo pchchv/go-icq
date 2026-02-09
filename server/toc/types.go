@@ -102,3 +102,11 @@ type CookieBaker interface {
 	// The resulting token can later be verified using Crack.
 	Issue(data []byte) ([]byte, error)
 }
+
+type TOCConfigStore interface {
+	// SetTOCConfig sets the user's TOC config.
+	// The TOC config is the server-side buddy list functionality for TOC.
+	// This configuration is not available to OSCAR clients.
+	SetTOCConfig(ctx context.Context, user state.IdentScreenName, config string) error
+	User(ctx context.Context, screenName state.IdentScreenName) (*state.User, error)
+}

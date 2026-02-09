@@ -87,3 +87,14 @@ func (c *ChatRegistry) RemoveSess(chatID int) {
 
 	delete(c.sessions, chatID)
 }
+
+// LookupRoom retrieves metadata for the chat room registered with chatID.
+// It returns the room metadata and a
+// boolean indicating whether the chat ID was found.
+func (c *ChatRegistry) LookupRoom(chatID int) (room wire.ICBMRoomInfo, found bool) {
+	c.m.RLock()
+	defer c.m.RUnlock()
+
+	room, found = c.lookup[chatID]
+	return
+}

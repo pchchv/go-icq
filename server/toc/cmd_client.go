@@ -61,3 +61,29 @@ func (c *ChatRegistry) Sessions() []*state.SessionInstance {
 
 	return sessions
 }
+
+// RegisterSess associates a chat session with a chat room.
+// If a session is already registered for the given chat ID, it will be overwritten.
+func (c *ChatRegistry) RegisterSess(chatID int, instance *state.SessionInstance) {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	c.sessions[chatID] = instance
+}
+
+// RetrieveSess retrieves the chat session associated with the given chat ID.
+// If no session is registered for the chat ID, it returns nil.
+func (c *ChatRegistry) RetrieveSess(chatID int) *state.SessionInstance {
+	c.m.RLock()
+	defer c.m.RUnlock()
+
+	return c.sessions[chatID]
+}
+
+// RemoveSess removes a chat session.
+func (c *ChatRegistry) RemoveSess(chatID int) {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	delete(c.sessions, chatID)
+}

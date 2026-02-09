@@ -1,8 +1,12 @@
 package toc
 
 import (
+	"bytes"
 	"context"
+	"encoding/csv"
+	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -158,4 +162,34 @@ func (s OSCARProxy) checkRateLimit(ctx context.Context, sender *state.SessionIns
 func (s OSCARProxy) runtimeErr(ctx context.Context, err error) string {
 	s.Logger.ErrorContext(ctx, "internal service error", "err", err.Error())
 	return cmdInternalSvcErr
+}
+
+// parseArgs extracts arguments from a TOC command.
+// Each positional argument is assigned to its corresponding args pointer.
+// It returns the remaining arguments as varargs.
+func parseArgs(payload []byte, args ...*string) (varArgs []string, err error) {
+	if len(payload) == 0 && len(args) == 0 {
+		return []string{}, nil
+	}
+
+	reader := csv.NewReader(bytes.NewReader(payload))
+	reader.Comma = ' '
+	reader.LazyQuotes = true
+	reader.TrimLeadingSpace = true
+	segs, err := reader.Read()
+	if err != nil {
+		return []string{}, fmt.Errorf("CSV reader error: %w", err)
+	} else if len(segs) < len(args) {
+		return []string{}, fmt.Errorf("command contains fewer arguments than expected")
+	}
+
+	// populate placeholder pointers with their corresponding values
+	for i, arg := range args {
+		if arg != nil {
+			*arg = strings.TrimSpace(segs[i])
+		}
+	}
+
+	// dump remaining arguments as varargs
+	return segs[len(args):], err
 }

@@ -1037,6 +1037,101 @@ func (s OSCARProxy) GetInfoURL(ctx context.Context, me *state.SessionInstance, a
 	return fmt.Sprintf("GOTO_URL:profile:info?%s", p.Encode())
 }
 
+// GetDirSearchURL handles the toc_dir_search TOC command.
+//
+// From the TiK documentation:
+//
+//	Perform a search of the Oscar Directory, using colon separated fields as in:
+//
+//	  "first name":"middle name":"last name":"maiden name":"city":"state":"country":"email"
+//
+// You can search by keyword by setting search terms in the 11th position
+// (this feature is not in the TiK docs but is present in the code):
+//
+//	::::::::::"search kw"
+//
+//	Returns either a GOTO_URL or ERROR msg.
+//
+// Command syntax: toc_dir_search <info information>
+func (s OSCARProxy) GetDirSearchURL(ctx context.Context, me *state.SessionInstance, args []byte) string {
+	if status := me.Session().EvaluateRateLimit(time.Now(), 1); status == wire.RateLimitStatusLimited {
+		return rateLimitExceededErr
+	}
+
+	var info string
+	if _, err := parseArgs(args, &info); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	info = unescape(info)
+	params := strings.Split(info, ":")
+	labels := []string{
+		"first_name",
+		"middle_name",
+		"last_name",
+		"maiden_name",
+		"city",
+		"state",
+		"country",
+		"email",
+		"nop", // unused placeholder
+		"nop",
+		"keyword",
+	}
+
+	// map labels to param values at their corresponding positions
+	p := url.Values{}
+	for i, param := range params {
+		if i >= len(labels) {
+			break
+		} else if param == "" {
+			continue
+		}
+
+		p.Add(labels[i], strings.Trim(param, "\""))
+	}
+
+	if len(p) == 0 {
+		return s.runtimeErr(ctx, errors.New("no search fields found"))
+	}
+
+	cookie, err := s.newHTTPAuthToken(me.IdentScreenName())
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("newHTTPAuthToken: %w", err))
+	}
+
+	p.Add("cookie", cookie)
+	return fmt.Sprintf("GOTO_URL:search results:dir_search?%s", p.Encode())
+}
+
+// GetDirURL handles the toc_get_dir TOC command.
+//
+// From the TiK documentation:
+//
+//	Gets a user's dir info a GOTO_URL or ERROR message will be sent back to the client.
+//
+// Command syntax: toc_get_dir <username>
+func (s OSCARProxy) GetDirURL(ctx context.Context, me *state.SessionInstance, args []byte) string {
+	if status := me.Session().EvaluateRateLimit(time.Now(), 1); status == wire.RateLimitStatusLimited {
+		return rateLimitExceededErr
+	}
+
+	var user string
+	if _, err := parseArgs(args, &user); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	cookie, err := s.newHTTPAuthToken(me.IdentScreenName())
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("newHTTPAuthToken: %w", err))
+	}
+
+	p := url.Values{}
+	p.Add("cookie", cookie)
+	p.Add("user", user)
+	return fmt.Sprintf("GOTO_URL:directory info:dir_info?%s", p.Encode())
+}
+
 func (s OSCARProxy) checkRateLimit(ctx context.Context, sender *state.SessionInstance, foodGroup uint16, subGroup uint16) (string, bool) {
 	rateClassID, ok := s.SNACRateLimits.RateClassLookup(foodGroup, subGroup)
 	if !ok {

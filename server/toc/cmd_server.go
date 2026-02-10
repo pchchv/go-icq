@@ -1,6 +1,7 @@
 package toc
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -61,4 +62,13 @@ func userInfoToUpdateBuddy(snac wire.TLVUserInfo) string {
 
 	class := strings.Join(uc[:], "")
 	return fmt.Sprintf("UPDATE_BUDDY:%s:%s:%s:%d:%d:%s", snac.ScreenName, "T", fmt.Sprintf("%d", snac.WarningLevel/10), online, idle, class)
+}
+
+func sendOrCancel(ctx context.Context, ch chan<- []byte, msg string) {
+	select {
+	case <-ctx.Done():
+		return
+	case ch <- []byte(msg):
+		return
+	}
 }

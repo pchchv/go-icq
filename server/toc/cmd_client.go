@@ -1226,6 +1226,100 @@ func (s OSCARProxy) ChangePassword(ctx context.Context, me *state.SessionInstanc
 	return "ADMIN_PASSWD_STATUS:0"
 }
 
+// Signon handles the toc_signon TOC command.
+//
+// From the TiK documentation:
+//
+//	The password needs to be roasted with the Roasting String if coming over a FLAP connection,
+//	CP connections don't use roasted passwords.
+//	The language specified will be used when generating web pages,
+//	such as the get info pages.
+//	Currently, the only supported language is "english".
+//	If the language sent isn't found, the default "english" language will be used.
+//	The version string will be used for the client identity,
+//	and must be less than 50 characters.
+//
+//	Passwords are roasted when sent to the host.
+//	This is done so they aren't sent in "clear text" over the wire,
+//	although they are still trivial to decode.
+//	Roasting is performed by first xoring each byte in the password with
+//	the equivalent modulo byte in the roasting string.
+//	The result is then converted to ascii hex, and prepended with "0x".
+//	So for example the password "password" roasts to "0x2408105c23001130".
+//
+//	The Roasting String is Tic/Toc.
+//
+// Command syntax: toc_signon <authorizer host> <authorizer port> <User Name> <Password> <language> <version>
+func (s OSCARProxy) Signon(ctx context.Context, args []byte) (*state.SessionInstance, []string) {
+	var userName, password string
+	if _, err := parseArgs(args, nil, nil, &userName, &password); err != nil {
+		return nil, []string{s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))}
+	}
+
+	passwordHash, err := hex.DecodeString(password[2:])
+	if err != nil {
+		return nil, []string{s.runtimeErr(ctx, fmt.Errorf("hex.DecodeString: %w", err))}
+	}
+
+	signonFrame := wire.FLAPSignonFrame{}
+	signonFrame.Append(wire.NewTLVBE(wire.LoginTLVTagsScreenName, userName))
+	signonFrame.Append(wire.NewTLVBE(wire.LoginTLVTagsRoastedTOCPassword, passwordHash))
+	block, err := s.AuthService.FLAPLogin(ctx, signonFrame, "")
+	if err != nil {
+		return nil, []string{s.runtimeErr(ctx, fmt.Errorf("AuthService.FLAPLogin: %w", err))}
+	}
+
+	if block.HasTag(wire.LoginTLVTagsErrorSubcode) {
+		s.Logger.DebugContext(ctx, "login failed")
+		return nil, []string{"ERROR:980"} // bad username/password
+	}
+
+	authCookie, ok := block.Bytes(wire.OServiceTLVTagsLoginCookie)
+	if !ok {
+		return nil, []string{s.runtimeErr(ctx, fmt.Errorf("unable to get session id from payload"))}
+	}
+
+	// TODO: naming for cookie: login cookie, server cookie, or auth cookie?
+	serverCookie, err := s.AuthService.CrackCookie(authCookie)
+	sess, err := s.AuthService.RegisterBOSSession(ctx, serverCookie)
+	if err != nil {
+		return nil, []string{s.runtimeErr(ctx, fmt.Errorf("AuthService.RegisterBOSSession: %w", err))}
+	}
+
+	sess.SetCaps([][16]byte{wire.CapChat})
+	if err := s.BuddyListRegistry.RegisterBuddyList(ctx, sess.IdentScreenName()); err != nil {
+		return nil, []string{s.runtimeErr(ctx, fmt.Errorf("BuddyListRegistry.RegisterBuddyList: %w", err))}
+	}
+
+	u, err := s.TOCConfigStore.User(ctx, sess.IdentScreenName())
+	if err != nil {
+		return nil, []string{s.runtimeErr(ctx, fmt.Errorf("TOCConfigStore.User: %w", err))}
+	} else if u == nil {
+		return nil, []string{s.runtimeErr(ctx, fmt.Errorf("TOCConfigStore.User: user not found"))}
+	}
+
+	return sess, []string{"SIGN_ON:TOC1.0", fmt.Sprintf("CONFIG:%s", u.TOCConfig)}
+}
+
+// Signout terminates a TOC session.
+// It sends departure notifications to buddies,
+// deregisters buddy list and session.
+func (s OSCARProxy) Signout(ctx context.Context, me *state.SessionInstance, chatRegistry *ChatRegistry) {
+	if err := s.BuddyService.BroadcastBuddyDeparted(ctx, me); err != nil {
+		s.Logger.ErrorContext(ctx, "error sending departure notifications", "err", err.Error())
+	}
+
+	if err := s.BuddyListRegistry.UnregisterBuddyList(ctx, me.IdentScreenName()); err != nil {
+		s.Logger.ErrorContext(ctx, "error removing buddy list entry", "err", err.Error())
+	}
+
+	s.AuthService.Signout(ctx, me)
+	for _, sess := range chatRegistry.Sessions() {
+		s.AuthService.SignoutChat(ctx, sess)
+		sess.CloseInstance() // stop async server SNAC reply handler for this chat room
+	}
+}
+
 func (s OSCARProxy) checkRateLimit(ctx context.Context, sender *state.SessionInstance, foodGroup uint16, subGroup uint16) (string, bool) {
 	rateClassID, ok := s.SNACRateLimits.RateClassLookup(foodGroup, subGroup)
 	if !ok {

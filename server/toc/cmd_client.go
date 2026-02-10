@@ -778,6 +778,92 @@ func (s OSCARProxy) SetAway(ctx context.Context, me *state.SessionInstance, args
 	return ""
 }
 
+// SetIdle handles the toc_set_idle TOC command.
+//
+// From the TiK documentation:
+//
+//	Set idle information.
+//	If <idle secs> is 0 then the user isn't idle at all.
+//	If <idle secs> is greater than 0 then the user has already been idle for <idle secs> number of seconds.
+//	The server will automatically keep incrementing this number,
+//	so do not repeatedly call with new idle times.
+//
+// Command syntax: toc_set_idle <idle secs>
+func (s OSCARProxy) SetIdle(ctx context.Context, me *state.SessionInstance, args []byte) string {
+	if errMsg, isLimited := s.checkRateLimit(ctx, me, wire.OService, wire.OServiceIdleNotification); isLimited {
+		return errMsg
+	}
+
+	var idleTimeStr string
+	if _, err := parseArgs(args, &idleTimeStr); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	time, err := strconv.Atoi(idleTimeStr)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("strconv.Atoi: %w", err))
+	}
+
+	snac := wire.SNAC_0x01_0x11_OServiceIdleNotification{
+		IdleTime: uint32(time),
+	}
+	if err := s.OServiceService.IdleNotification(ctx, me, snac); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("OServiceServiceBOS.IdleNotification: %w", err))
+	}
+
+	return ""
+}
+
+// SendIM handles the toc_send_im TOC command.
+//
+// From the TiK documentation:
+//
+//	Send a message to a remote user.
+//	Remember to quote and encode the message.
+//	If the optional string "auto" is the last argument,
+//	then the auto response flag will be turned on for the IM.
+//
+// Command syntax: toc_send_im <Destination User> <Message> [auto]
+func (s OSCARProxy) SendIM(ctx context.Context, sender *state.SessionInstance, args []byte) string {
+	if msg, isLimited := s.checkRateLimit(ctx, sender, wire.ICBM, wire.ICBMChannelMsgToHost); isLimited {
+		return msg
+	}
+
+	var recip, msg string
+	autoReply, err := parseArgs(args, &recip, &msg)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	msg = unescape(msg)
+	frags, err := wire.ICBMFragmentList(msg)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("wire.ICBMFragmentList: %w", err))
+	}
+
+	snac := wire.SNAC_0x04_0x06_ICBMChannelMsgToHost{
+		ChannelID:  wire.ICBMChannelIM,
+		ScreenName: recip,
+		TLVRestBlock: wire.TLVRestBlock{
+			TLVList: wire.TLVList{
+				wire.NewTLVBE(wire.ICBMTLVAOLIMData, frags),
+			},
+		},
+	}
+	if len(autoReply) > 0 && autoReply[0] == "auto" {
+		snac.Append(wire.NewTLVBE(wire.ICBMTLVAutoResponse, []byte{}))
+	}
+
+	// send message and ignore response since there is no TOC error code to
+	// handle errors such as "user is offline", etc.
+	_, err = s.ICBMService.ChannelMsgToHost(ctx, sender, wire.SNACFrame{}, snac)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("ICBMService.ChannelMsgToHost: %w", err))
+	}
+
+	return ""
+}
+
 func (s OSCARProxy) checkRateLimit(ctx context.Context, sender *state.SessionInstance, foodGroup uint16, subGroup uint16) (string, bool) {
 	rateClassID, ok := s.SNACRateLimits.RateClassLookup(foodGroup, subGroup)
 	if !ok {

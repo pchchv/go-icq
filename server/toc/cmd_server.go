@@ -110,6 +110,58 @@ func (s OSCARProxy) RecvChat(ctx context.Context, me *state.SessionInstance, cha
 	}
 }
 
+// UpdateBuddyArrival handles the UPDATE_BUDDY TOC command for buddy arrival events.
+//
+// From the TiK documentation:
+//
+//	This one command handles arrival/depart/updates.
+//	Evil Amount is a percentage, Signon Time is UNIX epoc,
+//	idle time is in minutes, UC (User Class) is a two/three character string.
+//	  - uc[0]
+//	    - ' ' - Ignore
+//	    - 'A' - On AOL
+//	  - uc[1]
+//	    - ' ' - Ignore
+//	    - 'A' - Oscar Admin
+//	    - 'U' - Oscar Unconfirmed
+//	    - 'O' - Oscar Normal
+//	  - uc[2]
+//	    - '\0' - Ignore
+//	    - ' ' - Ignore
+//	    - 'U' - The user has set their unavailable flag.
+//
+// Command syntax: UPDATE_BUDDY:<Buddy User>:<Online? T/F>:<Evil Amount>:<Signon Time>:<IdleTime>:<UC>
+func (s OSCARProxy) UpdateBuddyArrival(snac wire.SNAC_0x03_0x0B_BuddyArrived) string {
+	return userInfoToUpdateBuddy(snac.TLVUserInfo)
+}
+
+// UpdateBuddyDeparted handles the UPDATE_BUDDY TOC command for buddy departure events.
+//
+// From the TiK documentation:
+//
+//	This one command handles arrival/depart/updates.
+//	Evil Amount is a percentage,
+//	Signon Time is UNIX epoc,
+//	idle time is in minutes,
+//	UC (User Class) is a two/three character string.
+//	  - uc[0]
+//	    - ' ' - Ignore
+//	    - 'A' - On AOL
+//	  - uc[1]
+//	    - ' ' - Ignore
+//	    - 'A' - Oscar Admin
+//	    - 'U' - Oscar Unconfirmed
+//	    - 'O' - Oscar Normal
+//	  - uc[2]
+//	    - '\0' - Ignore
+//	    - ' ' - Ignore
+//	    - 'U' - The user has set their unavailable flag.
+//
+// Command syntax: UPDATE_BUDDY:<Buddy User>:<Online? T/F>:<Evil Amount>:<Signon Time>:<IdleTime>:<UC>
+func (s OSCARProxy) UpdateBuddyDeparted(snac wire.SNAC_0x03_0x0C_BuddyDeparted) string {
+	return fmt.Sprintf("UPDATE_BUDDY:%s:F:0:0:0:   ", snac.ScreenName)
+}
+
 // userInfoToUpdateBuddy creates an UPDATE_BUDDY server reply from a User Info TLV.
 func userInfoToUpdateBuddy(snac wire.TLVUserInfo) string {
 	online, _ := snac.Uint32BE(wire.OServiceUserInfoSignonTOD)

@@ -1,10 +1,13 @@
 package toc
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 )
 
@@ -49,6 +52,62 @@ func (s OSCARProxy) ChatUpdateBuddyLeft(snac wire.SNAC_0x0E_0x04_ChatUsersLeft, 
 	}
 
 	return fmt.Sprintf("CHAT_UPDATE_BUDDY:%d:F:%s", chatID, strings.Join(users, ":"))
+}
+
+// ChatIn handles the CHAT_IN TOC command.
+//
+// From the TiK documentation: a chat message was sent in a chat room.
+//
+// Command syntax: CHAT_IN:<Chat Room Id>:<Source User>:<Whisper? T/F>:<Message>
+func (s OSCARProxy) ChatIn(ctx context.Context, snac wire.SNAC_0x0E_0x06_ChatChannelMsgToClient, chatID int) string {
+	b, ok := snac.Bytes(wire.ChatTLVSenderInformation)
+	if !ok {
+		return s.runtimeErr(ctx, errors.New("snac.Bytes: missing wire.ChatTLVSenderInformation"))
+	}
+
+	u := wire.TLVUserInfo{}
+	err := wire.UnmarshalBE(&u, bytes.NewReader(b))
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("wire.UnmarshalBE: %w", err))
+	}
+
+	b, ok = snac.Bytes(wire.ChatTLVMessageInfo)
+	if !ok {
+		return s.runtimeErr(ctx, errors.New("snac.Bytes: missing wire.ChatTLVMessageInfo"))
+	}
+
+	text, err := wire.UnmarshalChatMessageText(b)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("wire.UnmarshalChatMessageText: %w", err))
+	}
+
+	return fmt.Sprintf("CHAT_IN:%d:%s:F:%s", chatID, u.ScreenName, text)
+}
+
+// RecvChat routes incoming SNAC messages from the chat server to their corresponding TOC handlers.
+// It ignores any SNAC messages for which there is no TOC response.
+func (s OSCARProxy) RecvChat(ctx context.Context, me *state.SessionInstance, chatID int, ch chan<- []byte) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-me.Closed():
+			return
+		case snac := <-me.ReceiveMessage():
+			switch v := snac.Body.(type) {
+			case wire.SNAC_0x0E_0x04_ChatUsersLeft:
+				sendOrCancel(ctx, ch, s.ChatUpdateBuddyLeft(v, chatID))
+			case wire.SNAC_0x0E_0x03_ChatUsersJoined:
+				sendOrCancel(ctx, ch, s.ChatUpdateBuddyArrived(v, chatID))
+			case wire.SNAC_0x0E_0x06_ChatChannelMsgToClient:
+				sendOrCancel(ctx, ch, s.ChatIn(ctx, v, chatID))
+			default:
+				s.Logger.DebugContext(ctx, fmt.Sprintf("unsupported snac. foodgroup: %s subgroup: %s",
+					wire.FoodGroupName(snac.Frame.FoodGroup),
+					wire.SubGroupName(snac.Frame.FoodGroup, snac.Frame.SubGroup)))
+			}
+		}
+	}
 }
 
 // userInfoToUpdateBuddy creates an UPDATE_BUDDY server reply from a User Info TLV.

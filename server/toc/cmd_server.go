@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/pchchv/go-icq/state"
@@ -15,8 +16,9 @@ import (
 )
 
 var (
-	rateLimitExceededErr = "ERROR:903"
+	errDisconnect        = errors.New("got booted by another session")
 	cmdInternalSvcErr    = "ERROR:989:internal server error"
+	rateLimitExceededErr = "ERROR:903"
 )
 
 // ChatUpdateBuddyArrived handles the CHAT_UPDATE_BUDDY TOC command for
@@ -108,6 +110,41 @@ func (s OSCARProxy) RecvChat(ctx context.Context, me *state.SessionInstance, cha
 				s.Logger.DebugContext(ctx, fmt.Sprintf("unsupported snac. foodgroup: %s subgroup: %s",
 					wire.FoodGroupName(snac.Frame.FoodGroup),
 					wire.SubGroupName(snac.Frame.FoodGroup, snac.Frame.SubGroup)))
+			}
+		}
+	}
+}
+
+// RecvBOS routes incoming SNAC messages from the BOS server to their corresponding TOC handlers.
+// It ignores any SNAC messages for which there is no TOC response.
+func (s OSCARProxy) RecvBOS(ctx context.Context, me *state.SessionInstance, chatRegistry *ChatRegistry, ch chan<- []byte) error {
+	for {
+		select {
+		case <-ctx.Done():
+			func() {
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				s.Signout(shutdownCtx, me, chatRegistry)
+			}()
+			return nil
+		case <-me.Closed():
+			return errDisconnect
+		case snac := <-me.ReceiveMessage():
+			switch v := snac.Body.(type) {
+			case wire.SNAC_0x03_0x0B_BuddyArrived:
+				sendOrCancel(ctx, ch, s.UpdateBuddyArrival(v))
+			case wire.SNAC_0x03_0x0C_BuddyDeparted:
+				sendOrCancel(ctx, ch, s.UpdateBuddyDeparted(v))
+			case wire.SNAC_0x04_0x07_ICBMChannelMsgToClient:
+				sendOrCancel(ctx, ch, s.IMIn(ctx, chatRegistry, v))
+			case wire.SNAC_0x01_0x10_OServiceEvilNotification:
+				sendOrCancel(ctx, ch, s.Eviled(v))
+			default:
+				s.Logger.DebugContext(ctx, fmt.Sprintf(
+					"unsupported snac. foodgroup: %s subgroup: %s",
+					wire.FoodGroupName(snac.Frame.FoodGroup),
+					wire.SubGroupName(snac.Frame.FoodGroup, snac.Frame.SubGroup),
+				))
 			}
 		}
 	}

@@ -688,6 +688,96 @@ func (s OSCARProxy) ChatAccept(ctx context.Context, me *state.SessionInstance, c
 	return chatID, fmt.Sprintf("CHAT_JOIN:%d:%s", chatID, roomName)
 }
 
+// SetConfig handles the toc_set_config TOC command.
+//
+// From the TiK documentation:
+//
+//	Set the config information for this user.
+//	The config information is line oriented with the first character being the item type,
+//	followed by a space, with the rest of the line being the item value.
+//	Only letters, numbers, and spaces should be used.
+//	Remember you will have to enclose the entire config in quotes.
+//
+//	Item Types:
+//	  - g - Buddy Group (All Buddies until the next g or the end of config are in this group.)
+//	  - b - A Buddy
+//	  - p - Person on permit list
+//	  - d - Person on deny list
+//	  - m - Permit/Deny Mode. Possible values are
+//	  - 1 - Permit All
+//	  - 2 - Deny All
+//	  - 3 - Permit Some
+//	  - 4 - Deny Some
+//
+// This method doesn't attempt to validate any of the configuration,
+// it saves the config as received from the client.
+//
+// Command syntax: toc_set_config <Config Info>
+func (s OSCARProxy) SetConfig(ctx context.Context, me *state.SessionInstance, args []byte) string {
+	if status := me.Session().EvaluateRateLimit(time.Now(), 1); status == wire.RateLimitStatusLimited {
+		return rateLimitExceededErr
+	}
+
+	// most TOC clients don't quote the config info argument,
+	// despite what the documentation specifies.
+	// this makes the argument payload incompatible for CSV parsing.
+	// since this command takes a single argument,
+	// we can get away with trimming quotes and spaces from the
+	// byte slice before passing it to the config store.
+	args = bytes.Trim(args, "'\" ")
+	config := string(args)
+	if config == "" {
+		return s.runtimeErr(ctx, fmt.Errorf("empty config"))
+	}
+
+	if err := s.TOCConfigStore.SetTOCConfig(ctx, me.IdentScreenName(), config); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("TOCConfigStore.SaveTOCConfig: %w", err))
+	}
+
+	return ""
+}
+
+// SetAway handles the toc_chat_join TOC command.
+//
+// From the TiK documentation:
+//
+//	If the away message is present,
+//	then the unavailable status flag is set for	the user.
+//	If the away message is not present,
+//	then the unavailable status flag is unset.
+//	The away message is basic HTML, remember to encode the information.
+//
+// Command syntax: toc_set_away [<away message>]
+func (s OSCARProxy) SetAway(ctx context.Context, me *state.SessionInstance, args []byte) string {
+	if errMsg, isLimited := s.checkRateLimit(ctx, me, wire.Locate, wire.LocateSetInfo); isLimited {
+		return errMsg
+	}
+
+	maybeMsg, err := parseArgs(args)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	var msg string
+	if len(maybeMsg) > 0 {
+		msg = unescape(maybeMsg[0])
+	}
+
+	snac := wire.SNAC_0x02_0x04_LocateSetInfo{
+		TLVRestBlock: wire.TLVRestBlock{
+			TLVList: wire.TLVList{
+				wire.NewTLVBE(wire.LocateTLVTagsInfoUnavailableData, msg),
+			},
+		},
+	}
+
+	if err := s.LocateService.SetInfo(ctx, me, snac); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("LocateService.SetInfo: %w", err))
+	}
+
+	return ""
+}
+
 func (s OSCARProxy) checkRateLimit(ctx context.Context, sender *state.SessionInstance, foodGroup uint16, subGroup uint16) (string, bool) {
 	rateClassID, ok := s.SNACRateLimits.RateClassLookup(foodGroup, subGroup)
 	if !ok {

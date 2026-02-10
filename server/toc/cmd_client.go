@@ -525,6 +525,169 @@ func (s OSCARProxy) ChatSend(ctx context.Context, chatRegistry *ChatRegistry, ar
 	}
 }
 
+// ChatWhisper handles the toc_chat_send TOC command.
+//
+// From the TiK documentation:
+//
+//	Send a message in a chat room using the chat room id from CHAT_JOIN.
+//	This message is directed at only one person.
+//	(Currently you DO need to add this to your UI.)
+//	Remember to quote and encode the message.
+//	Chat whispering is different from IMs since it is linked to a chat room,
+//	and should usually be displayed in the chat room UI.
+//
+// Command syntax: toc_chat_whisper <Chat Room ID> <dst_user> <Message>
+func (s OSCARProxy) ChatWhisper(ctx context.Context, chatRegistry *ChatRegistry, args []byte) string {
+	var chatIDStr, recip, msg string
+	if _, err := parseArgs(args, &chatIDStr, &recip, &msg); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	msg = unescape(msg)
+	chatID, err := strconv.Atoi(chatIDStr)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("strconv.Atoi: %w", err))
+	}
+
+	me := chatRegistry.RetrieveSess(chatID)
+	if me == nil {
+		return s.runtimeErr(ctx, fmt.Errorf("chatRegistry.RetrieveSess: session for chat ID `%d` not found", chatID))
+	}
+
+	if errMsg, isLimited := s.checkRateLimit(ctx, me, wire.Chat, wire.ChatChannelMsgToHost); isLimited {
+		return errMsg
+	}
+
+	block := wire.TLVRestBlock{}
+	block.Append(wire.NewTLVBE(wire.ChatTLVSenderInformation, me.Session().TLVUserInfo()))
+	block.Append(wire.NewTLVBE(wire.ChatTLVWhisperToUser, recip))
+	block.Append(wire.NewTLVBE(wire.ChatTLVMessageInfo, wire.TLVRestBlock{
+		TLVList: wire.TLVList{
+			wire.NewTLVBE(wire.ChatTLVMessageInfoText, msg),
+		},
+	}))
+	snac := wire.SNAC_0x0E_0x05_ChatChannelMsgToHost{
+		Channel:      wire.ICBMChannelMIME,
+		TLVRestBlock: block,
+	}
+	if _, err = s.ChatService.ChannelMsgToHost(ctx, me, wire.SNACFrame{}, snac); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("ChatService.ChannelMsgToHost: %w", err))
+	}
+
+	return ""
+}
+
+// ChatAccept handles the toc_chat_accept TOC command.
+//
+// From the TiK documentation: Accept a CHAT_INVITE message from TOC.
+// The server will send a CHAT_JOIN in response.
+//
+// Command syntax: toc_chat_accept <Chat Room ID>
+func (s OSCARProxy) ChatAccept(ctx context.Context, me *state.SessionInstance, chatRegistry *ChatRegistry, args []byte) (int, string) {
+	var chatIDStr string
+	if _, err := parseArgs(args, &chatIDStr); err != nil {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	chatID, err := strconv.Atoi(chatIDStr)
+	if err != nil {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("strconv.Atoi: %w", err))
+	}
+
+	chatInfo, found := chatRegistry.LookupRoom(chatID)
+	if !found {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("chatRegistry.LookupRoom: no chat found for ID %d", chatID))
+	}
+
+	if msg, isLimited := s.checkRateLimit(ctx, me, wire.ChatNav, wire.ChatNavRequestRoomInfo); isLimited {
+		return 0, msg
+	}
+
+	reqRoomSNAC := wire.SNAC_0x0D_0x04_ChatNavRequestRoomInfo{
+		Cookie:         chatInfo.Cookie,
+		Exchange:       chatInfo.Exchange,
+		InstanceNumber: chatInfo.Instance,
+	}
+	reqRoomReply, err := s.ChatNavService.RequestRoomInfo(ctx, wire.SNACFrame{}, reqRoomSNAC)
+	if err != nil {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("ChatNavService.RequestRoomInfo: %w", err))
+	}
+
+	reqRoomReplyBody, ok := reqRoomReply.Body.(wire.SNAC_0x0D_0x09_ChatNavNavInfo)
+	if !ok {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("chatNavService.RequestRoomInfo: unexpected response type %v", reqRoomReplyBody))
+	}
+
+	b, hasInfo := reqRoomReplyBody.Bytes(wire.ChatNavTLVRoomInfo)
+	if !hasInfo {
+		return 0, s.runtimeErr(ctx, errors.New("reqRoomReplyBody.Bytes: missing wire.ChatNavTLVRoomInfo"))
+	}
+
+	roomInfo := wire.SNAC_0x0E_0x02_ChatRoomInfoUpdate{}
+	if err := wire.UnmarshalBE(&roomInfo, bytes.NewReader(b)); err != nil {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("wire.UnmarshalBE: %w", err))
+	}
+
+	roomName, hasName := roomInfo.Bytes(wire.ChatRoomTLVRoomName)
+	if !hasName {
+		return 0, s.runtimeErr(ctx, errors.New("roomInfo.Bytes: missing wire.ChatRoomTLVRoomName"))
+	}
+
+	if msg, isLimited := s.checkRateLimit(ctx, me, wire.OService, wire.OServiceServiceRequest); isLimited {
+		return 0, msg
+	}
+
+	svcReqSNAC := wire.SNAC_0x01_0x04_OServiceServiceRequest{
+		FoodGroup: wire.Chat,
+		TLVRestBlock: wire.TLVRestBlock{
+			TLVList: wire.TLVList{
+				wire.NewTLVBE(0x01, wire.SNAC_0x01_0x04_TLVRoomInfo{
+					Cookie: chatInfo.Cookie,
+				}),
+			},
+		},
+	}
+	svcReqReply, err := s.OServiceService.ServiceRequest(ctx, wire.BOS, me, wire.SNACFrame{}, svcReqSNAC, config.Listener{})
+	if err != nil {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("OServiceServiceBOS.ServiceRequest: %w", err))
+	}
+
+	svcReqReplyBody, ok := svcReqReply.Body.(wire.SNAC_0x01_0x05_OServiceServiceResponse)
+	if !ok {
+		return 0, s.runtimeErr(
+			ctx,
+			fmt.Errorf("OServiceServiceBOS.ServiceRequest: unexpected response type %v", svcReqReplyBody),
+		)
+	}
+
+	loginCookie, hasCookie := svcReqReplyBody.Bytes(wire.OServiceTLVTagsLoginCookie)
+	if !hasCookie {
+		return 0, s.runtimeErr(ctx, errors.New("missing wire.OServiceTLVTagsLoginCookie"))
+	}
+
+	// TODO: naming for cookie: login cookie, server cookie, or auth cookie?
+	serverCookie, err := s.AuthService.CrackCookie(loginCookie)
+	if err != nil {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("AuthService.RegisterChatSession: %w", err))
+	}
+
+	chatSess, err := s.AuthService.RegisterChatSession(ctx, serverCookie)
+	if err != nil {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("AuthService.RegisterChatSession: %w", err))
+	}
+
+	if msg, isLimited := s.checkRateLimit(ctx, me, wire.OService, wire.OServiceClientOnline); isLimited {
+		return 0, msg
+	}
+
+	if err := s.OServiceService.ClientOnline(ctx, wire.Chat, wire.SNAC_0x01_0x02_OServiceClientOnline{}, chatSess); err != nil {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("OServiceServiceChat.ClientOnline: %w", err))
+	}
+
+	chatRegistry.RegisterSess(chatID, chatSess)
+	return chatID, fmt.Sprintf("CHAT_JOIN:%d:%s", chatID, roomName)
+}
+
 func (s OSCARProxy) checkRateLimit(ctx context.Context, sender *state.SessionInstance, foodGroup uint16, subGroup uint16) (string, bool) {
 	rateClassID, ok := s.SNACRateLimits.RateClassLookup(foodGroup, subGroup)
 	if !ok {

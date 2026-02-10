@@ -380,6 +380,151 @@ func (s OSCARProxy) ChatLeave(ctx context.Context, chatRegistry *ChatRegistry, a
 	return fmt.Sprintf("CHAT_LEFT:%d", chatID)
 }
 
+// ChatInvite handles the toc_chat_invite TOC command.
+//
+// From the TiK documentation:
+//
+//	Once you are inside a chat room you can invite other people into that room.
+//	Remember to quote and encode the invite message.
+//
+// Command syntax: toc_chat_invite <Chat Room ID> <Invite Msg> <buddy1> [<buddy2> [<buddy3> [...]]]
+func (s OSCARProxy) ChatInvite(ctx context.Context, me *state.SessionInstance, chatRegistry *ChatRegistry, args []byte) string {
+	var chatRoomIDStr, msg string
+	users, err := parseArgs(args, &chatRoomIDStr, &msg)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	msg = unescape(msg)
+	chatID, err := strconv.Atoi(chatRoomIDStr)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("strconv.Atoi: %w", err))
+	}
+
+	roomInfo, found := chatRegistry.LookupRoom(chatID)
+	if !found {
+		return s.runtimeErr(ctx, fmt.Errorf("chatRegistry.LookupRoom: chat ID `%d` not found", chatID))
+	}
+
+	for _, guest := range users {
+		if msg, isLimited := s.checkRateLimit(ctx, me, wire.ICBM, wire.ICBMChannelMsgToHost); isLimited {
+			return msg
+		}
+
+		snac := wire.SNAC_0x04_0x06_ICBMChannelMsgToHost{
+			ChannelID:  wire.ICBMChannelRendezvous,
+			ScreenName: guest,
+			TLVRestBlock: wire.TLVRestBlock{
+				TLVList: wire.TLVList{
+					wire.NewTLVBE(wire.ICBMTLVData, wire.ICBMCh2Fragment{
+						Type:       wire.ICBMRdvMessagePropose,
+						Capability: wire.CapChat,
+						TLVRestBlock: wire.TLVRestBlock{
+							TLVList: wire.TLVList{
+								wire.NewTLVBE(wire.ICBMRdvTLVTagsSeqNum, uint16(1)),
+								wire.NewTLVBE(wire.ICBMRdvTLVTagsInvitation, msg),
+								wire.NewTLVBE(wire.ICBMRdvTLVTagsInviteMIMECharset, "us-ascii"),
+								wire.NewTLVBE(wire.ICBMRdvTLVTagsInviteMIMELang, "en"),
+								wire.NewTLVBE(wire.ICBMRdvTLVTagsSvcData, roomInfo),
+							},
+						},
+					}),
+				},
+			},
+		}
+
+		if _, err := s.ICBMService.ChannelMsgToHost(ctx, me, wire.SNACFrame{}, snac); err != nil {
+			return s.runtimeErr(ctx, fmt.Errorf("ICBMService.ChannelMsgToHost: %w", err))
+		}
+	}
+
+	return ""
+}
+
+// ChatSend handles the toc_chat_send TOC command.
+//
+// From the TiK documentation:
+//
+//	Send a message in a chat room using the chat room id from CHAT_JOIN.
+//	Since reflection is always on in TOC,
+//	you do not need to add the message to your chat UI,
+//	since you will get a CHAT_IN with the message.
+//	Remember to quote and encode the message.
+//
+// Command syntax: toc_chat_send <Chat Room ID> <Message>
+func (s OSCARProxy) ChatSend(ctx context.Context, chatRegistry *ChatRegistry, args []byte) string {
+	var chatIDStr, msg string
+	if _, err := parseArgs(args, &chatIDStr, &msg); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	msg = unescape(msg)
+	chatID, err := strconv.Atoi(chatIDStr)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("strconv.Atoi: %w", err))
+	}
+
+	me := chatRegistry.RetrieveSess(chatID)
+	if me == nil {
+		return s.runtimeErr(ctx, fmt.Errorf("chatRegistry.RetrieveSess: session for chat ID `%d` not found", chatID))
+	}
+
+	if errMsg, isLimited := s.checkRateLimit(ctx, me, wire.Chat, wire.ChatChannelMsgToHost); isLimited {
+		return errMsg
+	}
+
+	block := wire.TLVRestBlock{}
+	// the order of these TLVs matters for AIM 2.x. if out of order,
+	// screen names do not appear with each chat message.
+	block.Append(wire.NewTLVBE(wire.ChatTLVEnableReflectionFlag, uint8(1)))
+	block.Append(wire.NewTLVBE(wire.ChatTLVSenderInformation, me.Session().TLVUserInfo()))
+	block.Append(wire.NewTLVBE(wire.ChatTLVPublicWhisperFlag, []byte{}))
+	block.Append(wire.NewTLVBE(wire.ChatTLVMessageInfo, wire.TLVRestBlock{
+		TLVList: wire.TLVList{
+			wire.NewTLVBE(wire.ChatTLVMessageInfoText, msg),
+		},
+	}))
+	snac := wire.SNAC_0x0E_0x05_ChatChannelMsgToHost{
+		Channel:      wire.ICBMChannelMIME,
+		TLVRestBlock: block,
+	}
+	reply, err := s.ChatService.ChannelMsgToHost(ctx, me, wire.SNACFrame{}, snac)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("ChatService.ChannelMsgToHost: %w", err))
+	}
+
+	if reply == nil {
+		return s.runtimeErr(ctx, errors.New("ChatService.ChannelMsgToHost: missing response "))
+	}
+
+	switch v := reply.Body.(type) {
+	case wire.SNAC_0x0E_0x06_ChatChannelMsgToClient:
+		msgInfo, ok := v.Bytes(wire.ChatTLVMessageInfo)
+		if !ok {
+			return s.runtimeErr(ctx, errors.New("ChatService.ChannelMsgToHost: missing wire.ChatTLVMessageInfo"))
+		}
+
+		reflectMsg, err := wire.UnmarshalChatMessageText(msgInfo)
+		if err != nil {
+			return s.runtimeErr(ctx, fmt.Errorf("wire.UnmarshalChatMessageText: %w", err))
+		}
+
+		senderInfo, ok := v.Bytes(wire.ChatTLVSenderInformation)
+		if !ok {
+			return s.runtimeErr(ctx, errors.New("ChatService.ChannelMsgToHost: missing wire.ChatTLVSenderInformation"))
+		}
+
+		var userInfo wire.TLVUserInfo
+		if err := wire.UnmarshalBE(&userInfo, bytes.NewReader(senderInfo)); err != nil {
+			return s.runtimeErr(ctx, fmt.Errorf("wire.UnmarshalBE: %w", err))
+		}
+
+		return fmt.Sprintf("CHAT_IN:%d:%s:F:%s", chatID, userInfo.ScreenName, reflectMsg)
+	default:
+		return s.runtimeErr(ctx, errors.New("ChatService.ChannelMsgToHost: unexpected response"))
+	}
+}
+
 func (s OSCARProxy) checkRateLimit(ctx context.Context, sender *state.SessionInstance, foodGroup uint16, subGroup uint16) (string, bool) {
 	rateClassID, ok := s.SNACRateLimits.RateClassLookup(foodGroup, subGroup)
 	if !ok {

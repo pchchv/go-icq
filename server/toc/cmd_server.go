@@ -3,10 +3,13 @@ package toc
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 )
@@ -160,6 +163,119 @@ func (s OSCARProxy) UpdateBuddyArrival(snac wire.SNAC_0x03_0x0B_BuddyArrived) st
 // Command syntax: UPDATE_BUDDY:<Buddy User>:<Online? T/F>:<Evil Amount>:<Signon Time>:<IdleTime>:<UC>
 func (s OSCARProxy) UpdateBuddyDeparted(snac wire.SNAC_0x03_0x0C_BuddyDeparted) string {
 	return fmt.Sprintf("UPDATE_BUDDY:%s:F:0:0:0:   ", snac.ScreenName)
+}
+
+// convertICBMInstantMsg converts an ICBM instant message SNAC to a TOC IM_IN response.
+func (s OSCARProxy) convertICBMInstantMsg(ctx context.Context, snac wire.SNAC_0x04_0x07_ICBMChannelMsgToClient) string {
+	buf, ok := snac.TLVRestBlock.Bytes(wire.ICBMTLVAOLIMData)
+	if !ok {
+		return s.runtimeErr(ctx, errors.New("TLVRestBlock.Bytes: missing wire.ICBMTLVAOLIMData"))
+	}
+
+	txt, err := wire.UnmarshalICBMMessageText(buf)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("wire.UnmarshalICBMMessageText: %w", err))
+	}
+
+	autoResp := "F"
+	if _, isAutoReply := snac.TLVRestBlock.Bytes(wire.ICBMTLVAutoResponse); isAutoReply {
+		autoResp = "T"
+	}
+
+	return fmt.Sprintf("IM_IN:%s:%s:%s", snac.ScreenName, autoResp, txt)
+}
+
+// convertICBMRendezvous converts an ICBM rendezvous SNAC to a TOC response.
+//   - if chat, return CHAT_INVITE
+//   - file transfer, return RVOUS_PROPOSE
+//   - don't respond for other rendezvous types
+func (s OSCARProxy) convertICBMRendezvous(ctx context.Context, chatRegistry *ChatRegistry, snac wire.SNAC_0x04_0x07_ICBMChannelMsgToClient) string {
+	rdinfo, has := snac.TLVRestBlock.Bytes(wire.ICBMTLVData)
+	if !has {
+		return s.runtimeErr(ctx, errors.New("TLVRestBlock.Bytes: missing rendezvous block"))
+	}
+
+	frag := wire.ICBMCh2Fragment{}
+	if err := wire.UnmarshalBE(&frag, bytes.NewReader(rdinfo)); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("wire.UnmarshalBE: %w", err))
+	}
+
+	if frag.Type != wire.ICBMRdvMessagePropose {
+		s.Logger.DebugContext(ctx, "can't convert ICBM rendezvous message to TOC response", "rdv_type", frag.Type)
+		return ""
+	}
+
+	switch uuid.UUID(frag.Capability) {
+	case wire.CapChat:
+		prompt, ok := frag.Bytes(wire.ICBMRdvTLVTagsInvitation)
+		if !ok {
+			return s.runtimeErr(ctx, errors.New("frag.Bytes: missing chat invite prompt"))
+		}
+
+		svcData, ok := frag.Bytes(wire.ICBMRdvTLVTagsSvcData)
+		if !ok || svcData == nil {
+			return s.runtimeErr(ctx, errors.New("frag.Bytes: missing room info"))
+		}
+
+		roomInfo := wire.ICBMRoomInfo{}
+		if err := wire.UnmarshalBE(&roomInfo, bytes.NewReader(svcData)); err != nil {
+			return s.runtimeErr(ctx, fmt.Errorf("wire.UnmarshalBE: %w", err))
+		}
+
+		cookie := strings.Split(roomInfo.Cookie, "-") // make this safe
+		if len(cookie) < 3 {
+			return s.runtimeErr(ctx, errors.New("roomInfo.Cookie: malformed cookie, could not get room name"))
+		}
+
+		roomName := cookie[2]
+		chatID := chatRegistry.Add(roomInfo)
+		return fmt.Sprintf("CHAT_INVITE:%s:%d:%s:%s", roomName, chatID, snac.ScreenName, prompt)
+	case wire.CapFileTransfer:
+		user := snac.TLVUserInfo.ScreenName
+		capability := strings.ToUpper(wire.CapFileTransfer.String()) // TiK requires upper-case UUID characters
+		cookie := base64.StdEncoding.EncodeToString(frag.Cookie[:])
+		seq, _ := frag.Uint16BE(wire.ICBMRdvTLVTagsSeqNum)
+		rvousIP := "0.0.0.0"
+		if ip, ok := frag.Bytes(wire.ICBMRdvTLVTagsRdvIP); ok && len(ip) == 4 {
+			rvousIP = net.IPv4(ip[0], ip[1], ip[2], ip[3]).String()
+		}
+
+		proposerIP := "0.0.0.0"
+		if ip, ok := frag.Bytes(wire.ICBMRdvTLVTagsRequesterIP); ok && len(ip) == 4 {
+			proposerIP = net.IPv4(ip[0], ip[1], ip[2], ip[3]).String()
+		}
+
+		verifiedIP := "0.0.0.0"
+		if ip, ok := frag.Bytes(wire.ICBMRdvTLVTagsVerifiedIP); ok && len(ip) == 4 {
+			verifiedIP = net.IPv4(ip[0], ip[1], ip[2], ip[3]).String()
+		}
+
+		var fileMetadata string
+		rvousPort, _ := frag.Uint16BE(wire.ICBMRdvTLVTagsPort)
+		if f, ok := frag.Bytes(wire.ICBMRdvTLVTagsSvcData); ok {
+			// remove sequence of null bytes from the
+			// end that causes TiK file open dialog to crash
+			f = bytes.TrimRight(f, "\x00")
+			fileMetadata = base64.StdEncoding.EncodeToString(f)
+		}
+
+		return fmt.Sprintf(
+			"RVOUS_PROPOSE:%s:%s:%s:%d:%s:%s:%s:%d:%d:%s",
+			user,
+			capability,
+			cookie,
+			seq,
+			rvousIP,
+			proposerIP,
+			verifiedIP,
+			rvousPort,
+			wire.ICBMRdvTLVTagsSvcData,
+			fileMetadata,
+		)
+	default:
+		s.Logger.DebugContext(ctx, "received rendezvous ICBM for unsupported capability", "capability", wire.CapChat)
+		return ""
+	}
 }
 
 // userInfoToUpdateBuddy creates an UPDATE_BUDDY server reply from a User Info TLV.

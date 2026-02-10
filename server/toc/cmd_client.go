@@ -1595,6 +1595,105 @@ func (s OSCARProxy) RvousCancel(ctx context.Context, me *state.SessionInstance, 
 	return ""
 }
 
+// RecvClientCmd processes a client TOC command and returns a server reply.
+//
+// * sessBOS is the current user's session.
+// * chatRegistry manages the current user's chat sessions
+// * payload is the command + arguments
+// * toCh is the channel that transports messages to client
+// * doAsync performs async tasks, is auto-cleaned up by caller
+//
+// It returns true if the server can continue processing commands.
+func (s OSCARProxy) RecvClientCmd(ctx context.Context, sessBOS *state.SessionInstance, chatRegistry *ChatRegistry, payload []byte, toCh chan<- []byte, doAsync func(f func() error)) (reply string) {
+	var args []byte
+	cmd := payload
+	if idx := bytes.IndexByte(payload, ' '); idx > -1 {
+		cmd, args = payload[:idx], payload[idx:]
+	}
+
+	if s.Logger.Enabled(ctx, slog.LevelDebug) {
+		s.Logger.DebugContext(ctx, "client request", "command", payload)
+	} else {
+		s.Logger.InfoContext(ctx, "client request", "command", cmd)
+	}
+
+	switch string(cmd) {
+	case "toc_send_im":
+		return s.SendIM(ctx, sessBOS, args)
+	case "toc_init_done":
+		return s.InitDone(ctx, sessBOS)
+	case "toc_add_buddy":
+		return s.AddBuddy(ctx, sessBOS, args)
+	case "toc_get_status":
+		return s.GetStatus(ctx, sessBOS, args)
+	case "toc_remove_buddy":
+		return s.RemoveBuddy(ctx, sessBOS, args)
+	case "toc_add_permit":
+		return s.AddPermit(ctx, sessBOS, args)
+	case "toc_add_deny":
+		return s.AddDeny(ctx, sessBOS, args)
+	case "toc_set_away":
+		return s.SetAway(ctx, sessBOS, args)
+	case "toc_set_caps":
+		return s.SetCaps(ctx, sessBOS, args)
+	case "toc_evil":
+		return s.Evil(ctx, sessBOS, args)
+	case "toc_get_info":
+		return s.GetInfoURL(ctx, sessBOS, args)
+	case "toc_change_passwd":
+		return s.ChangePassword(ctx, sessBOS, args)
+	case "toc_format_nickname":
+		return s.FormatNickname(ctx, sessBOS, args)
+	case "toc_chat_join", "toc_chat_accept":
+		var msg string
+		var chatID int
+		if string(cmd) == "toc_chat_join" {
+			chatID, msg = s.ChatJoin(ctx, sessBOS, chatRegistry, args)
+		} else {
+			chatID, msg = s.ChatAccept(ctx, sessBOS, chatRegistry, args)
+		}
+
+		if msg == cmdInternalSvcErr {
+			return msg
+		}
+
+		doAsync(func() error {
+			sess := chatRegistry.RetrieveSess(chatID)
+			s.RecvChat(ctx, sess, chatID, toCh)
+			return nil
+		})
+
+		return msg
+	case "toc_chat_send":
+		return s.ChatSend(ctx, chatRegistry, args)
+	case "toc_chat_whisper":
+		return s.ChatWhisper(ctx, chatRegistry, args)
+	case "toc_chat_leave":
+		return s.ChatLeave(ctx, chatRegistry, args)
+	case "toc_set_info":
+		return s.SetInfo(ctx, sessBOS, args)
+	case "toc_set_dir":
+		return s.SetDir(ctx, sessBOS, args)
+	case "toc_set_idle":
+		return s.SetIdle(ctx, sessBOS, args)
+	case "toc_set_config":
+		return s.SetConfig(ctx, sessBOS, args)
+	case "toc_chat_invite":
+		return s.ChatInvite(ctx, sessBOS, chatRegistry, args)
+	case "toc_dir_search":
+		return s.GetDirSearchURL(ctx, sessBOS, args)
+	case "toc_get_dir":
+		return s.GetDirURL(ctx, sessBOS, args)
+	case "toc_rvous_accept":
+		return s.RvousAccept(ctx, sessBOS, args)
+	case "toc_rvous_cancel":
+		return s.RvousCancel(ctx, sessBOS, args)
+	}
+
+	s.Logger.ErrorContext(ctx, fmt.Sprintf("unsupported TOC command %s", cmd))
+	return cmdInternalSvcErr
+}
+
 func (s OSCARProxy) checkRateLimit(ctx context.Context, sender *state.SessionInstance, foodGroup uint16, subGroup uint16) (string, bool) {
 	rateClassID, ok := s.SNACRateLimits.RateClassLookup(foodGroup, subGroup)
 	if !ok {

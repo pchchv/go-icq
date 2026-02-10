@@ -1174,6 +1174,58 @@ func (s OSCARProxy) GetStatus(ctx context.Context, me *state.SessionInstance, ar
 	}
 }
 
+// ChangePassword handles the toc_change_passwd TOC command.
+//
+// From the TiK documentation:
+//
+//	Change a user's password.
+//	An ADMIN_PASSWD_STATUS or ERROR message will be sent back to the client.
+//
+// Command syntax: toc_change_passwd <existing_passwd> <new_passwd>
+func (s OSCARProxy) ChangePassword(ctx context.Context, me *state.SessionInstance, args []byte) string {
+	if msg, isLimited := s.checkRateLimit(ctx, me, wire.Admin, wire.AdminInfoChangeRequest); isLimited {
+		return msg
+	}
+
+	var oldPass, newPass string
+	if _, err := parseArgs(args, &oldPass, &newPass); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	oldPass, newPass = unescape(oldPass), unescape(newPass)
+	reqSNAC := wire.SNAC_0x07_0x04_AdminInfoChangeRequest{
+		TLVRestBlock: wire.TLVRestBlock{
+			TLVList: wire.TLVList{
+				wire.NewTLVBE(wire.AdminTLVOldPassword, oldPass),
+				wire.NewTLVBE(wire.AdminTLVNewPassword, newPass),
+			},
+		},
+	}
+	reply, err := s.AdminService.InfoChangeRequest(ctx, me, wire.SNACFrame{}, reqSNAC)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("AdminService.InfoChangeRequest: %w", err))
+	}
+
+	replyBody, ok := reply.Body.(wire.SNAC_0x07_0x05_AdminChangeReply)
+	if !ok {
+		return s.runtimeErr(ctx, fmt.Errorf("AdminService.InfoChangeRequest: unexpected response type %v", replyBody))
+	}
+
+	code, ok := replyBody.Uint16BE(wire.AdminTLVErrorCode)
+	if ok {
+		switch code {
+		case wire.AdminInfoErrorInvalidPasswordLength:
+			return "ERROR:911"
+		case wire.AdminInfoErrorValidatePassword:
+			return "ERROR:912"
+		default:
+			return "ERROR:913"
+		}
+	}
+
+	return "ADMIN_PASSWD_STATUS:0"
+}
+
 func (s OSCARProxy) checkRateLimit(ctx context.Context, sender *state.SessionInstance, foodGroup uint16, subGroup uint16) (string, bool) {
 	rateClassID, ok := s.SNACRateLimits.RateClassLookup(foodGroup, subGroup)
 	if !ok {

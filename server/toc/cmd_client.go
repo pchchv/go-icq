@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -1006,6 +1008,35 @@ func (s OSCARProxy) SendIM(ctx context.Context, sender *state.SessionInstance, a
 	return ""
 }
 
+// GetInfoURL handles the toc_get_info TOC command.
+//
+// From the TiK documentation:
+//
+//	Gets a user's info a GOTO_URL or ERROR message will be sent back to the client.
+//
+// Command syntax: toc_get_info <username>
+func (s OSCARProxy) GetInfoURL(ctx context.Context, me *state.SessionInstance, args []byte) string {
+	if status := me.Session().EvaluateRateLimit(time.Now(), 1); status == wire.RateLimitStatusLimited {
+		return rateLimitExceededErr
+	}
+
+	var user string
+	if _, err := parseArgs(args, &user); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	cookie, err := s.newHTTPAuthToken(me.IdentScreenName())
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("newHTTPAuthToken: %w", err))
+	}
+
+	p := url.Values{}
+	p.Add("cookie", cookie)
+	p.Add("from", me.IdentScreenName().String())
+	p.Add("user", user)
+	return fmt.Sprintf("GOTO_URL:profile:info?%s", p.Encode())
+}
+
 func (s OSCARProxy) checkRateLimit(ctx context.Context, sender *state.SessionInstance, foodGroup uint16, subGroup uint16) (string, bool) {
 	rateClassID, ok := s.SNACRateLimits.RateClassLookup(foodGroup, subGroup)
 	if !ok {
@@ -1033,6 +1064,18 @@ func (s OSCARProxy) checkRateLimit(ctx context.Context, sender *state.SessionIns
 func (s OSCARProxy) runtimeErr(ctx context.Context, err error) string {
 	s.Logger.ErrorContext(ctx, "internal service error", "err", err.Error())
 	return cmdInternalSvcErr
+}
+
+// newHTTPAuthToken creates a HMAC token for authenticating TOC HTTP requests.
+func (s OSCARProxy) newHTTPAuthToken(me state.IdentScreenName) (string, error) {
+	cookie, err := s.CookieBaker.Issue([]byte(me.String()))
+	if err != nil {
+		return "", err
+	}
+
+	// trim padding so that gaim doesn't choke on the long value
+	cookie = bytes.TrimRight(cookie, "\x00")
+	return hex.EncodeToString(cookie), nil
 }
 
 // parseArgs extracts arguments from a TOC command.

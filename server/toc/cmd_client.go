@@ -1320,6 +1320,89 @@ func (s OSCARProxy) Signout(ctx context.Context, me *state.SessionInstance, chat
 	}
 }
 
+// FormatNickname handles the toc_format_nickname TOC command.
+//
+// From the TiK documentation:
+//
+//	Reformat a user's nickname.
+//	An ADMIN_NICK_STATUS or ERROR message will be sent back to the client.
+//
+// Command syntax: toc_format_nickname <new_format>
+func (s OSCARProxy) FormatNickname(ctx context.Context, me *state.SessionInstance, args []byte) string {
+	if errMsg, isLimited := s.checkRateLimit(ctx, me, wire.Admin, wire.AdminInfoChangeRequest); isLimited {
+		return errMsg
+	}
+
+	var newFormat string
+	if _, err := parseArgs(args, &newFormat); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	// remove curly braces added by TiK
+	newFormat = strings.Trim(newFormat, "{}")
+	reqSNAC := wire.SNAC_0x07_0x04_AdminInfoChangeRequest{
+		TLVRestBlock: wire.TLVRestBlock{
+			TLVList: wire.TLVList{
+				wire.NewTLVBE(wire.AdminTLVScreenNameFormatted, newFormat),
+			},
+		},
+	}
+
+	reply, err := s.AdminService.InfoChangeRequest(ctx, me, wire.SNACFrame{}, reqSNAC)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("AdminService.InfoChangeRequest: %w", err))
+	}
+
+	replyBody, ok := reply.Body.(wire.SNAC_0x07_0x05_AdminChangeReply)
+	if !ok {
+		return s.runtimeErr(ctx, fmt.Errorf("AdminService.InfoChangeRequest: unexpected response type %v", replyBody))
+	}
+
+	code, ok := replyBody.Uint16BE(wire.AdminTLVErrorCode)
+	if ok {
+		switch code {
+		case wire.AdminInfoErrorInvalidNickNameLength, wire.AdminInfoErrorInvalidNickName:
+			return "ERROR:911"
+		default:
+			return "ERROR:913"
+		}
+	}
+
+	return "ADMIN_NICK_STATUS:0"
+}
+
+// RemoveBuddy handles the toc_remove_buddy TOC command.
+//
+// From the TiK documentation:
+//
+//	Remove buddies from your buddy list.
+//	This does not change your saved config.
+//
+// Command syntax: toc_remove_buddy <Buddy User 1> [<Buddy User2> [<Buddy User 3> [...]]]
+func (s OSCARProxy) RemoveBuddy(ctx context.Context, me *state.SessionInstance, args []byte) string {
+	if errMsg, isLimited := s.checkRateLimit(ctx, me, wire.Buddy, wire.BuddyDelBuddies); isLimited {
+		return errMsg
+	}
+
+	users, err := parseArgs(args)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	snac := wire.SNAC_0x03_0x05_BuddyDelBuddies{}
+	for _, sn := range users {
+		snac.Buddies = append(snac.Buddies, struct {
+			ScreenName string `oscar:"len_prefix=uint8"`
+		}{ScreenName: sn})
+	}
+
+	if err := s.BuddyService.DelBuddies(ctx, me, snac); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("BuddyService.DelBuddies: %w", err))
+	}
+
+	return ""
+}
+
 func (s OSCARProxy) checkRateLimit(ctx context.Context, sender *state.SessionInstance, foodGroup uint16, subGroup uint16) (string, bool) {
 	rateClassID, ok := s.SNACRateLimits.RateClassLookup(foodGroup, subGroup)
 	if !ok {

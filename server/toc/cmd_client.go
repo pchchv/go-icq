@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pchchv/go-icq/config"
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
@@ -859,6 +860,113 @@ func (s OSCARProxy) SendIM(ctx context.Context, sender *state.SessionInstance, a
 	_, err = s.ICBMService.ChannelMsgToHost(ctx, sender, wire.SNACFrame{}, snac)
 	if err != nil {
 		return s.runtimeErr(ctx, fmt.Errorf("ICBMService.ChannelMsgToHost: %w", err))
+	}
+
+	return ""
+}
+
+// SetCaps handles the toc_set_caps TOC command.
+//
+// From the TiK documentation:
+//
+//	Set my capabilities.
+//	All capabilities that we support need to be sent at the same time.
+//	Capabilities are represented by UUIDs.
+//
+// This method automatically adds the "chat" capability since it doesn't seem to
+// be sent explicitly by the official clients,
+// even though they support chat.
+//
+// Command syntax: toc_set_caps [ <Capability 1> [<Capability 2> [...]]]
+func (s OSCARProxy) SetCaps(ctx context.Context, me *state.SessionInstance, args []byte) string {
+	if errMsg, isLimited := s.checkRateLimit(ctx, me, wire.Locate, wire.LocateSetInfo); isLimited {
+		return errMsg
+	}
+
+	params, err := parseArgs(args)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	caps := make([]uuid.UUID, 0, 16*(len(params)+1))
+	for _, capStr := range params {
+		uid, err := uuid.Parse(capStr)
+		if err != nil {
+			return s.runtimeErr(ctx, fmt.Errorf("UUID.Parse: %w", err))
+		}
+		caps = append(caps, uid)
+	}
+
+	// assume client supports chat,
+	// although we may want to do this according to client ID
+	caps = append(caps, wire.CapChat)
+	snac := wire.SNAC_0x02_0x04_LocateSetInfo{
+		TLVRestBlock: wire.TLVRestBlock{
+			TLVList: wire.TLVList{
+				wire.NewTLVBE(wire.LocateTLVTagsInfoCapabilities, caps),
+			},
+		},
+	}
+	if err := s.LocateService.SetInfo(ctx, me, snac); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("LocateService.SetInfo: %w", err))
+	}
+
+	return ""
+}
+
+// SetDir handles the toc_set_dir TOC command.
+//
+// From the TiK documentation:
+//
+//	Set the DIR user information.
+//	This is a colon separated fields as in:
+//
+//	  "first name":"middle name":"last name":"maiden name":"city":"state":"country":"email":"allow web searches".
+//
+//	Should return a DIR_STATUS msg.
+//	Having anything in the "allow web searches"
+//	field allows people to useweb-searches to find your directory info.
+//	Otherwise, they'd have to use the client.
+//
+// The fields "email" and "allow web searches" are ignored by this method.
+//
+// Command syntax: toc_set_dir <info information>
+func (s OSCARProxy) SetDir(ctx context.Context, me *state.SessionInstance, args []byte) string {
+	if errMsg, isLimited := s.checkRateLimit(ctx, me, wire.Locate, wire.LocateSetDirInfo); isLimited {
+		return errMsg
+	}
+
+	var info string
+	if _, err := parseArgs(args, &info); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	var finalFields [9]string
+	info = unescape(info)
+	rawFields := strings.Split(info, ":")
+	if len(rawFields) > len(finalFields) {
+		return s.runtimeErr(ctx, fmt.Errorf("expected at most %d params, got %d", len(finalFields), len(rawFields)))
+	}
+
+	for i, a := range rawFields {
+		finalFields[i] = strings.Trim(a, "\"")
+	}
+
+	snac := wire.SNAC_0x02_0x09_LocateSetDirInfo{
+		TLVRestBlock: wire.TLVRestBlock{
+			TLVList: wire.TLVList{
+				wire.NewTLVBE(wire.ODirTLVFirstName, finalFields[0]),
+				wire.NewTLVBE(wire.ODirTLVMiddleName, finalFields[1]),
+				wire.NewTLVBE(wire.ODirTLVLastName, finalFields[2]),
+				wire.NewTLVBE(wire.ODirTLVMaidenName, finalFields[3]),
+				wire.NewTLVBE(wire.ODirTLVCountry, finalFields[6]),
+				wire.NewTLVBE(wire.ODirTLVState, finalFields[5]),
+				wire.NewTLVBE(wire.ODirTLVCity, finalFields[4]),
+			},
+		},
+	}
+	if _, err := s.LocateService.SetDirInfo(ctx, me, wire.SNACFrame{}, snac); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("LocateService.SetDirInfo: %w", err))
 	}
 
 	return ""

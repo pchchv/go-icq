@@ -1403,6 +1403,82 @@ func (s OSCARProxy) RemoveBuddy(ctx context.Context, me *state.SessionInstance, 
 	return ""
 }
 
+// InitDone handles the toc_init_done TOC command.
+//
+// From the TiK documentation:
+//
+//	Tells TOC that we are ready to go online.
+//	TOC clients should first send TOC the buddy list and any permit/deny lists.
+//	However, toc_init_done must be called within 30 seconds after toc_signon,
+//	or the connection will be dropped.
+//	Remember, it can't be called until after the SIGN_ON message is received.
+//	Calling this before or multiple times after a SIGN_ON will cause the connection to be dropped.
+//
+// Note: The business logic described in the last 3 sentences are not yet implemented.
+//
+// Command syntax: toc_init_done
+func (s OSCARProxy) InitDone(ctx context.Context, instance *state.SessionInstance) string {
+	if errMsg, isLimited := s.checkRateLimit(ctx, instance, wire.OService, wire.OServiceClientOnline); isLimited {
+		return errMsg
+	}
+
+	if err := s.OServiceService.ClientOnline(ctx, wire.BOS, wire.SNAC_0x01_0x02_OServiceClientOnline{}, instance); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("OServiceServiceBOS.ClientOnliney: %w", err))
+	}
+
+	return ""
+}
+
+// Evil handles the toc_evil TOC command.
+//
+// From the TiK documentation:
+//
+//	Evil/Warn someone else.
+//	The 2nd argument is either the string "norm" for a normal warning, or "anon" for an anonymous warning.
+//	You can only evil people who have recently sent you ims.
+//	The higher someones evil level, the slower they can send message.
+//
+// Command syntax: toc_evil <User> <norm|anon>
+func (s OSCARProxy) Evil(ctx context.Context, me *state.SessionInstance, args []byte) string {
+	if errMsg, isLimited := s.checkRateLimit(ctx, me, wire.ICBM, wire.ICBMEvilRequest); isLimited {
+		return errMsg
+	}
+
+	var user, scope string
+	if _, err := parseArgs(args, &user, &scope); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	snac := wire.SNAC_0x04_0x08_ICBMEvilRequest{
+		ScreenName: user,
+	}
+
+	switch scope {
+	case "anon":
+		snac.SendAs = 1
+	case "norm":
+		snac.SendAs = 0
+	default:
+		return s.runtimeErr(ctx, fmt.Errorf("incorrect warning type `%s`. allowed values: anon, norm", scope))
+	}
+
+	response, err := s.ICBMService.EvilRequest(ctx, me, wire.SNACFrame{}, snac)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("ICBMService.EvilRequest: %w", err))
+	}
+
+	switch v := response.Body.(type) {
+	case wire.SNAC_0x04_0x09_ICBMEvilReply:
+		return ""
+	case wire.SNACError:
+		s.Logger.InfoContext(ctx, "unable to warn user", "code", v.Code)
+	default:
+		return s.runtimeErr(ctx, errors.New("unexpected response"))
+	}
+
+	return ""
+}
+
 func (s OSCARProxy) checkRateLimit(ctx context.Context, sender *state.SessionInstance, foodGroup uint16, subGroup uint16) (string, bool) {
 	rateClassID, ok := s.SNACRateLimits.RateClassLookup(foodGroup, subGroup)
 	if !ok {

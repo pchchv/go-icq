@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/pchchv/go-icq/config"
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 )
@@ -230,6 +233,151 @@ func (s OSCARProxy) AddDeny(ctx context.Context, me *state.SessionInstance, args
 	}
 
 	return ""
+}
+
+// ChatJoin handles the toc_chat_join TOC command.
+//
+// From the TiK documentation:
+//
+//	Join a chat room in the given exchange.
+//	Exchange is an integer that represents a group of chat rooms.
+//	Different exchanges have different properties.
+//	For example some exchanges might have room replication
+//	(i. e. a room never fills up, there are just multiple instances)
+//	and some exchanges might have navigational information.
+//	Currently, exchange should always be 4, however this may change in the future.
+//	You will either receive an ERROR if the room couldn't be joined or a CHAT_JOIN message.
+//	The Chat Room Name is case-insensitive and consecutive spaces are removed.
+//
+// Command syntax: toc_chat_join <Exchange> <Chat Room Name>
+func (s OSCARProxy) ChatJoin(ctx context.Context, me *state.SessionInstance, chatRegistry *ChatRegistry, args []byte) (int, string) {
+	var exchangeStr, roomName string
+	if _, err := parseArgs(args, &exchangeStr, &roomName); err != nil {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	// create room or retrieve the room if it already exists
+	roomName = unescape(roomName)
+	exchange, err := strconv.Atoi(exchangeStr)
+	if err != nil {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("strconv.Atoi: %w", err))
+	}
+
+	if msg, isLimited := s.checkRateLimit(ctx, me, wire.Chat, wire.ChatRoomInfoUpdate); isLimited {
+		return 0, msg
+	}
+
+	mkRoomReq := wire.SNAC_0x0E_0x02_ChatRoomInfoUpdate{
+		Exchange: uint16(exchange),
+		Cookie:   "create",
+		TLVBlock: wire.TLVBlock{
+			TLVList: wire.TLVList{
+				wire.NewTLVBE(wire.ChatRoomTLVRoomName, roomName),
+			},
+		},
+	}
+	mkRoomReply, err := s.ChatNavService.CreateRoom(ctx, me, wire.SNACFrame{}, mkRoomReq)
+	if err != nil {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("ChatNavService.CreateRoom: %w", err))
+	}
+
+	mkRoomReplyBody, ok := mkRoomReply.Body.(wire.SNAC_0x0D_0x09_ChatNavNavInfo)
+	if !ok {
+		return 0, s.runtimeErr(
+			ctx,
+			fmt.Errorf("chatNavService.CreateRoom: unexpected response type %v", mkRoomReplyBody),
+		)
+	}
+
+	buf, ok := mkRoomReplyBody.Bytes(wire.ChatNavTLVRoomInfo)
+	if !ok {
+		return 0, s.runtimeErr(ctx, errors.New("mkRoomReplyBody.Bytes: missing wire.ChatNavTLVRoomInfo"))
+	}
+
+	inBody := wire.SNAC_0x0E_0x02_ChatRoomInfoUpdate{}
+	if err := wire.UnmarshalBE(&inBody, bytes.NewReader(buf)); err != nil {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("wire.UnmarshalBE: %w", err))
+	}
+
+	if msg, isLimited := s.checkRateLimit(ctx, me, wire.OService, wire.OServiceServiceRequest); isLimited {
+		return 0, msg
+	}
+
+	svcReqSNAC := wire.SNAC_0x01_0x04_OServiceServiceRequest{
+		FoodGroup: wire.Chat,
+		TLVRestBlock: wire.TLVRestBlock{
+			TLVList: wire.TLVList{
+				wire.NewTLVBE(0x01, wire.SNAC_0x01_0x04_TLVRoomInfo{
+					Cookie: inBody.Cookie,
+				}),
+			},
+		},
+	}
+	svcReqReply, err := s.OServiceService.ServiceRequest(ctx, wire.BOS, me, wire.SNACFrame{}, svcReqSNAC, config.Listener{})
+	if err != nil {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("OServiceServiceBOS.ServiceRequest: %w", err))
+	}
+
+	svcReqReplyBody, ok := svcReqReply.Body.(wire.SNAC_0x01_0x05_OServiceServiceResponse)
+	if !ok {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("OServiceServiceBOS.ServiceRequest: unexpected response type %v", svcReqReplyBody))
+	}
+
+	loginCookie, hasCookie := svcReqReplyBody.Bytes(wire.OServiceTLVTagsLoginCookie)
+	if !hasCookie {
+		return 0, s.runtimeErr(ctx, errors.New("svcReqReplyBody.Bytes: missing wire.OServiceTLVTagsLoginCookie"))
+	}
+
+	// TODO: naming for cookie: login cookie, server cookie, or auth cookie?
+	serverCookie, err := s.AuthService.CrackCookie(loginCookie)
+	chatSess, err := s.AuthService.RegisterChatSession(ctx, serverCookie)
+	if err != nil {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("AuthService.RegisterChatSession: %w", err))
+	}
+
+	if msg, isLimited := s.checkRateLimit(ctx, me, wire.OService, wire.OServiceClientOnline); isLimited {
+		return 0, msg
+	}
+
+	if err := s.OServiceService.ClientOnline(ctx, wire.Chat, wire.SNAC_0x01_0x02_OServiceClientOnline{}, chatSess); err != nil {
+		return 0, s.runtimeErr(ctx, fmt.Errorf("OServiceServiceChat.ClientOnline: %w", err))
+	}
+
+	roomInfo := wire.ICBMRoomInfo{
+		Exchange: inBody.Exchange,
+		Cookie:   inBody.Cookie,
+		Instance: inBody.InstanceNumber,
+	}
+	chatID := chatRegistry.Add(roomInfo)
+	chatRegistry.RegisterSess(chatID, chatSess)
+	return chatID, fmt.Sprintf("CHAT_JOIN:%d:%s", chatID, roomName)
+}
+
+// ChatLeave handles the toc_chat_leave TOC command.
+//
+// From the TiK documentation: leave the chat room.
+//
+// Command syntax: toc_chat_leave <Chat Room ID>
+func (s OSCARProxy) ChatLeave(ctx context.Context, chatRegistry *ChatRegistry, args []byte) string {
+	var chatIDStr string
+	if _, err := parseArgs(args, &chatIDStr); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	chatID, err := strconv.Atoi(chatIDStr)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("strconv.Atoi: %w", err))
+	}
+
+	me := chatRegistry.RetrieveSess(chatID)
+	if me == nil {
+		return s.runtimeErr(ctx, fmt.Errorf("chatRegistry.RetrieveSess: chat session `%d` not found", chatID))
+	}
+
+	s.AuthService.SignoutChat(ctx, me)
+	me.CloseInstance() // stop async server SNAC reply handler for this chat room
+	chatRegistry.RemoveSess(chatID)
+	return fmt.Sprintf("CHAT_LEFT:%d", chatID)
 }
 
 func (s OSCARProxy) checkRateLimit(ctx context.Context, sender *state.SessionInstance, foodGroup uint16, subGroup uint16) (string, bool) {

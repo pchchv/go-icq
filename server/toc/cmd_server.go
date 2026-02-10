@@ -165,6 +165,41 @@ func (s OSCARProxy) UpdateBuddyDeparted(snac wire.SNAC_0x03_0x0C_BuddyDeparted) 
 	return fmt.Sprintf("UPDATE_BUDDY:%s:F:0:0:0:   ", snac.ScreenName)
 }
 
+// Eviled handles the EVILED TOC command.
+//
+// From the TiK documentation: the user was just eviled.
+//
+// Command syntax: EVILED:<new evil>:<name of eviler, blank if anonymous>
+func (s OSCARProxy) Eviled(snac wire.SNAC_0x01_0x10_OServiceEvilNotification) string {
+	var who string
+	if snac.Snitcher != nil {
+		who = snac.Snitcher.ScreenName
+	}
+
+	return fmt.Sprintf("EVILED:%s:%s", fmt.Sprintf("%d", snac.NewEvil/10), who)
+}
+
+// IMIn handles the IM_IN TOC command.
+//
+// From the TiK documentation:
+//
+//	Receive an IM from someone.
+//	Everything after the third colon is the incoming message,
+//	including other colons.
+//
+// Command syntax: IM_IN:<Source User>:<Auto Response T/F?>:<Message>
+func (s OSCARProxy) IMIn(ctx context.Context, chatRegistry *ChatRegistry, snac wire.SNAC_0x04_0x07_ICBMChannelMsgToClient) string {
+	switch snac.ChannelID {
+	case wire.ICBMChannelIM:
+		return s.convertICBMInstantMsg(ctx, snac)
+	case wire.ICBMChannelRendezvous:
+		return s.convertICBMRendezvous(ctx, chatRegistry, snac)
+	default:
+		s.Logger.DebugContext(ctx, "received unsupported ICBM channel message", "channel_id", snac.ChannelID)
+		return ""
+	}
+}
+
 // convertICBMInstantMsg converts an ICBM instant message SNAC to a TOC IM_IN response.
 func (s OSCARProxy) convertICBMInstantMsg(ctx context.Context, snac wire.SNAC_0x04_0x07_ICBMChannelMsgToClient) string {
 	buf, ok := snac.TLVRestBlock.Bytes(wire.ICBMTLVAOLIMData)

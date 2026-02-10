@@ -290,3 +290,28 @@ func parseArgs(payload []byte, args ...*string) (varArgs []string, err error) {
 	// dump remaining arguments as varargs
 	return segs[len(args):], err
 }
+
+// unescape removes escaping from the following TOC characters: \ { } ( ) [ ] $ "
+func unescape(encoded string) string {
+	if !strings.ContainsRune(encoded, '\\') {
+		return encoded
+	}
+
+	var escaped bool
+	var result strings.Builder
+	result.Grow(len(encoded))
+	for i := 0; i < len(encoded); i++ {
+		ch := encoded[i]
+		if escaped {
+			// append escaped character without the backslash
+			result.WriteByte(ch)
+			escaped = false
+		} else if ch == '\\' {
+			escaped = true
+		} else {
+			result.WriteByte(ch)
+		}
+	}
+
+	return result.String()
+}

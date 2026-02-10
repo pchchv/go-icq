@@ -738,6 +738,40 @@ func (s OSCARProxy) SetConfig(ctx context.Context, me *state.SessionInstance, ar
 	return ""
 }
 
+// SetInfo handles the toc_set_info TOC command.
+//
+// From the TiK documentation:
+//
+//	Set the LOCATE user information.
+//	This is basic HTML.
+//	Remember to encode the info.
+//
+// Command syntax: toc_set_info <info information>
+func (s OSCARProxy) SetInfo(ctx context.Context, me *state.SessionInstance, args []byte) string {
+	if errMsg, isLimited := s.checkRateLimit(ctx, me, wire.Locate, wire.LocateSetInfo); isLimited {
+		return errMsg
+	}
+
+	var info string
+	if _, err := parseArgs(args, &info); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	info = unescape(info)
+	snac := wire.SNAC_0x02_0x04_LocateSetInfo{
+		TLVRestBlock: wire.TLVRestBlock{
+			TLVList: wire.TLVList{
+				wire.NewTLVBE(wire.LocateTLVTagsInfoSigData, info),
+			},
+		},
+	}
+	if err := s.LocateService.SetInfo(ctx, me, snac); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("LocateService.SetInfo: %w", err))
+	}
+
+	return ""
+}
+
 // SetAway handles the toc_chat_join TOC command.
 //
 // From the TiK documentation:

@@ -1132,6 +1132,48 @@ func (s OSCARProxy) GetDirURL(ctx context.Context, me *state.SessionInstance, ar
 	return fmt.Sprintf("GOTO_URL:directory info:dir_info?%s", p.Encode())
 }
 
+// GetStatus handles the toc_get_status TOC command.
+//
+// From the TOC2 documentation:
+//
+//	This useful command wasn't ever really documented.
+//	It returns either an UPDATE_BUDDY message or an
+//	ERROR message depending on whether or not the
+//	guy appears to be online.
+//
+// Command syntax: toc_get_status <screenname>
+func (s OSCARProxy) GetStatus(ctx context.Context, me *state.SessionInstance, args []byte) string {
+	if errMsg, isLimited := s.checkRateLimit(ctx, me, wire.Locate, wire.LocateUserInfoQuery); isLimited {
+		return errMsg
+	}
+
+	var them string
+	if _, err := parseArgs(args, &them); err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("parseArgs: %w", err))
+	}
+
+	inBody := wire.SNAC_0x02_0x05_LocateUserInfoQuery{
+		ScreenName: them,
+	}
+	info, err := s.LocateService.UserInfoQuery(ctx, me, wire.SNACFrame{}, inBody)
+	if err != nil {
+		return s.runtimeErr(ctx, fmt.Errorf("LocateService.UserInfoQuery: %w", err))
+	}
+
+	switch v := info.Body.(type) {
+	case wire.SNACError:
+		if v.Code == wire.ErrorCodeNotLoggedOn {
+			return fmt.Sprintf("ERROR:901:%s", them)
+		} else {
+			return s.runtimeErr(ctx, fmt.Errorf("LocateService.UserInfoQuery error code: %d", v.Code))
+		}
+	case wire.SNAC_0x02_0x06_LocateUserInfoReply:
+		return userInfoToUpdateBuddy(v.TLVUserInfo)
+	default:
+		return s.runtimeErr(ctx, fmt.Errorf("AdminService.InfoChangeRequest: unexpected response type %v", v))
+	}
+}
+
 func (s OSCARProxy) checkRateLimit(ctx context.Context, sender *state.SessionInstance, foodGroup uint16, subGroup uint16) (string, bool) {
 	rateClassID, ok := s.SNACRateLimits.RateClassLookup(foodGroup, subGroup)
 	if !ok {

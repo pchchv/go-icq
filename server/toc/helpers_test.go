@@ -23,6 +23,10 @@ type addPermListEntriesParams []struct {
 	err  error
 }
 
+type adminParams struct {
+	infoChangeRequestParams
+}
+
 type infoChangeRequestParams []struct {
 	me     state.IdentScreenName
 	msg    wire.SNACMessage

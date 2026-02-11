@@ -67,6 +67,39 @@ type Server struct {
 	shutdownCancel     context.CancelFunc
 }
 
+func (s *Server) Shutdown(ctx context.Context) error {
+	s.logger.Debug("Initiating graceful shutdown...")
+	s.shutdownCancel()
+	s.cleanupListeners()
+	// wait for handlers to complete
+	done := make(chan struct{})
+	go func() {
+		s.connWg.Wait()
+		s.listenWg.Wait()
+		close(done)
+	}()
+
+	for _, srv := range s.servers {
+		_ = srv.Shutdown(ctx)
+	}
+
+	select {
+	case <-done:
+		s.logger.Info("shutdown complete")
+	case <-ctx.Done():
+		s.logger.Info("shutdown complete, but connections didn't close cleanly")
+	}
+
+	return nil
+}
+
+func (s *Server) cleanupListeners() {
+	for _, ln := range s.listeners {
+		_ = ln.Close()
+	}
+	s.listeners = nil
+}
+
 // channelListener is an implementation of net.Listener that
 // accepts connections from a channel instead of a network socket.
 // It is useful for attaching an HTTP service to a connection on the fly.

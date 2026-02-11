@@ -1,9 +1,19 @@
 package toc
 
 import (
+	"context"
 	"encoding/hex"
+	"fmt"
+	"html/template"
 	"net"
 	"net/http"
+
+	"github.com/pchchv/go-icq/wire"
+)
+
+var (
+	profileTemplate   *template.Template
+	directoryTemplate *template.Template
 )
 
 // AuthMiddleware is an HTTP middleware that enforces authentication using an
@@ -58,4 +68,50 @@ func (s OSCARProxy) RateLimiterMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (s OSCARProxy) logAndReturn500(ctx context.Context, w http.ResponseWriter, err error) {
+	s.Logger.ErrorContext(ctx, "internal service error", "err", err.Error())
+	http.Error(w, "internal server error", http.StatusInternalServerError)
+}
+
+func (s OSCARProxy) outputSearchResults(ctx context.Context, w http.ResponseWriter, users ...wire.TLVBlock) {
+	type DirSearchResult struct {
+		FirstName  string
+		MiddleName string
+		LastName   string
+		MaidenName string
+		Country    string
+		State      string
+		City       string
+		NickName   string
+		ZIP        string
+		Address    string
+		ScreenName string
+	}
+
+	type PageData struct {
+		Results []DirSearchResult
+	}
+
+	results := make([]DirSearchResult, 0, len(users))
+	for _, result := range users {
+		rec := DirSearchResult{}
+		rec.ScreenName, _ = result.String(wire.ODirTLVScreenName)
+		rec.FirstName, _ = result.String(wire.ODirTLVFirstName)
+		rec.MiddleName, _ = result.String(wire.ODirTLVMiddleName)
+		rec.LastName, _ = result.String(wire.ODirTLVLastName)
+		rec.MaidenName, _ = result.String(wire.ODirTLVMaidenName)
+		rec.Country, _ = result.String(wire.ODirTLVCountry)
+		rec.State, _ = result.String(wire.ODirTLVState)
+		rec.City, _ = result.String(wire.ODirTLVCity)
+		rec.NickName, _ = result.String(wire.ODirTLVNickName)
+		rec.ZIP, _ = result.String(wire.ODirTLVZIP)
+		rec.Address, _ = result.String(wire.ODirTLVAddress)
+		results = append(results, rec)
+	}
+
+	if err := directoryTemplate.Execute(w, PageData{Results: results}); err != nil {
+		s.logAndReturn500(ctx, w, fmt.Errorf("t.Execute: %w", err))
+	}
 }

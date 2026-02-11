@@ -1,7 +1,10 @@
 package toc
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
@@ -11,6 +14,7 @@ import (
 
 	"github.com/patrickmn/go-cache"
 	"github.com/pchchv/go-icq/state"
+	"github.com/pchchv/go-icq/wire"
 	"golang.org/x/time/rate"
 )
 
@@ -98,6 +102,63 @@ func (s *Server) cleanupListeners() {
 		_ = ln.Close()
 	}
 	s.listeners = nil
+}
+
+func (s *Server) runClientCommands(ctx context.Context, doAsync func(f func() error), sessBOS *state.SessionInstance, chatRegistry *ChatRegistry, clientFlap *wire.FlapClient, toCh chan<- []byte) error {
+	for {
+		clientFrame, err := clientFlap.ReceiveFLAP()
+		if err != nil {
+			return err
+		}
+
+		switch clientFrame.FrameType {
+		case wire.FLAPFrameSignoff:
+			return io.EOF // client disconnected
+		case wire.FLAPFrameKeepAlive:
+			// keep alive heartbeat, do nothing for now.
+			// todo set connection deadline to future time
+		case wire.FLAPFrameData:
+			clientFrame.Payload = bytes.TrimRight(clientFrame.Payload, "\x00") // trim null terminator
+			if len(clientFrame.Payload) == 0 {
+				return errors.New("TOC command is empty")
+			} else if len(clientFrame.Payload) > 2048 {
+				return errors.New("TOC command exceeds maximum length (2048)")
+			}
+
+			if msg := s.bosProxy.RecvClientCmd(ctx, sessBOS, chatRegistry, clientFrame.Payload, toCh, doAsync); msg != "" {
+				select {
+				case toCh <- []byte(msg):
+				case <-ctx.Done():
+					return nil
+				}
+			}
+		default:
+			return fmt.Errorf("unexpected clientFlap clientFrame type %d", clientFrame.FrameType)
+		}
+	}
+}
+
+func (s *Server) sendToClient(ctx context.Context, toClient <-chan []byte, clientFlap *wire.FlapClient) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case msg := <-toClient:
+			if err := clientFlap.SendDataFrame(msg); err != nil {
+				return fmt.Errorf("clientFlap.SendDataFrame: %w", err)
+			} else if s.logger.Enabled(ctx, slog.LevelDebug) {
+				s.logger.DebugContext(ctx, "server response", "command", msg)
+			} else {
+				// just log the command, omit params
+				idx := bytes.IndexByte(msg, ':')
+				if idx < 0 {
+					idx = len(msg)
+				}
+
+				s.logger.InfoContext(ctx, "server response", "command", msg[0:idx])
+			}
+		}
+	}
 }
 
 // channelListener is an implementation of net.Listener that

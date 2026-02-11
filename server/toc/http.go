@@ -259,6 +259,15 @@ func (s OSCARProxy) DirSearchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// NewServeMux creates and returns an HTTP mux that serves all TOC routes.
+func (s OSCARProxy) NewServeMux() http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("GET /info", s.RateLimiterMiddleware(s.AuthMiddleware(http.HandlerFunc(s.ProfileHandler))))
+	mux.Handle("GET /dir_info", s.RateLimiterMiddleware(s.AuthMiddleware(http.HandlerFunc(s.DirInfoHandler))))
+	mux.Handle("GET /dir_search", s.RateLimiterMiddleware(s.AuthMiddleware(http.HandlerFunc(s.DirSearchHandler))))
+	return mux
+}
+
 func (s OSCARProxy) logAndReturn500(ctx context.Context, w http.ResponseWriter, err error) {
 	s.Logger.ErrorContext(ctx, "internal service error", "err", err.Error())
 	http.Error(w, "internal server error", http.StatusInternalServerError)

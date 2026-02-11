@@ -365,3 +365,15 @@ type bufferedConn struct {
 func newBufferedConn(c net.Conn) bufferedConn {
 	return bufferedConn{bufio.NewReader(c), c}
 }
+
+// Peek returns the next n bytes from the buffer without advancing the reader.
+// If fewer than n bytes are available, it returns an error.
+func (b bufferedConn) Peek(n int) ([]byte, error) {
+	return b.r.Peek(n)
+}
+
+// Read reads data into p from the buffered connection.
+// It prioritizes buffered data before reading from the underlying connection.
+func (b bufferedConn) Read(p []byte) (int, error) {
+	return b.r.Read(p)
+}

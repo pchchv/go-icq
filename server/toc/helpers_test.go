@@ -76,3 +76,10 @@ type infoQueryParams []struct {
 	msg    wire.SNACMessage
 	err    error
 }
+
+// issueParams holds multiple scenarios for the Issue method.
+type issueParams []struct {
+	data       []byte
+	returnData []byte
+	returnErr  error
+}

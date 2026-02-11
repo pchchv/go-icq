@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"sync"
 	"time"
 
@@ -198,6 +199,79 @@ func (s *Server) login(ctx context.Context, clientFlap *wire.FlapClient) (*state
 	}
 
 	return sessBOS, nil
+}
+
+// initFLAP sets up a new FLAP connection.
+// It returns a flap client if the connection successfully initialized.
+func (s *Server) initFLAP(rw io.ReadWriter) (*wire.FlapClient, error) {
+	expected := "FLAPON\r\n\r\n"
+	buf := make([]byte, len(expected))
+	_, err := io.ReadFull(rw, buf)
+	if err != nil {
+		return nil, fmt.Errorf("io.ReadFull: %w", err)
+	}
+
+	if expected != string(buf) {
+		return nil, fmt.Errorf("expected FLAPON, got %s", buf)
+	}
+
+	clientFlap := wire.NewFlapClient(0, rw, rw)
+	if err := clientFlap.SendSignonFrame(nil); err != nil {
+		return nil, fmt.Errorf("clientFlap.SendSignonFrame: %w", err)
+	}
+
+	if _, err := clientFlap.ReceiveSignonFrame(); err != nil {
+		return nil, fmt.Errorf("clientFlap.ReceiveSignonFrame: %w", err)
+	}
+
+	return clientFlap, nil
+}
+
+func (s *Server) dispatchFLAP(ctx context.Context, conn net.Conn) error {
+	var once sync.Once
+	closeConn := func() {
+		once.Do(func() {
+			_ = conn.Close()
+		})
+	}
+	defer closeConn()
+
+	ctx = context.WithValue(ctx, "ip", conn.RemoteAddr().String())
+	clientFlap, err := s.initFLAP(conn)
+	if err != nil {
+		return err
+	}
+
+	ip, _, err := net.SplitHostPort(conn.RemoteAddr().String())
+	if err != nil {
+		s.logger.Error("failed to parse remote address", "err", err.Error())
+		return err
+	}
+
+	if ok := s.loginIPRateLimiter.Allow(ip); !ok {
+		if err := clientFlap.SendDataFrame([]byte("ERROR:983")); err != nil {
+			return fmt.Errorf("clientFlap.SendDataFrame: %w", err)
+		}
+		return nil
+	}
+
+	sessBOS, err := s.login(ctx, clientFlap)
+	if err != nil {
+		return fmt.Errorf("s.login: %w", err)
+	} else if sessBOS == nil {
+		return nil // user not found
+	}
+
+	ctx = context.WithValue(ctx, "screenName", sessBOS.IdentScreenName())
+	if remoteAddr, ok := ctx.Value("ip").(string); ok {
+		if ip, err := netip.ParseAddrPort(remoteAddr); err != nil {
+			return errors.New("unable to parse ip addr")
+		} else {
+			sessBOS.SetRemoteAddr(&ip)
+		}
+	}
+
+	return s.handleTOCRequest(ctx, closeConn, sessBOS, NewChatRegistry(), clientFlap)
 }
 
 // handleTOCRequest processes incoming TOC requests and coordinates their handling.

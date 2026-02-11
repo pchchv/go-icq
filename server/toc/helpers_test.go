@@ -32,6 +32,21 @@ type broadcastBuddyDepartedParams []struct {
 	err error
 }
 
+type channelMsgToHostParamsChat []struct {
+	sender state.IdentScreenName
+	inBody wire.SNAC_0x0E_0x05_ChatChannelMsgToHost
+	result *wire.SNACMessage
+	err    error
+}
+
+type channelMsgToHostParamsICBM []struct {
+	sender  state.IdentScreenName
+	inFrame wire.SNACFrame
+	inBody  wire.SNAC_0x04_0x06_ICBMChannelMsgToHost
+	result  *wire.SNACMessage
+	err     error
+}
+
 type infoChangeRequestParams []struct {
 	me     state.IdentScreenName
 	msg    wire.SNACMessage

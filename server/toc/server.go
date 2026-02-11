@@ -2,6 +2,7 @@ package toc
 
 import (
 	"context"
+	"io"
 	"net"
 	"time"
 
@@ -49,4 +50,28 @@ func (l *IPRateLimiter) Allow(ip string) (allowed bool) {
 type channelListener struct {
 	ch  chan net.Conn // channel used to receive connections
 	ctx context.Context
+}
+
+// Addr returns the network address of the listener.
+// Since channelListener is not bound to a real network address, it returns nil.
+func (l *channelListener) Addr() net.Addr {
+	return nil
+}
+
+// Accept waits for and returns the next connection from the channel.
+// If the channel is closed, it returns io.EOF to indicate no more connections.
+func (l *channelListener) Accept() (net.Conn, error) {
+	select {
+	case <-l.ctx.Done():
+		return nil, io.EOF
+	case ch := <-l.ch:
+		return ch, nil
+	}
+}
+
+// Close closes the listener.
+// Since channelListener does not manage an actual network connection,
+// this is a no-op and always returns nil.
+func (l *channelListener) Close() error {
+	return nil
 }

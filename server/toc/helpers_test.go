@@ -51,6 +51,19 @@ type chatParams struct {
 	channelMsgToHostParamsChat
 }
 
+type clientOnlineParams []struct {
+	body wire.SNAC_0x01_0x02_OServiceClientOnline
+	me   state.IdentScreenName
+	err  error
+}
+
+type createRoomParams []struct {
+	me     state.IdentScreenName
+	inBody wire.SNAC_0x0E_0x02_ChatRoomInfoUpdate
+	msg    wire.SNACMessage
+	err    error
+}
+
 type infoChangeRequestParams []struct {
 	me     state.IdentScreenName
 	msg    wire.SNACMessage

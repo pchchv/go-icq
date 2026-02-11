@@ -47,6 +47,10 @@ type channelMsgToHostParamsICBM []struct {
 	err     error
 }
 
+type chatParams struct {
+	channelMsgToHostParamsChat
+}
+
 type infoChangeRequestParams []struct {
 	me     state.IdentScreenName
 	msg    wire.SNACMessage

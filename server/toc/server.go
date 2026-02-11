@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/netip"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/patrickmn/go-cache"
@@ -317,6 +318,77 @@ func (s *Server) handleTOCRequest(ctx context.Context, closeConn func(), sessBOS
 	})
 
 	return g.Wait()
+}
+
+// handleConnection inspects and routes an incoming connection.
+// If the connection starts with "FLAP", handle as TOC/FLAP.
+// Otherwise, dispatch for HTTP processing.
+func (s *Server) handleConnection(conn net.Conn, ctx context.Context, httpCh chan net.Conn) error {
+	bufCon := newBufferedConn(conn)
+	doFlap := "FLAP"
+	buf, err := bufCon.Peek(len(doFlap))
+	if err != nil {
+		return fmt.Errorf("bufCon.Peek: %w", err)
+	}
+
+	// handle TOC/FLAP
+	if string(buf) == doFlap {
+		defer func() {
+			// untrack connections
+			s.connMu.Lock()
+			delete(s.conns, conn)
+			s.connMu.Unlock()
+			_ = conn.Close()
+			s.connWg.Done()
+		}()
+
+		// track connection
+		s.connMu.Lock()
+		s.conns[conn] = struct{}{}
+		s.connMu.Unlock()
+		s.connWg.Add(1)
+		if err = s.dispatchFLAP(ctx, bufCon); err != nil {
+			switch {
+			case errors.Is(err, io.EOF):
+			case errors.Is(err, net.ErrClosed):
+			case errors.Is(err, syscall.ECONNRESET):
+				return nil
+			default:
+				return fmt.Errorf("s.dispatchFLAP: %w", err)
+			}
+		}
+		return nil
+	}
+
+	// handle TOC/HTTP
+	select {
+	case httpCh <- bufCon:
+		return nil
+	case <-ctx.Done():
+		return nil
+	}
+}
+
+func (s *Server) acceptLoop(ctx context.Context, ln net.Listener, httpCh chan net.Conn) {
+	defer s.listenWg.Done()
+
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				break
+			} else {
+				s.logger.Error("accept error", "err", err.Error())
+				continue
+			}
+		}
+
+		go func() {
+			if err := s.handleConnection(conn, ctx, httpCh); err != nil {
+				s.logger.InfoContext(ctx, "user session failed", "err", err.Error())
+			}
+		}()
+	}
 }
 
 // channelListener is an implementation of net.Listener that

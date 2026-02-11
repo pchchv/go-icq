@@ -22,3 +22,16 @@ type addPermListEntriesParams []struct {
 	body wire.SNAC_0x09_0x05_PermitDenyAddPermListEntries
 	err  error
 }
+
+type infoChangeRequestParams []struct {
+	me     state.IdentScreenName
+	msg    wire.SNACMessage
+	inBody wire.SNAC_0x07_0x04_AdminInfoChangeRequest
+	err    error
+}
+
+type infoQueryParams []struct {
+	inBody wire.SNAC_0x0F_0x02_InfoQuery
+	msg    wire.SNACMessage
+	err    error
+}

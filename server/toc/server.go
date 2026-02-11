@@ -15,7 +15,17 @@ import (
 	"github.com/patrickmn/go-cache"
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
+)
+
+var (
+	// errClientReq indicates that an error occurred while reading a client request
+	errClientReq = errors.New("failed to read client request")
+	// errServerWrite indicates that an error occurred while writing a server response
+	errServerWrite = errors.New("failed to send server response")
+	// errTOCProcessing indicates that an error occurred in the TOC handler
+	errTOCProcessing = errors.New("failed to process TOC request")
 )
 
 // IPRateLimiter provides per-IP rate limiting using a token bucket algorithm.
@@ -159,6 +169,79 @@ func (s *Server) sendToClient(ctx context.Context, toClient <-chan []byte, clien
 			}
 		}
 	}
+}
+
+func (s *Server) login(ctx context.Context, clientFlap *wire.FlapClient) (*state.SessionInstance, error) {
+	clientFrame, err := clientFlap.ReceiveFLAP()
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("clientFlap.ReceiveFLAP: %w", err)
+	}
+
+	var args []byte
+	cmd := clientFrame.Payload
+	if idx := bytes.IndexByte(clientFrame.Payload, ' '); idx > -1 {
+		cmd, args = clientFrame.Payload[:idx], clientFrame.Payload[idx:]
+	}
+
+	if string(cmd) != "toc_signon" {
+		return nil, errors.New("expected toc_signon")
+	}
+
+	sessBOS, reply := s.bosProxy.Signon(ctx, args)
+	for _, m := range reply {
+		if err := clientFlap.SendDataFrame([]byte(m)); err != nil {
+			return nil, fmt.Errorf("clientFlap.SendDataFrame: %w", err)
+		}
+	}
+
+	return sessBOS, nil
+}
+
+// handleTOCRequest processes incoming TOC requests and coordinates their handling.
+// It reads client requests, processes TOC commands, and sends responses back to the client.
+//
+// Returns:
+//   - errClientReq if an error occurs while reading the TOC request. Wraps io.EOF if the client disconnected.
+//   - errTOCProcessing if an error occurs while processing the TOC command.
+//   - errServerWrite if an error occurs while sending the TOC response.
+func (s *Server) handleTOCRequest(ctx context.Context, closeConn func(), sessBOS *state.SessionInstance, chatRegistry *ChatRegistry, clientFlap *wire.FlapClient) error {
+	if err := s.recalcWarning(ctx, sessBOS); err != nil {
+		return fmt.Errorf("failed to recalculate warning level: %w", err)
+	}
+
+	// TOC response queue
+	msgCh := make(chan []byte, 1)
+	g, ctx := errgroup.WithContext(ctx)
+	// process TOC client requests and enqueue TOC server responses
+	g.Go(func() error {
+		err := s.runClientCommands(ctx, g.Go, sessBOS, chatRegistry, clientFlap, msgCh)
+		return errors.Join(err, errClientReq)
+	})
+
+	// translate OSCAR server responses to TOC responses and enqueue them
+	g.Go(func() error {
+		err := s.bosProxy.RecvBOS(ctx, sessBOS, chatRegistry, msgCh)
+		closeConn() // unblock runClientCommands
+		return errors.Join(err, errTOCProcessing)
+	})
+
+	// send TOC server responses to the client
+	g.Go(func() error {
+		err := s.sendToClient(ctx, msgCh, clientFlap)
+		closeConn() // unblock runClientCommands
+		return errors.Join(err, errServerWrite)
+	})
+
+	// process warning limits
+	g.Go(func() error {
+		s.lowerWarnLevel(ctx, sessBOS)
+		return nil
+	})
+
+	return g.Wait()
 }
 
 // channelListener is an implementation of net.Listener that

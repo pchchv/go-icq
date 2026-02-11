@@ -16,10 +16,57 @@ import (
 	"golang.org/x/net/html"
 )
 
+const (
+	// profileTpl is the profile lookup response go template.
+	profileTpl = `
+<HTML><HEAD><TITLE>Profile Lookup</TITLE></HEAD><BODY>
+Username : <B>{{- .ScreenName -}}</B><BR><BR>
+{{ .Profile }}
+</BODY></HTML>`
+	// directoryTpl is the directory search response go template.
+	directoryTpl = `
+<HTML><HEAD><TITLE>Open OSCAR Server</TITLE></HEAD><BODY><H3>Dir Results</H3>
+{{- if .Results -}}
+<TABLE>
+{{- range .Results -}}
+<TR><TD>
+<B>Screen Name:</B> {{.ScreenName}}<BR>
+{{- if .FirstName}}<B>First Name:</B> {{.FirstName}}<BR>{{- end -}}
+{{- if .MiddleName}}<B>Middle Name:</B> {{.MiddleName}}<BR>{{- end -}}
+{{- if .LastName}}<B>Last Name:</B> {{.LastName}}<BR>{{- end -}}
+{{- if .MaidenName}}<B>Maiden Name:</B> {{.MaidenName}}<BR>{{- end -}}
+{{- if .Country}}<B>Country:</B> {{.Country}}<BR>{{- end -}}
+{{- if .State}}<B>State:</B> {{.State}}<BR>{{- end -}}
+{{- if .City}}<B>City:</B> {{.City}}<BR>{{- end -}}
+{{- if .NickName}}<B>Nick Name:</B> {{.NickName}}<BR>{{- end -}}
+{{- if .ZIP}}<B>ZIP Code:</B> {{.ZIP}}<BR>{{- end -}}
+{{- if .Address}}<B>Address :</B> {{.Address}}<BR>{{- end -}}
+</TD></TR>
+{{- end -}}
+</TABLE>
+{{- else -}}
+<BR>No results found.
+{{- end -}}
+</BODY></HTML>`
+)
+
 var (
 	profileTemplate   *template.Template
 	directoryTemplate *template.Template
 )
+
+func init() {
+	var err error
+	profileTemplate, err = template.New("profile").Parse(profileTpl)
+	if err != nil {
+		panic(fmt.Errorf("failed to compile profile template: %w", err))
+	}
+
+	directoryTemplate, err = template.New("directory").Parse(directoryTpl)
+	if err != nil {
+		panic(fmt.Errorf("failed to compile directory template: %w", err))
+	}
+}
 
 // AuthMiddleware is an HTTP middleware that enforces authentication using an
 // authorization cookie provided as a query parameter.

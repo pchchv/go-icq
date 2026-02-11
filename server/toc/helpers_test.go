@@ -57,6 +57,17 @@ type clientOnlineParams []struct {
 	err  error
 }
 
+// cookieBakerParams groups the method scenarios for a CookieBaker.
+type cookieBakerParams struct {
+	issueParams issueParams
+}
+
+type crackCookieParams []struct {
+	cookieIn  []byte
+	cookieOut state.ServerCookie
+	err       error
+}
+
 type createRoomParams []struct {
 	me     state.IdentScreenName
 	inBody wire.SNAC_0x0E_0x02_ChatRoomInfoUpdate

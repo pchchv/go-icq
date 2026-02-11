@@ -3,10 +3,14 @@ package toc
 import (
 	"context"
 	"io"
+	"log/slog"
 	"net"
+	"net/http"
+	"sync"
 	"time"
 
 	"github.com/patrickmn/go-cache"
+	"github.com/pchchv/go-icq/state"
 	"golang.org/x/time/rate"
 )
 
@@ -42,6 +46,25 @@ func (l *IPRateLimiter) Allow(ip string) (allowed bool) {
 	}
 
 	return limiter.(*rate.Limiter).Allow()
+}
+
+// Server implements a TOC protocol server that multiplexes TOC/HTTP and TOC/FLAP requests.
+// It acts as a gateway, forwarding all TOC requests to the OSCAR server for processing.
+type Server struct {
+	bosProxy           OSCARProxy
+	logger             *slog.Logger
+	loginIPRateLimiter *IPRateLimiter
+	lowerWarnLevel     func(ctx context.Context, instance *state.SessionInstance)
+	recalcWarning      func(ctx context.Context, instance *state.SessionInstance) error
+	listenerCfg        []string
+	listeners          []net.Listener
+	servers            []*http.Server
+	connMu             sync.Mutex
+	conns              map[net.Conn]struct{}
+	connWg             sync.WaitGroup
+	listenWg           sync.WaitGroup
+	shutdownCtx        context.Context
+	shutdownCancel     context.CancelFunc
 }
 
 // channelListener is an implementation of net.Listener that

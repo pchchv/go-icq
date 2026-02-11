@@ -27,6 +27,11 @@ type adminParams struct {
 	infoChangeRequestParams
 }
 
+type broadcastBuddyDepartedParams []struct {
+	me  state.IdentScreenName
+	err error
+}
+
 type infoChangeRequestParams []struct {
 	me     state.IdentScreenName
 	msg    wire.SNACMessage

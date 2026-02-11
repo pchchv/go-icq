@@ -1,6 +1,8 @@
 package toc
 
 import (
+	"context"
+	"net"
 	"time"
 
 	"github.com/patrickmn/go-cache"
@@ -39,4 +41,12 @@ func (l *IPRateLimiter) Allow(ip string) (allowed bool) {
 	}
 
 	return limiter.(*rate.Limiter).Allow()
+}
+
+// channelListener is an implementation of net.Listener that
+// accepts connections from a channel instead of a network socket.
+// It is useful for attaching an HTTP service to a connection on the fly.
+type channelListener struct {
+	ch  chan net.Conn // channel used to receive connections
+	ctx context.Context
 }

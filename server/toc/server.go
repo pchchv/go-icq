@@ -110,6 +110,42 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+func (s *Server) ListenAndServe() error {
+	g, ctx := errgroup.WithContext(s.shutdownCtx)
+	for i, cfg := range s.listenerCfg {
+		ln, err := net.Listen("tcp", cfg)
+		if err != nil {
+			s.cleanupListeners()
+			s.shutdownCancel()
+			return fmt.Errorf("unable to start TOC server: %w", err)
+		}
+
+		s.logger.InfoContext(ctx, "starting server", "listen_host", cfg)
+		s.listeners = append(s.listeners, ln)
+		s.listenWg.Add(1)
+		httpCh := make(chan net.Conn)
+		g.Go(func() error {
+			cl := &channelListener{
+				ch:  httpCh,
+				ctx: s.shutdownCtx,
+			}
+			if err := s.servers[i].Serve(cl); !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, io.EOF) {
+				s.shutdownCancel()
+				return err
+			}
+
+			return nil
+		})
+
+		g.Go(func() error {
+			s.acceptLoop(ctx, ln, httpCh)
+			return nil
+		})
+	}
+
+	return g.Wait()
+}
+
 func (s *Server) cleanupListeners() {
 	for _, ln := range s.listeners {
 		_ = ln.Close()

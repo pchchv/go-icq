@@ -1,6 +1,7 @@
 package toc
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -348,4 +349,19 @@ func (l *channelListener) Accept() (net.Conn, error) {
 // this is a no-op and always returns nil.
 func (l *channelListener) Close() error {
 	return nil
+}
+
+// bufferedConn is a wrapper around net.Conn that allows peeking into the
+// incoming connection without consuming data.
+// It is useful for multiplexing TOC/HTTP and TOC/FLAP connections.
+//
+// It embeds net.Conn, so all standard connection methods remain available.
+type bufferedConn struct {
+	r *bufio.Reader
+	net.Conn
+}
+
+// newBufferedConn wraps a net.Conn with buffered reading capabilities.
+func newBufferedConn(c net.Conn) bufferedConn {
+	return bufferedConn{bufio.NewReader(c), c}
 }

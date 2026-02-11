@@ -1,14 +1,17 @@
 package toc
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
 	"html/template"
+	"io"
 	"net"
 	"net/http"
 
 	"github.com/pchchv/go-icq/wire"
+	"golang.org/x/net/html"
 )
 
 var (
@@ -113,5 +116,42 @@ func (s OSCARProxy) outputSearchResults(ctx context.Context, w http.ResponseWrit
 
 	if err := directoryTemplate.Execute(w, PageData{Results: results}); err != nil {
 		s.logAndReturn500(ctx, w, fmt.Errorf("t.Execute: %w", err))
+	}
+}
+
+// extractProfile extracts the contents of an HTML <BODY>.
+// If there's no HTML body, just return the text.
+//
+// It only returns the following HTML tags:
+//
+//	<a>
+//	<b>
+//	<i>
+//	<s>
+//	<u>
+//	<br>
+//	<hr>
+//	<sub>
+//	<sup>
+//	<font>
+func extractProfile(htmlContent []byte) string {
+	var bodyContent bytes.Buffer
+	tokenizer := html.NewTokenizer(bytes.NewReader(htmlContent))
+	for {
+		switch tokenizer.Next() {
+		case html.ErrorToken:
+			if err := tokenizer.Err(); err != nil && err != io.EOF {
+				return "unable to read profile"
+			}
+			return bodyContent.String()
+		case html.StartTagToken, html.EndTagToken:
+			token := tokenizer.Token()
+			switch token.Data {
+			case "b", "i", "font", "a", "u", "br", "hr", "s", "sub", "sup":
+				bodyContent.WriteString(token.String())
+			}
+		case html.TextToken:
+			bodyContent.Write(tokenizer.Text())
+		}
 	}
 }

@@ -84,6 +84,39 @@ type Server struct {
 	shutdownCancel     context.CancelFunc
 }
 
+func NewServer(
+	listenerCfg []string,
+	logger *slog.Logger,
+	BOSProxy OSCARProxy,
+	ipRateLimiter *IPRateLimiter,
+	recalcWarning func(ctx context.Context, instance *state.SessionInstance) error,
+	lowerWarnLevel func(ctx context.Context, instance *state.SessionInstance),
+) *Server {
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &Server{
+		bosProxy:           BOSProxy,
+		conns:              make(map[net.Conn]struct{}),
+		listenerCfg:        listenerCfg,
+		logger:             logger,
+		loginIPRateLimiter: ipRateLimiter,
+		recalcWarning:      recalcWarning,
+		lowerWarnLevel:     lowerWarnLevel,
+		servers:            make([]*http.Server, 0, len(listenerCfg)),
+		shutdownCancel:     cancel,
+		shutdownCtx:        ctx,
+	}
+	for range listenerCfg {
+		s.servers = append(s.servers, &http.Server{
+			Handler: BOSProxy.NewServeMux(),
+			BaseContext: func(net.Listener) context.Context {
+				return s.shutdownCtx
+			},
+		})
+	}
+
+	return s
+}
+
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.logger.Debug("Initiating graceful shutdown...")
 	s.shutdownCancel()

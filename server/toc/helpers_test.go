@@ -183,3 +183,22 @@ type serviceRequestParams []struct {
 type sessionRetrieverParams struct {
 	retrieveSessionParams
 }
+
+type setDirInfoParams []struct {
+	me     state.IdentScreenName
+	inBody wire.SNAC_0x02_0x09_LocateSetDirInfo
+	msg    wire.SNACMessage
+	err    error
+}
+
+type setInfoParams []struct {
+	me     state.IdentScreenName
+	inBody wire.SNAC_0x02_0x04_LocateSetInfo
+	err    error
+}
+
+type setTOCConfigParams []struct {
+	user   state.IdentScreenName
+	config string
+	err    error
+}

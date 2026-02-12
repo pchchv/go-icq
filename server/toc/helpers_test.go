@@ -172,3 +172,14 @@ type retrieveSessionParams []struct {
 	screenName      state.IdentScreenName
 	returnedSession *state.Session
 }
+
+type serviceRequestParams []struct {
+	me     state.IdentScreenName
+	bodyIn wire.SNAC_0x01_0x04_OServiceServiceRequest
+	msg    wire.SNACMessage
+	err    error
+}
+
+type sessionRetrieverParams struct {
+	retrieveSessionParams
+}

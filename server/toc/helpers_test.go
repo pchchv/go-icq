@@ -225,3 +225,8 @@ type signoutChatParams []struct {
 type signoutParams []struct {
 	me state.IdentScreenName
 }
+
+type unregisterBuddyListParams []struct {
+	user state.IdentScreenName
+	err  error
+}

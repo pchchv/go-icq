@@ -1,6 +1,8 @@
 package toc
 
 import (
+	"time"
+
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 )
@@ -265,4 +267,63 @@ type userParams []struct {
 	screenName   state.IdentScreenName
 	returnedUser *state.User
 	err          error
+}
+
+// newTestSession creates a session object with 0 or more functional options applied.
+func newTestSession(screenName state.DisplayScreenName, options ...func(instance *state.SessionInstance)) *state.SessionInstance {
+	s := state.NewSession().AddInstance()
+	s.Session().SetIdentScreenName(screenName.IdentScreenName())
+	s.Session().SetDisplayScreenName(screenName)
+	s.SetSignonComplete()
+	s.Session().SetRateClasses(time.Now(), wire.NewRateLimitClasses([5]wire.RateClass{
+		{
+			ID:              1,
+			WindowSize:      80,
+			ClearLevel:      2500,
+			AlertLevel:      2000,
+			LimitLevel:      1500,
+			DisconnectLevel: 800,
+			MaxLevel:        6000,
+		},
+		{
+			ID:              2,
+			WindowSize:      80,
+			ClearLevel:      3000,
+			AlertLevel:      2000,
+			LimitLevel:      1500,
+			DisconnectLevel: 1000,
+			MaxLevel:        6000,
+		},
+		{
+			ID:              3,
+			WindowSize:      20,
+			ClearLevel:      5100,
+			AlertLevel:      5000,
+			LimitLevel:      4000,
+			DisconnectLevel: 3000,
+			MaxLevel:        6000,
+		},
+		{
+			ID:              4,
+			WindowSize:      20,
+			ClearLevel:      5500,
+			AlertLevel:      5300,
+			LimitLevel:      4200,
+			DisconnectLevel: 3000,
+			MaxLevel:        8000,
+		},
+		{
+			ID:              5,
+			WindowSize:      10,
+			ClearLevel:      5500,
+			AlertLevel:      5300,
+			LimitLevel:      4200,
+			DisconnectLevel: 3000,
+			MaxLevel:        8000,
+		},
+	}))
+	for _, op := range options {
+		op(s)
+	}
+	return s
 }

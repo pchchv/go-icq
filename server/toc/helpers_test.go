@@ -241,3 +241,16 @@ type unregisterBuddyListParams []struct {
 	user state.IdentScreenName
 	err  error
 }
+
+type userInfoQueryParams []struct {
+	me     state.IdentScreenName
+	inBody wire.SNAC_0x02_0x05_LocateUserInfoQuery
+	msg    wire.SNACMessage
+	err    error
+}
+
+type userParams []struct {
+	screenName   state.IdentScreenName
+	returnedUser *state.User
+	err          error
+}

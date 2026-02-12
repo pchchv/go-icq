@@ -1,6 +1,7 @@
 package toc
 
 import (
+	"context"
 	"time"
 
 	"github.com/pchchv/go-icq/state"
@@ -353,3 +354,10 @@ func matchSession(mustMatch state.IdentScreenName) interface{} {
 	})
 }
 
+// matchContext matches any instance of Context interface.
+func matchContext() interface{} {
+	return mock.MatchedBy(func(ctx any) bool {
+		_, ok := ctx.(context.Context)
+		return ok
+	})
+}

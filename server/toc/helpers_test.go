@@ -41,6 +41,17 @@ type broadcastBuddyDepartedParams []struct {
 	err error
 }
 
+type buddyListRegistryParams struct {
+	registerBuddyListParams
+	unregisterBuddyListParams
+}
+
+type buddyParams struct {
+	addBuddiesParams
+	broadcastBuddyDepartedParams
+	delBuddiesParams
+}
+
 type channelMsgToHostParamsChat []struct {
 	sender state.IdentScreenName
 	inBody wire.SNAC_0x0E_0x05_ChatChannelMsgToHost

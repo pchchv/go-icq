@@ -103,6 +103,16 @@ type evilRequestParams []struct {
 	err    error
 }
 
+type flapLoginParams []struct {
+	frame wire.FLAPSignonFrame
+	tlv   wire.TLVRestBlock
+	err   error
+}
+
+type icbmParams struct {
+	channelMsgToHostParamsICBM
+	evilRequestParams
+}
 
 type infoChangeRequestParams []struct {
 	me     state.IdentScreenName

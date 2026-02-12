@@ -145,6 +145,23 @@ type permitDenyParams struct {
 	addPermListEntriesParams
 }
 
+type registerBOSSessionParams []struct {
+	authCookie state.ServerCookie
+	instance   *state.SessionInstance
+	err        error
+}
+
+type registerBuddyListParams []struct {
+	user state.IdentScreenName
+	err  error
+}
+
+type registerChatSessionParams []struct {
+	authCookie state.ServerCookie
+	instance   *state.SessionInstance
+	err        error
+}
+
 type requestRoomInfoParams []struct {
 	inBody wire.SNAC_0x0D_0x04_ChatNavRequestRoomInfo
 	msg    wire.SNACMessage

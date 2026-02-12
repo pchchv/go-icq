@@ -100,3 +100,13 @@ type delBuddiesParams []struct {
 	inBody wire.SNAC_0x03_0x05_BuddyDelBuddies
 	err    error
 }
+
+type dirInfoParams []struct {
+	body wire.SNAC_0x02_0x0B_LocateGetDirInfo
+	msg  wire.SNACMessage
+	err  error
+}
+
+type dirSearchParams struct {
+	infoQueryParams
+}

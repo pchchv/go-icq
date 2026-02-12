@@ -1,0 +1,363 @@
+package toc
+
+import (
+	"context"
+	"time"
+
+	"github.com/pchchv/go-icq/state"
+	"github.com/pchchv/go-icq/wire"
+	"github.com/stretchr/testify/mock"
+)
+
+type addBuddiesParams []struct {
+	me     state.IdentScreenName
+	inBody wire.SNAC_0x03_0x04_BuddyAddBuddies
+	err    error
+}
+
+type addDenyListEntriesParams []struct {
+	me   state.IdentScreenName
+	body wire.SNAC_0x09_0x07_PermitDenyAddDenyListEntries
+	err  error
+}
+
+type addPermListEntriesParams []struct {
+	me   state.IdentScreenName
+	body wire.SNAC_0x09_0x05_PermitDenyAddPermListEntries
+	err  error
+}
+
+type adminParams struct {
+	infoChangeRequestParams
+}
+
+type authParams struct {
+	crackCookieParams
+	flapLoginParams
+	signoutParams
+	signoutChatParams
+	registerBOSSessionParams
+	registerChatSessionParams
+}
+
+type broadcastBuddyDepartedParams []struct {
+	me  state.IdentScreenName
+	err error
+}
+
+type buddyListRegistryParams struct {
+	registerBuddyListParams
+	unregisterBuddyListParams
+}
+
+type buddyParams struct {
+	addBuddiesParams
+	broadcastBuddyDepartedParams
+	delBuddiesParams
+}
+
+type channelMsgToHostParamsChat []struct {
+	sender state.IdentScreenName
+	inBody wire.SNAC_0x0E_0x05_ChatChannelMsgToHost
+	result *wire.SNACMessage
+	err    error
+}
+
+type channelMsgToHostParamsICBM []struct {
+	sender  state.IdentScreenName
+	inFrame wire.SNACFrame
+	inBody  wire.SNAC_0x04_0x06_ICBMChannelMsgToHost
+	result  *wire.SNACMessage
+	err     error
+}
+
+type chatNavParams struct {
+	createRoomParams
+	requestRoomInfoParams
+}
+
+type chatParams struct {
+	channelMsgToHostParamsChat
+}
+
+type clientOnlineParams []struct {
+	body wire.SNAC_0x01_0x02_OServiceClientOnline
+	me   state.IdentScreenName
+	err  error
+}
+
+// cookieBakerParams groups the method scenarios for a CookieBaker.
+type cookieBakerParams struct {
+	issueParams issueParams
+}
+
+type crackCookieParams []struct {
+	cookieIn  []byte
+	cookieOut state.ServerCookie
+	err       error
+}
+
+type createRoomParams []struct {
+	me     state.IdentScreenName
+	inBody wire.SNAC_0x0E_0x02_ChatRoomInfoUpdate
+	msg    wire.SNACMessage
+	err    error
+}
+
+type delBuddiesParams []struct {
+	me     state.IdentScreenName
+	inBody wire.SNAC_0x03_0x05_BuddyDelBuddies
+	err    error
+}
+
+type dirInfoParams []struct {
+	body wire.SNAC_0x02_0x0B_LocateGetDirInfo
+	msg  wire.SNACMessage
+	err  error
+}
+
+type dirSearchParams struct {
+	infoQueryParams
+}
+
+type evilRequestParams []struct {
+	me     state.IdentScreenName
+	inBody wire.SNAC_0x04_0x08_ICBMEvilRequest
+	msg    wire.SNACMessage
+	err    error
+}
+
+type flapLoginParams []struct {
+	frame wire.FLAPSignonFrame
+	tlv   wire.TLVRestBlock
+	err   error
+}
+
+type icbmParams struct {
+	channelMsgToHostParamsICBM
+	evilRequestParams
+}
+
+type idleNotificationParams []struct {
+	me     state.IdentScreenName
+	bodyIn wire.SNAC_0x01_0x11_OServiceIdleNotification
+	err    error
+}
+
+type infoChangeRequestParams []struct {
+	me     state.IdentScreenName
+	msg    wire.SNACMessage
+	inBody wire.SNAC_0x07_0x04_AdminInfoChangeRequest
+	err    error
+}
+
+type infoQueryParams []struct {
+	inBody wire.SNAC_0x0F_0x02_InfoQuery
+	msg    wire.SNACMessage
+	err    error
+}
+
+// issueParams holds multiple scenarios for the Issue method.
+type issueParams []struct {
+	data       []byte
+	returnData []byte
+	returnErr  error
+}
+
+type locateParams struct {
+	userInfoQueryParams
+	setDirInfoParams
+	setInfoParams
+	dirInfoParams
+}
+
+type mockParams struct {
+	adminParams
+	authParams
+	buddyListRegistryParams
+	buddyParams
+	chatNavParams
+	chatParams
+	cookieBakerParams
+	dirSearchParams
+	icbmParams
+	locateParams
+	oServiceParams
+	permitDenyParams
+	sessionRetrieverParams
+	tocConfigParams
+}
+
+type oServiceParams struct {
+	clientOnlineParams
+	idleNotificationParams
+	serviceRequestParams
+}
+
+type permitDenyParams struct {
+	addDenyListEntriesParams
+	addPermListEntriesParams
+}
+
+type registerBOSSessionParams []struct {
+	authCookie state.ServerCookie
+	instance   *state.SessionInstance
+	err        error
+}
+
+type registerBuddyListParams []struct {
+	user state.IdentScreenName
+	err  error
+}
+
+type registerChatSessionParams []struct {
+	authCookie state.ServerCookie
+	instance   *state.SessionInstance
+	err        error
+}
+
+type requestRoomInfoParams []struct {
+	inBody wire.SNAC_0x0D_0x04_ChatNavRequestRoomInfo
+	msg    wire.SNACMessage
+	err    error
+}
+
+type retrieveSessionParams []struct {
+	screenName      state.IdentScreenName
+	returnedSession *state.Session
+}
+
+type serviceRequestParams []struct {
+	me     state.IdentScreenName
+	bodyIn wire.SNAC_0x01_0x04_OServiceServiceRequest
+	msg    wire.SNACMessage
+	err    error
+}
+
+type sessionRetrieverParams struct {
+	retrieveSessionParams
+}
+
+type setDirInfoParams []struct {
+	me     state.IdentScreenName
+	inBody wire.SNAC_0x02_0x09_LocateSetDirInfo
+	msg    wire.SNACMessage
+	err    error
+}
+
+type setInfoParams []struct {
+	me     state.IdentScreenName
+	inBody wire.SNAC_0x02_0x04_LocateSetInfo
+	err    error
+}
+
+type setTOCConfigParams []struct {
+	user   state.IdentScreenName
+	config string
+	err    error
+}
+
+type signoutChatParams []struct {
+	me state.IdentScreenName
+}
+
+type signoutParams []struct {
+	me state.IdentScreenName
+}
+
+type tocConfigParams struct {
+	setTOCConfigParams
+	userParams
+}
+
+type unregisterBuddyListParams []struct {
+	user state.IdentScreenName
+	err  error
+}
+
+type userInfoQueryParams []struct {
+	me     state.IdentScreenName
+	inBody wire.SNAC_0x02_0x05_LocateUserInfoQuery
+	msg    wire.SNACMessage
+	err    error
+}
+
+type userParams []struct {
+	screenName   state.IdentScreenName
+	returnedUser *state.User
+	err          error
+}
+
+// newTestSession creates a session object with 0 or more functional options applied.
+func newTestSession(screenName state.DisplayScreenName, options ...func(instance *state.SessionInstance)) *state.SessionInstance {
+	s := state.NewSession().AddInstance()
+	s.Session().SetIdentScreenName(screenName.IdentScreenName())
+	s.Session().SetDisplayScreenName(screenName)
+	s.SetSignonComplete()
+	s.Session().SetRateClasses(time.Now(), wire.NewRateLimitClasses([5]wire.RateClass{
+		{
+			ID:              1,
+			WindowSize:      80,
+			ClearLevel:      2500,
+			AlertLevel:      2000,
+			LimitLevel:      1500,
+			DisconnectLevel: 800,
+			MaxLevel:        6000,
+		},
+		{
+			ID:              2,
+			WindowSize:      80,
+			ClearLevel:      3000,
+			AlertLevel:      2000,
+			LimitLevel:      1500,
+			DisconnectLevel: 1000,
+			MaxLevel:        6000,
+		},
+		{
+			ID:              3,
+			WindowSize:      20,
+			ClearLevel:      5100,
+			AlertLevel:      5000,
+			LimitLevel:      4000,
+			DisconnectLevel: 3000,
+			MaxLevel:        6000,
+		},
+		{
+			ID:              4,
+			WindowSize:      20,
+			ClearLevel:      5500,
+			AlertLevel:      5300,
+			LimitLevel:      4200,
+			DisconnectLevel: 3000,
+			MaxLevel:        8000,
+		},
+		{
+			ID:              5,
+			WindowSize:      10,
+			ClearLevel:      5500,
+			AlertLevel:      5300,
+			LimitLevel:      4200,
+			DisconnectLevel: 3000,
+			MaxLevel:        8000,
+		},
+	}))
+	for _, op := range options {
+		op(s)
+	}
+	return s
+}
+
+// matchSession matches a mock call based session ident screen name.
+func matchSession(mustMatch state.IdentScreenName) interface{} {
+	return mock.MatchedBy(func(s *state.SessionInstance) bool {
+		return mustMatch == s.IdentScreenName()
+	})
+}
+
+// matchContext matches any instance of Context interface.
+func matchContext() interface{} {
+	return mock.MatchedBy(func(ctx any) bool {
+		_, ok := ctx.(context.Context)
+		return ok
+	})
+}

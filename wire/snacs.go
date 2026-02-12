@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -979,6 +981,13 @@ const (
 
 	PopupErr     uint16 = 0x0001
 	PopupDisplay uint16 = 0x0002
+)
+
+var (
+	// CapChat is the UUID that represents an OSCAR client's ability to chat.
+	CapChat = uuid.MustParse("748F2420-6287-11D1-8222-444553540000")
+	// CapFileTransfer is the UUID that represents an OSCAR client's ability to send files.
+	CapFileTransfer = uuid.MustParse("09461343-4C7F-11D1-8222-444553540000")
 )
 
 type TLVUserInfo struct {

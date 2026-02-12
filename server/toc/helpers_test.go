@@ -169,6 +169,23 @@ type locateParams struct {
 	dirInfoParams
 }
 
+type mockParams struct {
+	adminParams
+	authParams
+	buddyListRegistryParams
+	buddyParams
+	chatNavParams
+	chatParams
+	cookieBakerParams
+	dirSearchParams
+	icbmParams
+	locateParams
+	oServiceParams
+	permitDenyParams
+	sessionRetrieverParams
+	tocConfigParams
+}
+
 type oServiceParams struct {
 	clientOnlineParams
 	idleNotificationParams

@@ -202,3 +202,11 @@ type setTOCConfigParams []struct {
 	config string
 	err    error
 }
+
+type signoutChatParams []struct {
+	me state.IdentScreenName
+}
+
+type signoutParams []struct {
+	me state.IdentScreenName
+}

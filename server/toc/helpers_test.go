@@ -114,6 +114,12 @@ type icbmParams struct {
 	evilRequestParams
 }
 
+type idleNotificationParams []struct {
+	me     state.IdentScreenName
+	bodyIn wire.SNAC_0x01_0x11_OServiceIdleNotification
+	err    error
+}
+
 type infoChangeRequestParams []struct {
 	me     state.IdentScreenName
 	msg    wire.SNACMessage

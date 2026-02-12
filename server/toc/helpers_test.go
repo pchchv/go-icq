@@ -94,3 +94,9 @@ type issueParams []struct {
 	returnData []byte
 	returnErr  error
 }
+
+type delBuddiesParams []struct {
+	me     state.IdentScreenName
+	inBody wire.SNAC_0x03_0x05_BuddyDelBuddies
+	err    error
+}

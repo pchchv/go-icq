@@ -80,6 +80,30 @@ type createRoomParams []struct {
 	err    error
 }
 
+type delBuddiesParams []struct {
+	me     state.IdentScreenName
+	inBody wire.SNAC_0x03_0x05_BuddyDelBuddies
+	err    error
+}
+
+type dirInfoParams []struct {
+	body wire.SNAC_0x02_0x0B_LocateGetDirInfo
+	msg  wire.SNACMessage
+	err  error
+}
+
+type dirSearchParams struct {
+	infoQueryParams
+}
+
+type evilRequestParams []struct {
+	me     state.IdentScreenName
+	inBody wire.SNAC_0x04_0x08_ICBMEvilRequest
+	msg    wire.SNACMessage
+	err    error
+}
+
+
 type infoChangeRequestParams []struct {
 	me     state.IdentScreenName
 	msg    wire.SNACMessage
@@ -98,22 +122,6 @@ type issueParams []struct {
 	data       []byte
 	returnData []byte
 	returnErr  error
-}
-
-type delBuddiesParams []struct {
-	me     state.IdentScreenName
-	inBody wire.SNAC_0x03_0x05_BuddyDelBuddies
-	err    error
-}
-
-type dirInfoParams []struct {
-	body wire.SNAC_0x02_0x0B_LocateGetDirInfo
-	msg  wire.SNACMessage
-	err  error
-}
-
-type dirSearchParams struct {
-	infoQueryParams
 }
 
 type requestRoomInfoParams []struct {

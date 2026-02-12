@@ -27,6 +27,15 @@ type adminParams struct {
 	infoChangeRequestParams
 }
 
+type authParams struct {
+	crackCookieParams
+	flapLoginParams
+	signoutParams
+	signoutChatParams
+	registerBOSSessionParams
+	registerChatSessionParams
+}
+
 type broadcastBuddyDepartedParams []struct {
 	me  state.IdentScreenName
 	err error
@@ -138,6 +147,12 @@ type issueParams []struct {
 	data       []byte
 	returnData []byte
 	returnErr  error
+}
+
+type oServiceParams struct {
+	clientOnlineParams
+	idleNotificationParams
+	serviceRequestParams
 }
 
 type permitDenyParams struct {

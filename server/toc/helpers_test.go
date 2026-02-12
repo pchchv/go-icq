@@ -5,6 +5,7 @@ import (
 
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
+	"github.com/stretchr/testify/mock"
 )
 
 type addBuddiesParams []struct {
@@ -344,3 +345,11 @@ func newTestSession(screenName state.DisplayScreenName, options ...func(instance
 	}
 	return s
 }
+
+// matchSession matches a mock call based session ident screen name.
+func matchSession(mustMatch state.IdentScreenName) interface{} {
+	return mock.MatchedBy(func(s *state.SessionInstance) bool {
+		return mustMatch == s.IdentScreenName()
+	})
+}
+

@@ -244,6 +244,11 @@ type signoutParams []struct {
 	me state.IdentScreenName
 }
 
+type tocConfigParams struct {
+	setTOCConfigParams
+	userParams
+}
+
 type unregisterBuddyListParams []struct {
 	user state.IdentScreenName
 	err  error

@@ -47,6 +47,11 @@ type channelMsgToHostParamsICBM []struct {
 	err     error
 }
 
+type chatNavParams struct {
+	createRoomParams
+	requestRoomInfoParams
+}
+
 type chatParams struct {
 	channelMsgToHostParamsChat
 }
@@ -110,3 +115,10 @@ type dirInfoParams []struct {
 type dirSearchParams struct {
 	infoQueryParams
 }
+
+type requestRoomInfoParams []struct {
+	inBody wire.SNAC_0x0D_0x04_ChatNavRequestRoomInfo
+	msg    wire.SNACMessage
+	err    error
+}
+

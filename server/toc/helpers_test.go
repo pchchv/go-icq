@@ -160,6 +160,13 @@ type issueParams []struct {
 	returnErr  error
 }
 
+type locateParams struct {
+	userInfoQueryParams
+	setDirInfoParams
+	setInfoParams
+	dirInfoParams
+}
+
 type oServiceParams struct {
 	clientOnlineParams
 	idleNotificationParams

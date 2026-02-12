@@ -140,9 +140,18 @@ type issueParams []struct {
 	returnErr  error
 }
 
+type permitDenyParams struct {
+	addDenyListEntriesParams
+	addPermListEntriesParams
+}
+
 type requestRoomInfoParams []struct {
 	inBody wire.SNAC_0x0D_0x04_ChatNavRequestRoomInfo
 	msg    wire.SNACMessage
 	err    error
 }
 
+type retrieveSessionParams []struct {
+	screenName      state.IdentScreenName
+	returnedSession *state.Session
+}

@@ -125,3 +125,10 @@ type LocateService interface {
 	SetKeywordInfo(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x02_0x0F_LocateSetKeywordInfo) (wire.SNACMessage, error)
 	UserInfoQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x02_0x05_LocateUserInfoQuery) (wire.SNACMessage, error)
 }
+
+// OnlineNotifier returns a OServiceHostOnline SNAC that is sent to the
+// client at the beginning of the protocol sequence which lists all
+// food groups managed by the server.
+type OnlineNotifier interface {
+	HostOnline(service uint16) wire.SNACMessage
+}

@@ -13,6 +13,14 @@ type RouteLogger struct {
 	Logger *slog.Logger
 }
 
+func (rt RouteLogger) LogRequest(ctx context.Context, inFrame wire.SNACFrame, inSNAC any) {
+	LogRequest(ctx, rt.Logger, inFrame, inSNAC)
+}
+
+func (rt RouteLogger) LogRequestError(ctx context.Context, inFrame wire.SNACFrame, err error) {
+	LogRequestError(ctx, rt.Logger, inFrame, err)
+}
+
 func LogRequest(ctx context.Context, logger *slog.Logger, inFrame wire.SNACFrame, inSNAC any) {
 	const msg = "client request"
 	switch {

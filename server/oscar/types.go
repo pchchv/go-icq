@@ -64,3 +64,9 @@ type ChatService interface {
 type ChatSessionManager interface {
 	RemoveUserFromAllChats(user state.IdentScreenName)
 }
+
+// DepartureNotifier is the interface for sending buddy departure notifications when a client disconnects.
+type DepartureNotifier interface {
+	BroadcastBuddyArrived(ctx context.Context, screenName state.IdentScreenName, userInfo wire.TLVUserInfo) error
+	BroadcastBuddyDeparted(ctx context.Context, instance *state.SessionInstance) error
+}

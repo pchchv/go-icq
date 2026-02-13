@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/pchchv/go-icq/wire"
@@ -39,6 +40,18 @@ func (rt RouteLogger) LogRequestAndResponse(ctx context.Context, inFrame wire.SN
 
 type handler struct {
 	slog.Handler
+}
+
+func (h handler) Handle(ctx context.Context, r slog.Record) error {
+	if sn := ctx.Value("screenName"); sn != nil {
+		r.AddAttrs(slog.Attr{Key: "screenName", Value: slog.StringValue(sn.(fmt.Stringer).String())})
+	}
+
+	if ip := ctx.Value("ip"); ip != nil {
+		r.AddAttrs(slog.Attr{Key: "ip", Value: slog.StringValue(ip.(string))})
+	}
+
+	return h.Handler.Handle(ctx, r)
 }
 
 func LogRequest(ctx context.Context, logger *slog.Logger, inFrame wire.SNACFrame, inSNAC any) {

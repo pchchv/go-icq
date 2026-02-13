@@ -26,3 +26,9 @@ type AuthService interface {
 	Signout(ctx context.Context, instance *state.SessionInstance)
 	SignoutChat(ctx context.Context, instance *state.SessionInstance)
 }
+
+type BARTService interface {
+	UpsertItem(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x10_0x02_BARTUploadQuery) (wire.SNACMessage, error)
+	RetrieveItem(ctx context.Context, inFrame wire.SNACFrame, inBody wire.SNAC_0x10_0x04_BARTDownloadQuery) (wire.SNACMessage, error)
+	RetrieveItemV2(ctx context.Context, inFrame wire.SNACFrame, inBody wire.SNAC_0x10_0x06_BARTDownload2Query) ([]wire.SNACMessage, error)
+}

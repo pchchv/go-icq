@@ -32,3 +32,19 @@ type BARTService interface {
 	RetrieveItem(ctx context.Context, inFrame wire.SNACFrame, inBody wire.SNAC_0x10_0x04_BARTDownloadQuery) (wire.SNACMessage, error)
 	RetrieveItemV2(ctx context.Context, inFrame wire.SNACFrame, inBody wire.SNAC_0x10_0x06_BARTDownload2Query) ([]wire.SNACMessage, error)
 }
+
+// BuddyListRegistry is the interface for keeping track of users with active buddy lists.
+// Once registered, a user becomes visible to other users' buddy lists and vice versa.
+type BuddyListRegistry interface {
+	ClearBuddyListRegistry(ctx context.Context) error
+	RegisterBuddyList(ctx context.Context, user state.IdentScreenName) error
+	UnregisterBuddyList(ctx context.Context, user state.IdentScreenName) error
+}
+
+type BuddyService interface {
+	RightsQuery(ctx context.Context, inFrame wire.SNACFrame) wire.SNACMessage
+	AddBuddies(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x03_0x04_BuddyAddBuddies) error
+	DelBuddies(_ context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x03_0x05_BuddyDelBuddies) error
+	AddTempBuddies(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x03_0x0F_BuddyAddTempBuddies) error
+	DelTempBuddies(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x03_0x10_BuddyDelTempBuddies) error
+}

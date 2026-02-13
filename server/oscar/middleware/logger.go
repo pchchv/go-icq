@@ -1,13 +1,26 @@
 package middleware
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/pchchv/go-icq/wire"
 )
 
+const LevelTrace = slog.Level(-8)
+
 type RouteLogger struct {
 	Logger *slog.Logger
+}
+
+func LogRequest(ctx context.Context, logger *slog.Logger, inFrame wire.SNACFrame, inSNAC any) {
+	const msg = "client request"
+	switch {
+	case logger.Enabled(ctx, LevelTrace):
+		logger.LogAttrs(ctx, LevelTrace, msg, snacLogGroupWithPayload("request", inFrame, inSNAC))
+	case logger.Enabled(ctx, slog.LevelDebug):
+		logger.LogAttrs(ctx, slog.LevelDebug, msg, snacLogGroup("request", inFrame))
+	}
 }
 
 func snacLogGroupWithPayload(key string, outFrame wire.SNACFrame, outSNAC any) slog.Attr {

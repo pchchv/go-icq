@@ -4,11 +4,52 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"strings"
 
+	"github.com/pchchv/go-icq/config"
 	"github.com/pchchv/go-icq/wire"
 )
 
 const LevelTrace = slog.Level(-8)
+
+func NewLogger(cfg config.Config) *slog.Logger {
+	var level slog.Level
+	switch strings.ToLower(cfg.LogLevel) {
+	case "trace":
+		level = LevelTrace
+	case "debug":
+		level = slog.LevelDebug
+	case "warn":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	case "info":
+		fallthrough
+	default:
+		level = slog.LevelInfo
+	}
+
+	var levelNames = map[slog.Leveler]string{
+		LevelTrace: "TRACE",
+	}
+	opts := &slog.HandlerOptions{
+		Level: level,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.LevelKey {
+				level := a.Value.Any().(slog.Level)
+				levelLabel, exists := levelNames[level]
+				if !exists {
+					levelLabel = level.String()
+				}
+				a.Value = slog.StringValue(levelLabel)
+			}
+
+			return a
+		},
+	}
+	return slog.New(handler{slog.NewTextHandler(os.Stdout, opts)})
+}
 
 type RouteLogger struct {
 	Logger *slog.Logger

@@ -2,6 +2,7 @@ package oscar
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/pchchv/go-icq/config"
@@ -159,4 +160,9 @@ type PermitDenyService interface {
 	DelDenyListEntries(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x09_0x08_PermitDenyDelDenyListEntries) error
 	DelPermListEntries(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x09_0x06_PermitDenyDelPermListEntries) error
 	RightsQuery(ctx context.Context, inFrame wire.SNACFrame) wire.SNACMessage
+}
+
+// RateLimitUpdater provides rate limit updates for subscribed rate limit classes.
+type RateLimitUpdater interface {
+	RateLimitUpdates(ctx context.Context, instance *state.SessionInstance, now time.Time) []wire.SNACMessage
 }

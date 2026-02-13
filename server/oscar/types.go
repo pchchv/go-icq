@@ -166,3 +166,7 @@ type PermitDenyService interface {
 type RateLimitUpdater interface {
 	RateLimitUpdates(ctx context.Context, instance *state.SessionInstance, now time.Time) []wire.SNACMessage
 }
+
+type StatsService interface {
+	ReportEvents(ctx context.Context, inFrame wire.SNACFrame, inBody wire.SNAC_0x0B_0x03_StatsReportEvents) wire.SNACMessage
+}

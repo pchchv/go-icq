@@ -21,6 +21,22 @@ func (rt RouteLogger) LogRequestError(ctx context.Context, inFrame wire.SNACFram
 	LogRequestError(ctx, rt.Logger, inFrame, err)
 }
 
+func (rt RouteLogger) LogRequestAndResponse(ctx context.Context, inFrame wire.SNACFrame, inSNAC any, outFrame wire.SNACFrame, outSNAC any) {
+	msg := "client request -> server response"
+	switch {
+	case rt.Logger.Enabled(ctx, LevelTrace):
+		rt.Logger.LogAttrs(
+			ctx,
+			LevelTrace,
+			msg,
+			snacLogGroupWithPayload("request", inFrame, inSNAC),
+			snacLogGroupWithPayload("response", outFrame, outSNAC),
+		)
+	case rt.Logger.Enabled(ctx, slog.LevelDebug):
+		rt.Logger.LogAttrs(ctx, slog.LevelDebug, msg, snacLogGroup("request", inFrame), snacLogGroup("response", outFrame))
+	}
+}
+
 func LogRequest(ctx context.Context, logger *slog.Logger, inFrame wire.SNACFrame, inSNAC any) {
 	const msg = "client request"
 	switch {

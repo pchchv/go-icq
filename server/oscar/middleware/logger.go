@@ -54,6 +54,14 @@ func (h handler) Handle(ctx context.Context, r slog.Record) error {
 	return h.Handler.Handle(ctx, r)
 }
 
+func (h handler) WithGroup(name string) slog.Handler {
+	return h.Handler.WithGroup(name)
+}
+
+func (h handler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return handler{h.Handler.WithAttrs(attrs)}
+}
+
 func LogRequest(ctx context.Context, logger *slog.Logger, inFrame wire.SNACFrame, inSNAC any) {
 	const msg = "client request"
 	switch {

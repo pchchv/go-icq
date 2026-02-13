@@ -23,6 +23,16 @@ func LogRequest(ctx context.Context, logger *slog.Logger, inFrame wire.SNACFrame
 	}
 }
 
+func LogRequestError(ctx context.Context, logger *slog.Logger, inFrame wire.SNACFrame, err error) {
+	logger.LogAttrs(ctx, slog.LevelError, "client request error",
+		slog.Group("request",
+			slog.String("food_group", wire.FoodGroupName(inFrame.FoodGroup)),
+			slog.String("sub_group", wire.SubGroupName(inFrame.FoodGroup, inFrame.SubGroup)),
+		),
+		slog.String("err", err.Error()),
+	)
+}
+
 func snacLogGroupWithPayload(key string, outFrame wire.SNACFrame, outSNAC any) slog.Attr {
 	return slog.Group(key,
 		slog.String("food_group", wire.FoodGroupName(outFrame.FoodGroup)),

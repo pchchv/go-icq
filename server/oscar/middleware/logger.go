@@ -37,6 +37,10 @@ func (rt RouteLogger) LogRequestAndResponse(ctx context.Context, inFrame wire.SN
 	}
 }
 
+type handler struct {
+	slog.Handler
+}
+
 func LogRequest(ctx context.Context, logger *slog.Logger, inFrame wire.SNACFrame, inSNAC any) {
 	const msg = "client request"
 	switch {

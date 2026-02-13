@@ -170,3 +170,7 @@ type RateLimitUpdater interface {
 type StatsService interface {
 	ReportEvents(ctx context.Context, inFrame wire.SNACFrame, inBody wire.SNAC_0x0B_0x03_StatsReportEvents) wire.SNACMessage
 }
+
+type UserLookupService interface {
+	FindByEmail(ctx context.Context, inFrame wire.SNACFrame, inBody wire.SNAC_0x0A_0x02_UserLookupFindByEmail) (wire.SNACMessage, error)
+}

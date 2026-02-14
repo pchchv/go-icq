@@ -122,7 +122,7 @@ func (rt Handler) BARTDownload2Query(ctx context.Context, instance *state.Sessio
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -230,7 +230,7 @@ func (rt Handler) ChatNavRequestExchangeInfo(ctx context.Context, _ *state.Sessi
 	if err != nil {
 		return err
 	}
-	
+
 	rt.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
 	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
 }
@@ -245,8 +245,33 @@ func (rt Handler) ChatNavRequestRoomInfo(ctx context.Context, _ *state.SessionIn
 	if err != nil {
 		return err
 	}
-	
+
 	rt.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
 	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
 }
 
+func (rt Handler) FeedbagDeleteItem(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x13_0x0A_FeedbagDeleteItem{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := rt.FeedbagService.DeleteItem(ctx, instance, inFrame, inBody)
+	if err != nil {
+		return err
+	}
+
+	if outSNAC == nil {
+		rt.LogRequest(ctx, inFrame, inBody)
+		return nil
+	}
+
+	rt.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (rt Handler) FeedbagEndCluster(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	rt.FeedbagService.EndCluster(ctx, instance, inFrame)
+	rt.LogRequest(ctx, inFrame, nil)
+	return nil
+}

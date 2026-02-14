@@ -275,3 +275,48 @@ func (rt Handler) FeedbagEndCluster(ctx context.Context, instance *state.Session
 	rt.LogRequest(ctx, inFrame, nil)
 	return nil
 }
+
+func (rt Handler) FeedbagInsertItem(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x13_0x08_FeedbagInsertItem{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := rt.FeedbagService.UpsertItem(ctx, instance, inFrame, inBody.Items)
+	if err != nil {
+		return err
+	}
+	
+	if outSNAC == nil {
+		rt.LogRequest(ctx, inFrame, inBody)
+		return nil
+	}
+
+	rt.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (rt Handler) FeedbagQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, rw ResponseWriter) error {
+	outSNAC, err := rt.FeedbagService.Query(ctx, instance, inFrame)
+	if err != nil {
+		return err
+	}
+
+	rt.LogRequest(ctx, inFrame, outSNAC)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (rt Handler) FeedbagQueryIfModified(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x13_0x05_FeedbagQueryIfModified{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := rt.FeedbagService.QueryIfModified(ctx, instance, inFrame, inBody)
+	if err != nil {
+		return err
+	}
+	
+	rt.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}

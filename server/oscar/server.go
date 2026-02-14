@@ -237,3 +237,15 @@ func (s oscarServer) authenticate(ctx context.Context, flap wire.FLAPSignonFrame
 	s.SetBUCP(ip)
 	return s.processBUCPAuth(ctx, flapc, advertisedHost)
 }
+
+func sendInvalidSNACErr(frameIn wire.SNACFrame, rw ResponseWriter) error {
+	frameOut := wire.SNACFrame{
+		FoodGroup: frameIn.FoodGroup,
+		SubGroup:  0x01, // error subgroup for all SNACs
+		RequestID: frameIn.RequestID,
+	}
+	bodyOut := wire.SNACError{
+		Code: wire.ErrorCodeInvalidSnac,
+	}
+	return rw.SendSNAC(frameOut, bodyOut)
+}

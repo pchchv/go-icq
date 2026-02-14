@@ -30,6 +30,22 @@ func NewIPRateLimiter(rate rate.Limit, burst int, ttl time.Duration) *IPRateLimi
 	}
 }
 
+// Allow checks if a request from the given IP is allowed under its rate limit.
+// It returns whether the request is allowed and
+// whether the connection uses BUCP auth.
+func (l *IPRateLimiter) Allow(ip string) (allowed bool, isBUCP bool) {
+	limiter, found := l.cache.Get(ip)
+	if !found {
+		limiter = &rateLimitEntry{
+			limiter: rate.NewLimiter(l.rate, l.burst),
+		}
+		l.cache.Set(ip, limiter, cache.DefaultExpiration)
+	}
+	
+	entry := limiter.(*rateLimitEntry)
+	return entry.limiter.Allow(), entry.isBUCP
+}
+
 type rateLimitEntry struct {
 	isBUCP  bool
 	limiter *rate.Limiter

@@ -129,6 +129,33 @@ func NewServer(
 	}
 }
 
+func (s *Server) ListenAndServe() error {
+	for _, listenCfg := range s.listenerCfg {
+		ln, err := net.Listen("tcp", listenCfg.BOSListenAddress)
+		if err != nil {
+			s.cleanupListeners()
+			s.shutdownCancel()
+			return fmt.Errorf("failed to listen on %s: %w", listenCfg.BOSListenAddress, err)
+		}
+
+		args := []any{
+			"listen_address", listenCfg.BOSListenAddress,
+			"advertised_host_plain", listenCfg.BOSAdvertisedHostPlain,
+		}
+		if listenCfg.HasSSL {
+			args = append(args, "advertised_host_ssl", listenCfg.BOSAdvertisedHostSSL)
+		}
+
+		s.logger.Info("starting server", args...)
+		s.listeners = append(s.listeners, ln)
+		s.listenWg.Add(1)
+		go s.acceptLoop(ln, listenCfg)
+	}
+
+	<-s.closed // block until Shutdown is called
+	return nil
+}
+
 func (s *Server) cleanupListeners() {
 	for _, ln := range s.listeners {
 		_ = ln.Close()
@@ -148,6 +175,27 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn, listener c
 	ctx = context.WithValue(ctx, "ip", conn.RemoteAddr().String())
 	if err := s.handler(ctx, conn, listener); err != nil {
 		s.logger.InfoContext(ctx, "user session failed", "err", err.Error())
+	}
+}
+
+func (s *Server) acceptLoop(ln net.Listener, listener config.Listener) {
+	defer s.listenWg.Done()
+
+	for {
+		conn, err := ln.Accept()
+		if err == net.ErrClosed {
+			break
+		} else if err != nil {
+			s.logger.Error("accept error", "err", err.Error())
+			continue
+		}
+
+		// track connection
+		s.connMu.Lock()
+		s.conns[conn] = struct{}{}
+		s.connMu.Unlock()
+		s.connWg.Add(1)
+		go s.handleConnection(s.shutdownCtx, conn, listener)
 	}
 }
 

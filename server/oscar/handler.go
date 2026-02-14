@@ -1,9 +1,12 @@
 package oscar
 
 import (
+	"context"
 	"errors"
+	"io"
 
 	"github.com/pchchv/go-icq/server/oscar/middleware"
+	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 )
 
@@ -34,4 +37,34 @@ type Handler struct {
 	StatsService
 	UserLookupService
 	middleware.RouteLogger
+}
+
+func (rt Handler) AdminInfoQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x07_0x02_AdminInfoQuery{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := rt.AdminService.InfoQuery(ctx, instance, inFrame, inBody)
+	if err != nil {
+		return err
+	}
+
+	rt.LogRequestAndResponse(ctx, inFrame, nil, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (rt Handler) AdminInfoChangeRequest(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x07_0x04_AdminInfoChangeRequest{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := rt.AdminService.InfoChangeRequest(ctx, instance, inFrame, inBody)
+	if err != nil {
+		return err
+	}
+
+	rt.LogRequestAndResponse(ctx, inFrame, nil, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
 }

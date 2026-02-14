@@ -19,6 +19,8 @@ const (
 	FLAPFrameSignon    uint8 = 0x01
 	FLAPFrameSignoff   uint8 = 0x04
 	FLAPFrameKeepAlive uint8 = 0x05
+	// FLAPMaxDataSize is the maximum size of a FLAP packet's data (excluding header).
+	FLAPMaxDataSize uint32 = 0xFFF9
 )
 
 type SNACError struct {

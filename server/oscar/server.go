@@ -509,6 +509,36 @@ func (s oscarServer) connectToOSCARService(ctx context.Context, flap wire.FLAPSi
 	return s.dispatchIncomingMessages(ctx, cookie.Service, instance, flapc, conn, listener)
 }
 
+func (s oscarServer) routeConnection(ctx context.Context, conn net.Conn, listener config.Listener) error {
+	ip, _, err := net.SplitHostPort(conn.RemoteAddr().String())
+	if err != nil {
+		s.Logger.Error("failed to parse remote address", "err", err.Error())
+		return err
+	}
+
+	flapc := wire.NewFlapClient(100, conn, conn)
+	// send flap signon with server capabilities
+	signonTLVs := []wire.TLV{
+		wire.NewTLVBE(wire.LoginTLVTagsMaxSendSize, wire.FLAPMaxDataSize),
+		wire.NewTLVBE(wire.LoginTLVTagsMaxRecvSize, wire.FLAPMaxDataSize),
+		wire.NewTLVBE(wire.LoginTLVTagsUseBigTime, []byte{}), // empty TLV indicates support
+	}
+	if err := flapc.SendSignonFrame(signonTLVs); err != nil {
+		return err
+	}
+	
+	flap, err := flapc.ReceiveSignonFrame()
+	if err != nil {
+		return err
+	}
+
+	if flap.HasTag(wire.OServiceTLVTagsLoginCookie) {
+		return s.connectToOSCARService(ctx, flap, flapc, conn, listener)
+	}
+
+	return s.authenticate(ctx, flap, ip, conn, flapc, listener.BOSAdvertisedHostPlain)
+}
+
 func sendInvalidSNACErr(frameIn wire.SNACFrame, rw ResponseWriter) error {
 	frameOut := wire.SNACFrame{
 		FoodGroup: frameIn.FoodGroup,

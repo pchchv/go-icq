@@ -911,6 +911,10 @@ const (
 	LoginTLVTagsRoastedKerberosPassword uint16 = 0x1335
 	LoginTLVTagsRoastedTOCPassword      uint16 = 0x1337
 	LoginTLVTagsPlaintextPassword       uint16 = 0x1338
+	LoginTLVTagsMaxSendSize             uint16 = 0x8001
+	LoginTLVTagsMaxRecvSize             uint16 = 0x8003
+	LoginTLVTagsHostSuffix              uint16 = 0x8004
+	LoginTLVTagsUseBigTime              uint16 = 0x2038
 	LoginErrInvalidUsernameOrPassword   uint16 = 0x0001
 	LoginErrInvalidPassword             uint16 = 0x0005 // invalid password
 	LoginErrInvalidAccount              uint16 = 0x0007

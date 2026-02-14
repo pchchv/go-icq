@@ -88,3 +88,39 @@ func (rt Handler) AlertNotifyDisplayCapabilities(ctx context.Context, _ *state.S
 	rt.LogRequest(ctx, inFrame, nil)
 	return nil
 }
+
+func (rt Handler) BARTDownloadQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x10_0x04_BARTDownloadQuery{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := rt.BARTService.RetrieveItem(ctx, inFrame, inBody)
+	if err != nil {
+		return err
+	}
+
+	rt.LogRequestAndResponse(ctx, inFrame, outSNAC, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (rt Handler) BARTDownload2Query(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x10_0x06_BARTDownload2Query{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNACS, err := rt.BARTService.RetrieveItemV2(ctx, inFrame, inBody)
+	if err != nil {
+		return err
+	}
+
+	for _, snac := range outSNACS {
+		rt.LogRequestAndResponse(ctx, inFrame, snac, snac.Frame, snac.Body)
+		if err := rw.SendSNAC(snac.Frame, snac.Body); err != nil {
+			return err
+		}
+	}
+	
+	return nil
+}

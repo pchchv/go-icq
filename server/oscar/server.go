@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/netip"
 	"time"
 
 	"github.com/google/uuid"
@@ -362,6 +363,150 @@ func (s oscarServer) dispatchIncomingMessages(ctx context.Context, fg uint16, in
 			return nil
 		}
 	}
+}
+
+func (s oscarServer) connectToOSCARService(ctx context.Context, flap wire.FLAPSignonFrame, flapc *wire.FlapClient, conn net.Conn, listener config.Listener) error {
+	authCookie, ok := flap.Bytes(wire.OServiceTLVTagsLoginCookie)
+	if !ok {
+		return errors.New("unable to get session id from payload")
+	}
+
+	cookie, err := s.CrackCookie(authCookie)
+	if err != nil {
+		return err
+	}
+
+	var instance *state.SessionInstance
+	s.Logger.Debug("connecting to service", "service", wire.FoodGroupName(cookie.Service))
+	switch cookie.Service {
+	case wire.BOS:
+		instance, err = s.AuthService.RegisterBOSSession(ctx, cookie)
+		if err != nil {
+			if errors.Is(err, state.ErrMaxConcurrentSessionsReached) {
+				s.Logger.Debug("session registration failed", "err", err.Error())
+				block := wire.TLVRestBlock{}
+				// error code indicating the signon is blocked.
+				block.Append(wire.NewTLVBE(0x0008, uint8(0x18)))
+				if err := flapc.NewSignoff(block); err != nil {
+					return fmt.Errorf("unable to gracefully disconnect user. %w", err)
+				}
+
+				return nil
+			}
+
+			return err
+		}
+
+		if instance == nil {
+			return errors.New("session not found")
+		}
+
+		defer func() {
+			instance.CloseInstance()
+		}()
+
+		if err = instance.Session().RunOnce(func() error {
+			// make buddy list visible to other users
+			if err := s.BuddyListRegistry.RegisterBuddyList(ctx, instance.IdentScreenName()); err != nil {
+				return fmt.Errorf("unable to init buddy list: %w", err)
+			}
+
+			// restore warning level from last session
+			if err := s.recalcWarning(ctx, instance); err != nil {
+				return fmt.Errorf("failed to recalculate warning level: %w", err)
+			}
+
+			// periodically decay warning level
+			go s.lowerWarnLevel(ctx, instance)
+			return nil
+		}); err != nil {
+			return err
+		}
+
+		// гpdate user visibility when an instance closes, as the user's overall status may change.
+		// Example: With 1 away and 1 non-away instance, the user appears available.
+		// If the non-away instance closes, the user should appear away.
+		instance.OnClose(func() {
+			if shuttingDown(ctx) {
+				return
+			}
+
+			if instance.Session().Invisible() {
+				if err := s.DepartureNotifier.BroadcastBuddyDeparted(ctx, instance); err != nil {
+					s.Logger.ErrorContext(ctx, "error sending buddy departure notifications", "err", err.Error())
+				}
+			} else {
+				if err := s.DepartureNotifier.BroadcastBuddyArrived(ctx, instance.IdentScreenName(), instance.Session().TLVUserInfo()); err != nil {
+					s.Logger.ErrorContext(ctx, "error sending buddy arrival notifications", "err", err.Error())
+				}
+			}
+		})
+
+		instance.Session().OnSessionClose(func() {
+			if !shuttingDown(ctx) {
+				if err := s.DepartureNotifier.BroadcastBuddyDeparted(ctx, instance); err != nil {
+					s.Logger.ErrorContext(ctx, "error sending buddy departure notifications", "err", err.Error())
+				}
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+
+			// buddy list must be cleared before session is closed,
+			// otherwise there will be a race condition that could cause the buddy list be prematurely deleted.
+			if err := s.BuddyListRegistry.UnregisterBuddyList(ctx, instance.IdentScreenName()); err != nil {
+				s.Logger.ErrorContext(ctx, "error removing buddy list entry", "err", err.Error())
+			}
+
+			s.ChatSessionManager.RemoveUserFromAllChats(instance.IdentScreenName())
+			s.AuthService.Signout(ctx, instance)
+		})
+
+		if remoteAddr, ok := ctx.Value("ip").(string); ok {
+			ip, err := netip.ParseAddrPort(remoteAddr)
+			if err != nil {
+				return errors.New("unable to parse ip addr")
+			}
+			instance.SetRemoteAddr(&ip)
+		}
+
+		go s.receiveSessMessages(ctx, instance, flapc)
+	case wire.Chat:
+		instance, err = s.AuthService.RegisterChatSession(ctx, cookie)
+		if err != nil {
+			return err
+		}
+
+		if instance == nil {
+			return errors.New("session not found")
+		}
+
+		defer func() {
+			instance.CloseInstance()
+		}()
+
+		instance.Session().OnSessionClose(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			s.SignoutChat(ctx, instance)
+		})
+
+		go s.receiveSessMessages(ctx, instance, flapc)
+	default:
+		if instance, err = s.AuthService.RetrieveBOSSession(ctx, cookie); err != nil {
+			return err
+		} else if instance == nil {
+			return errors.New("session not found")
+		}
+	}
+
+	ctx = context.WithValue(ctx, "screenName", instance.IdentScreenName())
+	msg := s.OnlineNotifier.HostOnline(cookie.Service)
+	if err := flapc.SendSNAC(msg.Frame, msg.Body); err != nil {
+		return err
+	}
+
+	return s.dispatchIncomingMessages(ctx, cookie.Service, instance, flapc, conn, listener)
 }
 
 func sendInvalidSNACErr(frameIn wire.SNACFrame, rw ResponseWriter) error {

@@ -55,7 +55,7 @@ func (l *IPRateLimiter) Allow(ip string) (allowed bool, isBUCP bool) {
 		}
 		l.cache.Set(ip, limiter, cache.DefaultExpiration)
 	}
-	
+
 	entry := limiter.(*rateLimitEntry)
 	return entry.limiter.Allow(), entry.isBUCP
 }
@@ -153,6 +153,30 @@ func (s *Server) ListenAndServe() error {
 	}
 
 	<-s.closed // block until Shutdown is called
+	return nil
+}
+
+func (s *Server) Shutdown(ctx context.Context) error {
+	s.logger.Debug("Initiating graceful shutdown...")
+	s.shutdownCancel()
+	s.cleanupListeners()
+
+	// wait for handlers to complete
+	done := make(chan struct{})
+	go func() {
+		s.connWg.Wait()
+		s.listenWg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		s.logger.Info("shutdown complete")
+	case <-ctx.Done():
+		s.logger.Info("shutdown complete, but connections didn't close cleanly")
+	}
+
+	close(s.closed)
 	return nil
 }
 
@@ -652,7 +676,7 @@ func (s oscarServer) routeConnection(ctx context.Context, conn net.Conn, listene
 	if err := flapc.SendSignonFrame(signonTLVs); err != nil {
 		return err
 	}
-	
+
 	flap, err := flapc.ReceiveSignonFrame()
 	if err != nil {
 		return err

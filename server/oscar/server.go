@@ -1,9 +1,15 @@
 package oscar
 
 import (
+	"context"
+	"io"
+	"log/slog"
 	"time"
 
 	"github.com/patrickmn/go-cache"
+	"github.com/pchchv/go-icq/config"
+	"github.com/pchchv/go-icq/state"
+	"github.com/pchchv/go-icq/wire"
 	"golang.org/x/time/rate"
 )
 
@@ -63,4 +69,19 @@ func (l *IPRateLimiter) SetBUCP(ip string) {
 type rateLimitEntry struct {
 	isBUCP  bool
 	limiter *rate.Limiter
+}
+
+type oscarServer struct {
+	AuthService
+	BuddyListRegistry
+	ChatSessionManager
+	DepartureNotifier
+	Logger *slog.Logger
+	OnlineNotifier
+	SNACHandler func(ctx context.Context, serverType uint16, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter, listener config.Listener) error
+	RateLimitUpdater
+	wire.SNACRateLimits
+	*IPRateLimiter
+	recalcWarning  func(ctx context.Context, instance *state.SessionInstance) error
+	lowerWarnLevel func(ctx context.Context, instance *state.SessionInstance)
 }

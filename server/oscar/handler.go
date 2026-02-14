@@ -124,3 +124,23 @@ func (rt Handler) BARTDownload2Query(ctx context.Context, instance *state.Sessio
 	
 	return nil
 }
+
+func (rt Handler) BuddyAddBuddies(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inSNAC := wire.SNAC_0x03_0x04_BuddyAddBuddies{}
+	if err := wire.UnmarshalBE(&inSNAC, r); err != nil {
+		return err
+	}
+
+	rt.LogRequest(ctx, inFrame, inSNAC)
+	return rt.BuddyService.AddBuddies(ctx, instance, inSNAC)
+}
+
+func (rt Handler) BuddyAddTempBuddies(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inSNAC := wire.SNAC_0x03_0x0F_BuddyAddTempBuddies{}
+	if err := wire.UnmarshalBE(&inSNAC, r); err != nil {
+		return err
+	}
+
+	rt.LogRequest(ctx, inFrame, inSNAC)
+	return rt.BuddyService.AddTempBuddies(ctx, instance, inSNAC)
+}

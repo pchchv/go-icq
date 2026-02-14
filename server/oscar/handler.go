@@ -68,3 +68,23 @@ func (rt Handler) AdminInfoChangeRequest(ctx context.Context, instance *state.Se
 	rt.LogRequestAndResponse(ctx, inFrame, nil, outSNAC.Frame, outSNAC.Body)
 	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
 }
+
+func (rt Handler) AdminConfirmRequest(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, rw ResponseWriter) error {
+	outSNAC, err := rt.AdminService.ConfirmRequest(ctx, instance, inFrame)
+	if err != nil {
+		return err
+	}
+
+	rt.LogRequestAndResponse(ctx, inFrame, nil, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (rt Handler) AlertNotifyCapabilities(ctx context.Context, _ *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, _ ResponseWriter) error {
+	rt.LogRequest(ctx, inFrame, nil)
+	return nil
+}
+
+func (rt Handler) AlertNotifyDisplayCapabilities(ctx context.Context, _ *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, _ ResponseWriter) error {
+	rt.LogRequest(ctx, inFrame, nil)
+	return nil
+}

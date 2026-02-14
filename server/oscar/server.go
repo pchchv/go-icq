@@ -3,6 +3,7 @@ package oscar
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -236,6 +237,131 @@ func (s oscarServer) authenticate(ctx context.Context, flap wire.FLAPSignonFrame
 
 	s.SetBUCP(ip)
 	return s.processBUCPAuth(ctx, flapc, advertisedHost)
+}
+
+// dispatchIncomingMessages receives incoming messages and sends them to the appropriate message handler.
+// Messages from the client are sent to the router.
+// Messages relayed from the user session are forwarded to the client.
+// This function ensures that the same sequence number is incremented for both types of messages.
+// The function terminates upon receiving a connection error or when the session closes.
+func (s oscarServer) dispatchIncomingMessages(ctx context.Context, fg uint16, instance *state.SessionInstance, flapc *wire.FlapClient, r io.ReadCloser, listener config.Listener) error {
+	defer func() {
+		s.Logger.InfoContext(ctx, "user disconnected")
+	}()
+
+	// buffered so that the go routine has room to exit
+	msgCh := make(chan wire.FLAPFrame, 1)
+	errCh := make(chan error, 1)
+	// consume flap frames
+	go func() {
+		defer close(msgCh)
+		defer close(errCh)
+
+		for {
+			frame := wire.FLAPFrame{}
+			if err := wire.UnmarshalBE(&frame, r); err != nil {
+				errCh <- err
+				return
+			}
+			msgCh <- frame
+		}
+	}()
+
+	for {
+		select {
+		case flap, ok := <-msgCh:
+			if !ok {
+				return nil
+			}
+
+			switch flap.FrameType {
+			case wire.FLAPFrameData:
+				flapBuf := bytes.NewBuffer(flap.Payload)
+
+				inFrame := wire.SNACFrame{}
+				if err := wire.UnmarshalBE(&inFrame, flapBuf); err != nil {
+					return err
+				}
+
+				rateClassID, ok := s.SNACRateLimits.RateClassLookup(inFrame.FoodGroup, inFrame.SubGroup)
+				if ok {
+					if status := instance.Session().EvaluateRateLimit(time.Now(), rateClassID); status == wire.RateLimitStatusLimited {
+						s.Logger.DebugContext(ctx, "rate limit exceeded, dropping SNAC",
+							"foodgroup", wire.FoodGroupName(inFrame.FoodGroup),
+							"subgroup", wire.SubGroupName(inFrame.FoodGroup, inFrame.SubGroup))
+						break
+					}
+				} else {
+					s.Logger.ErrorContext(ctx, "rate limit not found, allowing request through")
+				}
+
+				// route a client request to the appropriate service handler. the
+				// handler may write a response to the client connection.
+				if err := s.SNACHandler(ctx, fg, instance, inFrame, flapBuf, flapc, listener); err != nil {
+					middleware.LogRequestError(ctx, s.Logger, inFrame, err)
+					if errors.Is(err, ErrRouteNotFound) {
+						if err1 := sendInvalidSNACErr(inFrame, flapc); err1 != nil {
+							return errors.Join(err1, err)
+						}
+						break
+					}
+					return err
+				}
+			case wire.FLAPFrameSignon:
+				return fmt.Errorf("shouldn't get FLAPFrameSignon. flap: %v", flap)
+			case wire.FLAPFrameError:
+				return fmt.Errorf("got FLAPFrameError. flap: %v", flap)
+			case wire.FLAPFrameSignoff:
+				s.Logger.InfoContext(ctx, "got FLAPFrameSignoff", "flap", flap)
+				return nil
+			case wire.FLAPFrameKeepAlive:
+				s.Logger.DebugContext(ctx, "keepalive heartbeat")
+			default:
+				return fmt.Errorf("got unknown FLAP frame type. flap: %v", flap)
+			}
+		case <-time.After(1 * time.Second):
+			updates := s.RateLimitUpdater.RateLimitUpdates(ctx, instance, time.Now())
+			for _, update := range updates {
+				if err := flapc.SendSNAC(update.Frame, update.Body); err != nil {
+					middleware.LogRequestError(ctx, s.Logger, update.Frame, err)
+					return err
+				}
+			}
+		case <-instance.Closed():
+			// add logoff reason to clients that support multi-conn
+			if instance.MultiConnFlag() == wire.MultiConnFlagsOldClient {
+				if err := flapc.OldSignoff(); err != nil {
+					return fmt.Errorf("unable to gracefully disconnect user. %w", err)
+				}
+			} else {
+				block := wire.TLVRestBlock{}
+				// error code indicating user signed in a different location
+				block.Append(wire.NewTLVBE(0x0009, wire.OServiceDiscErrNewLogin))
+				// "more info" button
+				block.Append(wire.NewTLVBE(0x000b, "https://github.com/mk6i/open-oscar-server"))
+				if err := flapc.NewSignoff(block); err != nil {
+					return fmt.Errorf("unable to gracefully disconnect user. %w", err)
+				}
+			}
+			return nil
+		case <-ctx.Done():
+			if instance.MultiConnFlag() == wire.MultiConnFlagsOldClient {
+				if err := flapc.OldSignoff(); err != nil {
+					return fmt.Errorf("unable to gracefully disconnect user. %w", err)
+				}
+			} else {
+				if err := flapc.NewSignoff(wire.TLVRestBlock{}); err != nil {
+					return fmt.Errorf("unable to gracefully disconnect user. %w", err)
+				}
+			}
+			return nil
+		case err := <-errCh:
+			if !errors.Is(io.EOF, err) {
+				s.Logger.ErrorContext(ctx, "client disconnected with error", "err", err)
+			}
+			return nil
+		}
+	}
 }
 
 func sendInvalidSNACErr(frameIn wire.SNACFrame, rw ResponseWriter) error {

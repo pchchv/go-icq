@@ -29,3 +29,8 @@ func NewIPRateLimiter(rate rate.Limit, burst int, ttl time.Duration) *IPRateLimi
 		burst: burst,
 	}
 }
+
+type rateLimitEntry struct {
+	isBUCP  bool
+	limiter *rate.Limiter
+}

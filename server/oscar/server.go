@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -71,6 +72,61 @@ func (l *IPRateLimiter) SetBUCP(ip string) {
 		l.cache.Set(ip, limiter, cache.DefaultExpiration)
 	}
 	limiter.(*rateLimitEntry).isBUCP = true
+}
+
+type Server struct {
+	logger         *slog.Logger
+	listenerCfg    []config.Listener
+	listeners      []net.Listener
+	connMu         sync.Mutex
+	conns          map[net.Conn]struct{}
+	connWg         sync.WaitGroup
+	listenWg       sync.WaitGroup
+	shutdownCtx    context.Context
+	shutdownCancel context.CancelFunc
+	closed         chan struct{}
+	handler        func(ctx context.Context, conn net.Conn, listener config.Listener) error
+}
+
+func NewServer(
+	authService AuthService,
+	buddyListRegistry BuddyListRegistry,
+	chatSessionManager *state.InMemoryChatSessionManager,
+	departureNotifier DepartureNotifier,
+	logger *slog.Logger,
+	onlineNotifier OnlineNotifier,
+	SNACHandler func(ctx context.Context, serverType uint16, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter, listener config.Listener) error,
+	rateLimitUpdater RateLimitUpdater,
+	limits wire.SNACRateLimits,
+	limiter *IPRateLimiter,
+	listenerCfg []config.Listener,
+	recalcWarning func(ctx context.Context, instance *state.SessionInstance) error,
+	lowerWarnLevel func(ctx context.Context, instance *state.SessionInstance),
+) *Server {
+	oscarSvc := oscarServer{
+		AuthService:        authService,
+		BuddyListRegistry:  buddyListRegistry,
+		ChatSessionManager: chatSessionManager,
+		DepartureNotifier:  departureNotifier,
+		Logger:             logger,
+		OnlineNotifier:     onlineNotifier,
+		SNACHandler:        SNACHandler,
+		RateLimitUpdater:   rateLimitUpdater,
+		SNACRateLimits:     limits,
+		IPRateLimiter:      limiter,
+		recalcWarning:      recalcWarning,
+		lowerWarnLevel:     lowerWarnLevel,
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	return &Server{
+		closed:         make(chan struct{}),
+		conns:          make(map[net.Conn]struct{}),
+		handler:        oscarSvc.routeConnection,
+		listenerCfg:    listenerCfg,
+		logger:         logger,
+		shutdownCancel: cancel,
+		shutdownCtx:    ctx,
+	}
 }
 
 type rateLimitEntry struct {

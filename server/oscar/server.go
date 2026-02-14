@@ -1,0 +1,31 @@
+package oscar
+
+import (
+	"time"
+
+	"github.com/patrickmn/go-cache"
+	"golang.org/x/time/rate"
+)
+
+// IPRateLimiter enforces a per-IP rate limit using a token bucket algorithm.
+// It caches individual rate limiters by IP address and
+// supports tagging requests as originating from the BUCP or FLAP auth.
+//
+// The limiter uses an in-memory cache with TTL expiration,
+// so rate limits reset after the TTL if no activity is observed for a given IP.
+type IPRateLimiter struct {
+	cache *cache.Cache // in-memory cache mapping IPs to rate limiters with optional BUCP tag
+	rate  rate.Limit   // requests allowed per second
+	burst int          // maximum burst size allowed
+}
+
+// NewIPRateLimiter initializes a new IPRateLimiter with the specified rate,
+// burst size, and TTL for each IP's limiter.
+// Entries expire after 2×TTL.
+func NewIPRateLimiter(rate rate.Limit, burst int, ttl time.Duration) *IPRateLimiter {
+	return &IPRateLimiter{
+		cache: cache.New(ttl, 2*ttl),
+		rate:  rate,
+		burst: burst,
+	}
+}

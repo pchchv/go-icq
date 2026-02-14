@@ -144,3 +144,34 @@ func (rt Handler) BuddyAddTempBuddies(ctx context.Context, instance *state.Sessi
 	rt.LogRequest(ctx, inFrame, inSNAC)
 	return rt.BuddyService.AddTempBuddies(ctx, instance, inSNAC)
 }
+
+func (rt Handler) BuddyDelBuddies(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inSNAC := wire.SNAC_0x03_0x05_BuddyDelBuddies{}
+	if err := wire.UnmarshalBE(&inSNAC, r); err != nil {
+		return err
+	}
+
+	rt.LogRequest(ctx, inFrame, inSNAC)
+	return rt.BuddyService.DelBuddies(ctx, instance, inSNAC)
+}
+
+func (rt Handler) BuddyDelTempBuddies(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inSNAC := wire.SNAC_0x03_0x10_BuddyDelTempBuddies{}
+	if err := wire.UnmarshalBE(&inSNAC, r); err != nil {
+		return err
+	}
+
+	rt.LogRequest(ctx, inFrame, inSNAC)
+	return rt.BuddyService.DelTempBuddies(ctx, instance, inSNAC)
+}
+
+func (rt Handler) BuddyRightsQuery(ctx context.Context, _ *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inSNAC := wire.SNAC_0x03_0x02_BuddyRightsQuery{}
+	if err := wire.UnmarshalBE(&inSNAC, r); err != nil {
+		return err
+	}
+
+	outSNAC := rt.BuddyService.RightsQuery(ctx, inFrame)
+	rt.LogRequestAndResponse(ctx, inFrame, inSNAC, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}

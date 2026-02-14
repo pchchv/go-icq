@@ -90,6 +90,21 @@ func (rt Handler) AlertNotifyDisplayCapabilities(ctx context.Context, _ *state.S
 	return nil
 }
 
+func (rt Handler) BARTUploadQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x10_0x02_BARTUploadQuery{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := rt.BARTService.UpsertItem(ctx, instance, inFrame, inBody)
+	if err != nil {
+		return err
+	}
+
+	rt.LogRequestAndResponse(ctx, inFrame, outSNAC, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
 func (rt Handler) BARTDownloadQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
 	inBody := wire.SNAC_0x10_0x04_BARTDownloadQuery{}
 	if err := wire.UnmarshalBE(&inBody, r); err != nil {

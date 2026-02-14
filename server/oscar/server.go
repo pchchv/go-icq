@@ -46,6 +46,20 @@ func (l *IPRateLimiter) Allow(ip string) (allowed bool, isBUCP bool) {
 	return entry.limiter.Allow(), entry.isBUCP
 }
 
+// SetBUCP marks the rate limiter for the given IP as
+// originating from BUCP auth (default FLAP auth).
+func (l *IPRateLimiter) SetBUCP(ip string) {
+	limiter, found := l.cache.Get(ip)
+	if !found {
+		limiter = &rateLimitEntry{
+			isBUCP:  true,
+			limiter: rate.NewLimiter(l.rate, l.burst),
+		}
+		l.cache.Set(ip, limiter, cache.DefaultExpiration)
+	}
+	limiter.(*rateLimitEntry).isBUCP = true
+}
+
 type rateLimitEntry struct {
 	isBUCP  bool
 	limiter *rate.Limiter

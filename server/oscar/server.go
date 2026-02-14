@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/patrickmn/go-cache"
 	"github.com/pchchv/go-icq/config"
+	"github.com/pchchv/go-icq/server/oscar/middleware"
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 	"golang.org/x/time/rate"
@@ -173,4 +175,65 @@ func (s oscarServer) processBUCPAuth(ctx context.Context, flapc *wire.FlapClient
 			return io.EOF
 		}
 	}
+}
+
+func (s oscarServer) receiveSessMessages(ctx context.Context, instance *state.SessionInstance, flapc *wire.FlapClient) {
+	for {
+		select {
+		case <-instance.Closed():
+			return
+		case <-ctx.Done():
+			return
+		case m := <-instance.ReceiveMessage():
+			// forward a notification sent from another client to this client
+			if err := flapc.SendSNAC(m.Frame, m.Body); err != nil {
+				middleware.LogRequestError(ctx, s.Logger, m.Frame, err)
+			} else {
+				middleware.LogRequest(ctx, s.Logger, m.Frame, m.Body)
+			}
+		}
+	}
+}
+
+func (s oscarServer) authenticate(ctx context.Context, flap wire.FLAPSignonFrame, ip string, conn net.Conn, flapc *wire.FlapClient, advertisedHost string) error {
+	if ok, isBUCP := s.Allow(ip); !ok {
+		s.Logger.Error("user rate limited at login", "remote", ip)
+		tlv := wire.TLVRestBlock{
+			TLVList: []wire.TLV{
+				wire.NewTLVBE(wire.LoginTLVTagsErrorSubcode, wire.LoginErrRateLimitExceeded),
+			},
+		}
+		// gives wrong response if you quickly switch between BUCP/FLAP clients
+		if isBUCP {
+			return flapc.SendSNAC(
+				wire.SNACFrame{
+					FoodGroup: wire.BUCP,
+					SubGroup:  wire.BUCPLoginResponse,
+				},
+				wire.SNAC_0x17_0x03_BUCPLoginResponse{
+					TLVRestBlock: tlv,
+				},
+			)
+		} else {
+			return flapc.NewSignoff(tlv)
+		}
+	}
+
+	// auth must complete within the next 30 seconds
+	if err := conn.SetDeadline(time.Now().Add(30 * time.Second)); err != nil {
+		return fmt.Errorf("failed to set deadline: %w", err)
+	}
+
+	// decide whether the client is using BUCP or FLAP authentication based on
+	// the presence of the screen name TLV.
+	// This block used to check for the presence of the roasted password TLV,
+	// however that proved an unreliable indicator of
+	// FLAP-auth because older ICQ clients appear to omit the
+	// roasted password TLV when the password is not stored client-side.
+	if _, hasScreenName := flap.Uint16BE(wire.LoginTLVTagsScreenName); hasScreenName {
+		return s.processFLAPAuth(ctx, flap, flapc, advertisedHost)
+	}
+
+	s.SetBUCP(ip)
+	return s.processBUCPAuth(ctx, flapc, advertisedHost)
 }

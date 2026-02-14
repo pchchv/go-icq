@@ -316,7 +316,32 @@ func (rt Handler) FeedbagQueryIfModified(ctx context.Context, instance *state.Se
 	if err != nil {
 		return err
 	}
-	
+
+	rt.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (rt Handler) FeedbagRespondAuthorizeToHost(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x13_0x1A_FeedbagRespondAuthorizeToHost{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	if err := rt.FeedbagService.RespondAuthorizeToHost(ctx, instance, inFrame, inBody); err != nil {
+		return err
+	}
+
+	rt.LogRequest(ctx, inFrame, inBody)
+	return nil
+}
+
+func (rt Handler) FeedbagRightsQuery(ctx context.Context, _ *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x13_0x02_FeedbagRightsQuery{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC := rt.FeedbagService.RightsQuery(ctx, inFrame)
 	rt.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
 	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
 }

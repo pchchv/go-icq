@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 
 	"github.com/pchchv/go-icq/server/oscar/middleware"
 	"github.com/pchchv/go-icq/state"
@@ -173,5 +174,42 @@ func (rt Handler) BuddyRightsQuery(ctx context.Context, _ *state.SessionInstance
 
 	outSNAC := rt.BuddyService.RightsQuery(ctx, inFrame)
 	rt.LogRequestAndResponse(ctx, inFrame, inSNAC, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (rt Handler) ChatChannelMsgToHost(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x0E_0x05_ChatChannelMsgToHost{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := rt.ChatService.ChannelMsgToHost(ctx, instance, inFrame, inBody)
+	if err != nil {
+		return err
+	}
+
+	if outSNAC == nil {
+		return nil
+	}
+
+	rt.Logger.InfoContext(ctx, "user sent a chat message")
+	rt.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (rt Handler) ChatNavCreateRoom(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x0E_0x02_ChatRoomInfoUpdate{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := rt.ChatNavService.CreateRoom(ctx, instance, inFrame, inBody)
+	if err != nil {
+		return err
+	}
+
+	roomName, _ := inBody.String(wire.ChatRoomTLVRoomName)
+	rt.Logger.InfoContext(ctx, "user started a chat room", slog.String("roomName", roomName))
+	rt.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
 	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
 }

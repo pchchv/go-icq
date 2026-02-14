@@ -286,7 +286,7 @@ func (rt Handler) FeedbagInsertItem(ctx context.Context, instance *state.Session
 	if err != nil {
 		return err
 	}
-	
+
 	if outSNAC == nil {
 		rt.LogRequest(ctx, inFrame, inBody)
 		return nil
@@ -344,4 +344,40 @@ func (rt Handler) FeedbagRightsQuery(ctx context.Context, _ *state.SessionInstan
 	outSNAC := rt.FeedbagService.RightsQuery(ctx, inFrame)
 	rt.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
 	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (rt Handler) FeedbagStartCluster(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, _ ResponseWriter) error {
+	inBody := wire.SNAC_0x13_0x11_FeedbagStartCluster{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	rt.FeedbagService.StartCluster(ctx, instance, inFrame, inBody)
+	rt.LogRequest(ctx, inFrame, inBody)
+	return nil
+}
+
+func (rt Handler) FeedbagUpdateItem(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x13_0x09_FeedbagUpdateItem{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := rt.FeedbagService.UpsertItem(ctx, instance, inFrame, inBody.Items)
+	if err != nil {
+		return err
+	}
+
+	if outSNAC == nil {
+		rt.LogRequest(ctx, inFrame, inBody)
+		return nil
+	}
+
+	rt.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (rt Handler) FeedbagUse(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, _ ResponseWriter) error {
+	rt.LogRequest(ctx, inFrame, nil)
+	return rt.FeedbagService.Use(ctx, instance)
 }

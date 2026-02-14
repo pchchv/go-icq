@@ -375,3 +375,13 @@ func sendInvalidSNACErr(frameIn wire.SNACFrame, rw ResponseWriter) error {
 	}
 	return rw.SendSNAC(frameOut, bodyOut)
 }
+
+func shuttingDown(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		// server is shutting down, don't send buddy notifications
+		return true
+	default:
+		return false
+	}
+}

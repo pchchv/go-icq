@@ -736,3 +736,43 @@ func (h Handler) LocateRightsQuery(ctx context.Context, _ *state.SessionInstance
 	h.LogRequestAndResponse(ctx, inFrame, nil, outSNAC.Frame, outSNAC.Body)
 	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
 }
+
+func (h Handler) LocateSetDirInfo(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x02_0x09_LocateSetDirInfo{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := h.LocateService.SetDirInfo(ctx, instance, inFrame, inBody)
+	if err != nil {
+		return err
+	}
+
+	h.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (h Handler) LocateSetInfo(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, _ ResponseWriter) error {
+	inBody := wire.SNAC_0x02_0x04_LocateSetInfo{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	h.LogRequest(ctx, inFrame, inBody)
+	return h.LocateService.SetInfo(ctx, instance, inBody)
+}
+
+func (h Handler) LocateSetKeywordInfo(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x02_0x0F_LocateSetKeywordInfo{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := h.LocateService.SetKeywordInfo(ctx, instance, inFrame, inBody)
+	if err != nil {
+		return err
+	}
+	
+	h.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}

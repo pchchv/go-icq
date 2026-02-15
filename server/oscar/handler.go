@@ -1,8 +1,11 @@
 package oscar
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 
@@ -11,8 +14,12 @@ import (
 	"github.com/pchchv/go-icq/wire"
 )
 
-// ErrRouteNotFound is an error that indicates a failure to find a matching route for an OSCAR protocol request.
-var ErrRouteNotFound = errors.New("route not found")
+var (
+	// ErrRouteNotFound is an error that indicates a failure to find a matching route for an OSCAR protocol request.
+	ErrRouteNotFound            = errors.New("route not found")
+	errUnknownICQMetaReqType    = errors.New("unknown ICQ request type")
+	errUnknownICQMetaReqSubType = errors.New("unknown ICQ metadata request subtype")
+)
 
 // ResponseWriter is the interface for sending a SNAC response to
 // the client from the server handlers.
@@ -473,4 +480,233 @@ func (h Handler) ICBMParameterQuery(ctx context.Context, _ *state.SessionInstanc
 	outSNAC := h.ICBMService.ParameterQuery(ctx, inFrame)
 	h.LogRequestAndResponse(ctx, inFrame, outSNAC, outSNAC.Frame, outSNAC.Body)
 	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (h Handler) ICQDBQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x15_0x02_BQuery{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	md, ok := inBody.Bytes(wire.ICQTLVTagsMetadata)
+	if !ok {
+		return errors.New("invalid ICQ frame")
+	}
+
+	icqChunk := wire.ICQMessageRequestEnvelope{}
+	if err := wire.UnmarshalLE(&icqChunk, bytes.NewBuffer(md)); err != nil {
+		return err
+	}
+
+	buf := bytes.NewBuffer(icqChunk.Body)
+	icqMD := wire.ICQMetadataWithSubType{}
+	if err := wire.UnmarshalLE(&icqMD, buf); err != nil {
+		return err
+	}
+
+	switch icqMD.ReqType {
+	case wire.ICQDBQueryOfflineMsgReq:
+		return h.ICQService.OfflineMsgReq(ctx, instance, icqMD.Seq)
+	case wire.ICQDBQueryDeleteMsgReq:
+		return h.ICQService.DeleteMsgReq(ctx, instance, icqMD.Seq)
+	case wire.ICQDBQueryMetaReq:
+		if icqMD.Optional == nil {
+			return errors.New("got req without subtype")
+		}
+
+		h.Logger.Debug(
+			"ICQ client request",
+			"query_name",
+			wire.ICQDBQueryName(icqMD.ReqType),
+			"query_type",
+			wire.ICQDBQueryMetaName(icqMD.Optional.ReqSubType),
+			"uin",
+			instance.UIN(),
+		)
+		switch icqMD.Optional.ReqSubType {
+		case wire.ICQDBQueryMetaReqShortInfo:
+			userInfo := wire.ICQ_0x07D0_0x04BA_DBQueryMetaReqShortInfo{}
+			if err := binary.Read(buf, binary.LittleEndian, &userInfo); err != nil {
+				return nil
+			}
+			return h.ICQService.ShortUserInfo(ctx, instance, userInfo, icqMD.Seq)
+		case wire.ICQDBQueryMetaReqFullInfo, wire.ICQDBQueryMetaReqFullInfo2:
+			userInfo := wire.ICQ_0x07D0_0x051F_DBQueryMetaReqSearchByUIN{}
+			if err := binary.Read(buf, binary.LittleEndian, &userInfo); err != nil {
+				return nil
+			}
+			return h.ICQService.FullUserInfo(ctx, instance, userInfo, icqMD.Seq)
+		case wire.ICQDBQueryMetaReqXMLReq:
+			req := wire.ICQ_0x07D0_0x0898_DBQueryMetaReqXMLReq{}
+			if err := wire.UnmarshalLE(&req, buf); err != nil {
+				return err
+			}
+
+			if err := h.ICQService.XMLReqData(ctx, instance, req, icqMD.Seq); err != nil {
+				return err
+			}
+		case wire.ICQDBQueryMetaReqSetPermissions:
+			req := wire.ICQ_0x07D0_0x0424_DBQueryMetaReqSetPermissions{}
+			if err := wire.UnmarshalLE(&req, buf); err != nil {
+				return err
+			}
+
+			if err := h.ICQService.SetPermissions(ctx, instance, req, icqMD.Seq); err != nil {
+				return err
+			}
+		case wire.ICQDBQueryMetaReqSearchByUIN:
+			req := wire.ICQ_0x07D0_0x051F_DBQueryMetaReqSearchByUIN{}
+			if err := wire.UnmarshalLE(&req, buf); err != nil {
+				return err
+			}
+
+			if err := h.ICQService.FindByUIN(ctx, instance, req, icqMD.Seq); err != nil {
+				return err
+			}
+		case wire.ICQDBQueryMetaReqSearchByUIN2:
+			rest := buf.Bytes()
+			if bytes.HasPrefix(rest, []byte{0x36, 0x01, 0x06, 0x00}) && len(rest) == 8 {
+				// fix incorrect TLV len set by QIP 2005. it specifies len=6
+				// for a 4-byte value, causing the unmarshaler to return EOF.
+				rest[2] = 4
+			}
+
+			req := wire.ICQ_0x07D0_0x0569_DBQueryMetaReqSearchByUIN2{}
+			if err := wire.UnmarshalLE(&req, bytes.NewReader(rest)); err != nil {
+				return err
+			}
+
+			if err := h.ICQService.FindByUIN2(ctx, instance, req, icqMD.Seq); err != nil {
+				return err
+			}
+		case wire.ICQDBQueryMetaReqSearchByEmail:
+			req := wire.ICQ_0x07D0_0x0529_DBQueryMetaReqSearchByEmail{}
+			if err := wire.UnmarshalLE(&req, buf); err != nil {
+				return err
+			}
+
+			if err := h.ICQService.FindByICQEmail(ctx, instance, req, icqMD.Seq); err != nil {
+				return err
+			}
+		case wire.ICQDBQueryMetaReqSearchByEmail3:
+			req := wire.ICQ_0x07D0_0x0573_DBQueryMetaReqSearchByEmail3{}
+			if err := wire.UnmarshalLE(&req, buf); err != nil {
+				return err
+			}
+
+			if err := h.ICQService.FindByEmail3(ctx, instance, req, icqMD.Seq); err != nil {
+				return err
+			}
+		case wire.ICQDBQueryMetaReqSearchByDetails:
+			req := wire.ICQ_0x07D0_0x0515_DBQueryMetaReqSearchByDetails{}
+			if err := wire.UnmarshalLE(&req, buf); err != nil {
+				return err
+			}
+
+			if err := h.ICQService.FindByICQName(ctx, instance, req, icqMD.Seq); err != nil {
+				return err
+			}
+		case wire.ICQDBQueryMetaReqSearchWhitePages:
+			req := wire.ICQ_0x07D0_0x0533_DBQueryMetaReqSearchWhitePages{}
+			if err := wire.UnmarshalLE(&req, buf); err != nil {
+				return err
+			}
+
+			if err := h.ICQService.FindByICQInterests(ctx, instance, req, icqMD.Seq); err != nil {
+				return err
+			}
+		case wire.ICQDBQueryMetaReqSearchWhitePages2:
+			req := wire.ICQ_0x07D0_0x055F_DBQueryMetaReqSearchWhitePages2{}
+			if err := wire.UnmarshalLE(&req, buf); err != nil {
+				return err
+			}
+
+			if err := h.ICQService.FindByWhitePages2(ctx, instance, req, icqMD.Seq); err != nil {
+				return err
+			}
+		case wire.ICQDBQueryMetaReqSetBasicInfo:
+			req := wire.ICQ_0x07D0_0x03EA_DBQueryMetaReqSetBasicInfo{}
+			if err := wire.UnmarshalLE(&req, buf); err != nil {
+				return err
+			}
+
+			if err := h.ICQService.SetBasicInfo(ctx, instance, req, icqMD.Seq); err != nil {
+				return err
+			}
+		case wire.ICQDBQueryMetaReqSetWorkInfo:
+			req := wire.ICQ_0x07D0_0x03F3_DBQueryMetaReqSetWorkInfo{}
+			if err := wire.UnmarshalLE(&req, buf); err != nil {
+				return err
+			}
+
+			if err := h.ICQService.SetWorkInfo(ctx, instance, req, icqMD.Seq); err != nil {
+				return err
+			}
+		case wire.ICQDBQueryMetaReqSetMoreInfo:
+			req := wire.ICQ_0x07D0_0x03FD_DBQueryMetaReqSetMoreInfo{}
+			if err := wire.UnmarshalLE(&req, buf); err != nil {
+				return err
+			}
+
+			if err := h.ICQService.SetMoreInfo(ctx, instance, req, icqMD.Seq); err != nil {
+				return err
+			}
+		case wire.ICQDBQueryMetaReqSetNotes:
+			req := wire.ICQ_0x07D0_0x0406_DBQueryMetaReqSetNotes{}
+			if err := wire.UnmarshalLE(&req, buf); err != nil {
+				return err
+			}
+
+			if err := h.ICQService.SetUserNotes(ctx, instance, req, icqMD.Seq); err != nil {
+				return err
+			}
+		case wire.ICQDBQueryMetaReqSetEmails:
+			req := wire.ICQ_0x07D0_0x040B_DBQueryMetaReqSetEmails{}
+			if err := wire.UnmarshalLE(&req, buf); err != nil {
+				return err
+			}
+
+			if err := h.ICQService.SetEmails(ctx, instance, req, icqMD.Seq); err != nil {
+				return err
+			}
+		case wire.ICQDBQueryMetaReqSetInterests:
+			req := wire.ICQ_0x07D0_0x0410_DBQueryMetaReqSetInterests{}
+			if err := wire.UnmarshalLE(&req, buf); err != nil {
+				return err
+			}
+
+			if err := h.ICQService.SetInterests(ctx, instance, req, icqMD.Seq); err != nil {
+				return err
+			}
+		case wire.ICQDBQueryMetaReqSetAffiliations:
+			req := wire.ICQ_0x07D0_0x041A_DBQueryMetaReqSetAffiliations{}
+			if err := wire.UnmarshalLE(&req, buf); err != nil {
+				return err
+			}
+
+			if err := h.ICQService.SetAffiliations(ctx, instance, req, icqMD.Seq); err != nil {
+				return err
+			}
+		case wire.ICQDBQueryMetaReqStat0a8c,
+			wire.ICQDBQueryMetaReqStat0a96,
+			wire.ICQDBQueryMetaReqStat0aaa,
+			wire.ICQDBQueryMetaReqStat0ab4,
+			wire.ICQDBQueryMetaReqStat0ab9,
+			wire.ICQDBQueryMetaReqStat0abe,
+			wire.ICQDBQueryMetaReqStat0ac8,
+			wire.ICQDBQueryMetaReqStat0acd,
+			wire.ICQDBQueryMetaReqStat0ad2,
+			wire.ICQDBQueryMetaReqStat0ad7,
+			wire.ICQDBQueryMetaReqStat0758:
+			h.Logger.Debug("got a request for stats, not doing anything right now")
+		case wire.ICQDBQueryMetaReqDirectoryQuery, wire.ICQDBQueryMetaReqDirectoryUpdate:
+			h.Logger.Debug("got a directory query/update request, not implemented yet")
+		default:
+			return fmt.Errorf("%w: %X", errUnknownICQMetaReqSubType, icqMD.Optional.ReqSubType)
+		}
+	default:
+		return fmt.Errorf("%w: %X", errUnknownICQMetaReqType, icqMD.ReqType)
+	}
+
+	return nil
 }

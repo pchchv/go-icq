@@ -396,3 +396,29 @@ func (rt Handler) FeedbagUse(ctx context.Context, instance *state.SessionInstanc
 	rt.LogRequest(ctx, inFrame, nil)
 	return rt.FeedbagService.Use(ctx, instance)
 }
+
+func (h Handler) ICBMAddParameters(ctx context.Context, _ *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, _ ResponseWriter) error {
+	inBody := wire.SNAC_0x04_0x02_ICBMAddParameters{}
+	h.LogRequest(ctx, inFrame, inBody)
+	return wire.UnmarshalBE(&inBody, r)
+}
+
+func (h Handler) ICBMChannelMsgToHost(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x04_0x06_ICBMChannelMsgToHost{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := h.ICBMService.ChannelMsgToHost(ctx, instance, inFrame, inBody)
+	if err != nil {
+		return err
+	}
+
+	h.Logger.InfoContext(ctx, "user sent an IM", slog.String("recipient", inBody.ScreenName))
+	if outSNAC == nil {
+		return nil
+	}
+
+	h.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}

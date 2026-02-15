@@ -834,6 +834,10 @@ const (
 	ICQDBQueryMetaReplyUserFound       uint16 = 0x01A4
 	ICQDBQueryMetaReplyLastUserFound   uint16 = 0x01AE
 	ICQDBQueryMetaReplyXMLData         uint16 = 0x08A2
+	ICQDBQueryMetaReqDirectoryQuery    uint16 = 0x0FA0
+	ICQDBQueryMetaReqDirectoryUpdate   uint16 = 0x0FD2
+	ICQDBQueryMetaReplySetICQPhone     uint16 = 0x031E
+	ICQDBQueryMetaReqSetICQPhone       uint16 = 0x0654
 
 	ODirErr                          uint16 = 0x0001
 	ODirInfoQuery                    uint16 = 0x0002

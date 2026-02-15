@@ -443,3 +443,34 @@ func (h Handler) ICBMClientEvent(ctx context.Context, instance *state.SessionIns
 	h.LogRequest(ctx, inFrame, inBody)
 	return h.ICBMService.ClientEvent(ctx, instance, inFrame, inBody)
 }
+
+func (h Handler) ICBMEvilRequest(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x04_0x08_ICBMEvilRequest{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := h.ICBMService.EvilRequest(ctx, instance, inFrame, inBody)
+	if err != nil {
+		return err
+	}
+	
+	h.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (h Handler) ICBMOfflineRetrieve(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, rw ResponseWriter) error {
+	outSNAC, err := h.ICBMService.OfflineRetrieve(ctx, instance, inFrame)
+	if err != nil {
+		return err
+	}
+	
+	h.LogRequestAndResponse(ctx, inFrame, nil, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (h Handler) ICBMParameterQuery(ctx context.Context, _ *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, rw ResponseWriter) error {
+	outSNAC := h.ICBMService.ParameterQuery(ctx, inFrame)
+	h.LogRequestAndResponse(ctx, inFrame, outSNAC, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}

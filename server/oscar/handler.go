@@ -812,3 +812,8 @@ func (h Handler) LocateUserInfoQuery2(ctx context.Context, instance *state.Sessi
 	h.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
 	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
 }
+
+func (h Handler) MDirRequest(ctx context.Context, _ *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, _ ResponseWriter) error {
+	h.LogRequest(ctx, inFrame, nil)
+	return nil
+}

@@ -772,7 +772,43 @@ func (h Handler) LocateSetKeywordInfo(ctx context.Context, instance *state.Sessi
 	if err != nil {
 		return err
 	}
-	
+
+	h.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (h Handler) LocateUserInfoQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x02_0x05_LocateUserInfoQuery{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := h.LocateService.UserInfoQuery(ctx, instance, inFrame, inBody)
+	if err != nil {
+		return err
+	}
+
+	h.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (h Handler) LocateUserInfoQuery2(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x02_0x15_LocateUserInfoQuery2{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	// SNAC functionality for LocateUserInfoQuery and LocateUserInfoQuery2 is
+	// identical except for the Type field data type (uint16 vs uint32).
+	wrappedBody := wire.SNAC_0x02_0x05_LocateUserInfoQuery{
+		Type:       uint16(inBody.Type2),
+		ScreenName: inBody.ScreenName,
+	}
+	outSNAC, err := h.LocateService.UserInfoQuery(ctx, instance, inFrame, wrappedBody)
+	if err != nil {
+		return err
+	}
+
 	h.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
 	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
 }

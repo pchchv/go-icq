@@ -715,3 +715,24 @@ func (h Handler) InviteRequest(ctx context.Context, _ *state.SessionInstance, in
 	h.LogRequest(ctx, inFrame, nil)
 	return nil
 }
+
+func (h Handler) LocateGetDirInfo(ctx context.Context, _ *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x02_0x0B_LocateGetDirInfo{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := h.LocateService.DirInfo(ctx, inFrame, inBody)
+	if err != nil {
+		return err
+	}
+
+	h.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (h Handler) LocateRightsQuery(ctx context.Context, _ *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, rw ResponseWriter) error {
+	outSNAC := h.LocateService.RightsQuery(ctx, inFrame)
+	h.LogRequestAndResponse(ctx, inFrame, nil, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}

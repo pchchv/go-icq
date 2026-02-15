@@ -710,3 +710,8 @@ func (h Handler) ICQDBQuery(ctx context.Context, instance *state.SessionInstance
 
 	return nil
 }
+
+func (h Handler) InviteRequest(ctx context.Context, _ *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, _ ResponseWriter) error {
+	h.LogRequest(ctx, inFrame, nil)
+	return nil
+}

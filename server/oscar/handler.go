@@ -422,3 +422,24 @@ func (h Handler) ICBMChannelMsgToHost(ctx context.Context, instance *state.Sessi
 	h.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
 	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
 }
+
+func (h Handler) ICBMClientErr(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, _ ResponseWriter) error {
+	inBody := wire.SNAC_0x04_0x0B_ICBMClientErr{}
+	h.LogRequest(ctx, inFrame, inBody)
+	err := wire.UnmarshalBE(&inBody, r)
+	if err != nil {
+		return err
+	}
+
+	return h.ICBMService.ClientErr(ctx, instance, inFrame, inBody)
+}
+
+func (h Handler) ICBMClientEvent(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, _ ResponseWriter) error {
+	inBody := wire.SNAC_0x04_0x14_ICBMClientEvent{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	h.LogRequest(ctx, inFrame, inBody)
+	return h.ICBMService.ClientEvent(ctx, instance, inFrame, inBody)
+}

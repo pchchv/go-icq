@@ -893,6 +893,23 @@ func (h Handler) OServiceProbeReq(ctx context.Context, instance *state.SessionIn
 	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
 }
 
+func (h Handler) OServiceRateParamsQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, rw ResponseWriter) error {
+	outSNAC := h.OServiceService.RateParamsQuery(ctx, instance, inFrame)
+	h.LogRequestAndResponse(ctx, inFrame, nil, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (h Handler) OServiceRateParamsSubAdd(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x01_0x08_OServiceRateParamsSubAdd{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	h.OServiceService.RateParamsSubAdd(ctx, instance, inBody)
+	h.LogRequest(ctx, inFrame, inBody)
+	return nil
+}
+
 func (h Handler) OServiceUserInfoQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, rw ResponseWriter) error {
 	outSNAC := h.OServiceService.UserInfoQuery(ctx, instance, inFrame)
 	h.LogRequestAndResponse(ctx, inFrame, nil, outSNAC.Frame, outSNAC.Body)

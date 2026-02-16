@@ -839,6 +839,7 @@ const (
 	ICQDBQueryMetaReplySetICQPhone     uint16 = 0x031E
 	ICQDBQueryMetaReqSetICQPhone       uint16 = 0x0654
 
+	OServiceTLVTagsMOTDMessage       uint16 = 0x0B
 	ODirErr                          uint16 = 0x0001
 	ODirInfoQuery                    uint16 = 0x0002
 	ODirInfoReply                    uint16 = 0x0003
@@ -1970,6 +1971,11 @@ type SNAC_0x0B_0x04_StatsReportAck struct {
 
 type SNAC_0x0D_0x03_ChatNavRequestExchangeInfo struct {
 	Exchange uint16
+}
+
+type SNAC_0x01_0x13_OServiceMOTD struct {
+	MessageType uint16
+	TLVRestBlock
 }
 
 type SNAC_0x0D_0x04_ChatNavRequestRoomInfo struct {

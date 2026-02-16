@@ -886,3 +886,15 @@ func (h Handler) OServiceNoop(ctx context.Context, instance *state.SessionInstan
 	h.LogRequest(ctx, inFrame, nil)
 	return nil
 }
+
+func (h Handler) OServiceProbeReq(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, rw ResponseWriter) error {
+	outSNAC := h.OServiceService.ProbeReq(ctx, inFrame)
+	h.LogRequestAndResponse(ctx, inFrame, nil, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (h Handler) OServiceUserInfoQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, rw ResponseWriter) error {
+	outSNAC := h.OServiceService.UserInfoQuery(ctx, instance, inFrame)
+	h.LogRequestAndResponse(ctx, inFrame, nil, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}

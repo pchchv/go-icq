@@ -977,3 +977,23 @@ func (h Handler) PermitDenyAddPermListEntries(ctx context.Context, instance *sta
 	h.LogRequest(ctx, inFrame, inBody)
 	return h.PermitDenyService.AddPermListEntries(ctx, instance, inBody)
 }
+
+func (h Handler) PermitDenyDelDenyListEntries(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x09_0x08_PermitDenyDelDenyListEntries{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	h.LogRequest(ctx, inFrame, inBody)
+	return h.PermitDenyService.DelDenyListEntries(ctx, instance, inBody)
+}
+
+func (h Handler) PermitDenyDelPermListEntries(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x09_0x06_PermitDenyDelPermListEntries{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	h.LogRequest(ctx, inFrame, inBody)
+	return h.PermitDenyService.DelPermListEntries(ctx, instance, inBody)
+}

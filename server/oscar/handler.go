@@ -842,3 +842,31 @@ func (h Handler) ODirKeywordListQuery(ctx context.Context, instance *state.Sessi
 	h.LogRequestAndResponse(ctx, inFrame, nil, outSNAC.Frame, outSNAC.Body)
 	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
 }
+
+func (h Handler) OServiceClientOnline(ctx context.Context, service uint16, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, _ ResponseWriter) error {
+	inBody := wire.SNAC_0x01_0x02_OServiceClientOnline{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	h.Logger.InfoContext(ctx, "user signed on")
+	h.LogRequest(ctx, inFrame, inBody)
+	return h.OServiceService.ClientOnline(ctx, service, inBody, instance)
+}
+
+func (h Handler) OServiceClientVersions(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x01_0x17_OServiceClientVersions{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNACs := h.OServiceService.ClientVersions(ctx, instance, inFrame, inBody)
+	for _, snac := range outSNACs {
+		h.LogRequestAndResponse(ctx, inFrame, inBody, snac.Frame, snac.Body)
+		if err := rw.SendSNAC(snac.Frame, snac.Body); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

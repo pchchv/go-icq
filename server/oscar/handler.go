@@ -817,3 +817,28 @@ func (h Handler) MDirRequest(ctx context.Context, _ *state.SessionInstance, inFr
 	h.LogRequest(ctx, inFrame, nil)
 	return nil
 }
+
+func (h Handler) ODirInfoQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x0F_0x02_InfoQuery{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := h.ODirService.InfoQuery(ctx, inFrame, inBody)
+	if err != nil {
+		return err
+	}
+
+	h.LogRequestAndResponse(ctx, inFrame, outSNAC, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (h Handler) ODirKeywordListQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	outSNAC, err := h.ODirService.KeywordListQuery(ctx, inFrame)
+	if err != nil {
+		return err
+	}
+
+	h.LogRequestAndResponse(ctx, inFrame, nil, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}

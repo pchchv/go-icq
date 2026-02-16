@@ -870,3 +870,19 @@ func (h Handler) OServiceClientVersions(ctx context.Context, instance *state.Ses
 
 	return nil
 }
+
+func (h Handler) OServiceIdleNotification(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, _ ResponseWriter) error {
+	inBody := wire.SNAC_0x01_0x11_OServiceIdleNotification{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	h.LogRequest(ctx, inFrame, inBody)
+	return h.OServiceService.IdleNotification(ctx, instance, inBody)
+}
+
+func (h Handler) OServiceNoop(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, rw ResponseWriter) error {
+	// no-op keep-alive
+	h.LogRequest(ctx, inFrame, nil)
+	return nil
+}

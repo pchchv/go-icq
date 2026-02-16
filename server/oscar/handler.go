@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 
+	"github.com/pchchv/go-icq/config"
 	"github.com/pchchv/go-icq/server/oscar/middleware"
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
@@ -908,6 +909,21 @@ func (h Handler) OServiceRateParamsSubAdd(ctx context.Context, instance *state.S
 	h.OServiceService.RateParamsSubAdd(ctx, instance, inBody)
 	h.LogRequest(ctx, inFrame, inBody)
 	return nil
+}
+
+func (h Handler) OServiceServiceRequest(ctx context.Context, service uint16, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter, listener config.Listener) error {
+	inBody := wire.SNAC_0x01_0x04_OServiceServiceRequest{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := h.OServiceService.ServiceRequest(ctx, service, instance, inFrame, inBody, listener)
+	if err != nil {
+		return err
+	}
+
+	h.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
 }
 
 func (h Handler) OServiceUserInfoQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, rw ResponseWriter) error {

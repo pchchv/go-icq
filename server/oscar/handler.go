@@ -957,3 +957,23 @@ func (h Handler) OServiceUserInfoQuery(ctx context.Context, instance *state.Sess
 	h.LogRequestAndResponse(ctx, inFrame, nil, outSNAC.Frame, outSNAC.Body)
 	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
 }
+
+func (h Handler) PermitDenyAddDenyListEntries(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x09_0x07_PermitDenyAddDenyListEntries{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	h.LogRequest(ctx, inFrame, inBody)
+	return h.PermitDenyService.AddDenyListEntries(ctx, instance, inBody)
+}
+
+func (h Handler) PermitDenyAddPermListEntries(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x09_0x05_PermitDenyAddPermListEntries{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	h.LogRequest(ctx, inFrame, inBody)
+	return h.PermitDenyService.AddPermListEntries(ctx, instance, inBody)
+}

@@ -926,6 +926,32 @@ func (h Handler) OServiceServiceRequest(ctx context.Context, service uint16, ins
 	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
 }
 
+func (h Handler) OServiceSetUserInfoFields(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x01_0x1E_OServiceSetUserInfoFields{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC, err := h.OServiceService.SetUserInfoFields(ctx, instance, inFrame, inBody)
+	if err != nil {
+		return err
+	}
+
+	h.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (h Handler) OServiceSetPrivacyFlags(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, _ ResponseWriter) error {
+	inBody := wire.SNAC_0x01_0x14_OServiceSetPrivacyFlags{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	h.OServiceService.SetPrivacyFlags(ctx, inBody)
+	h.LogRequest(ctx, inFrame, inBody)
+	return nil
+}
+
 func (h Handler) OServiceUserInfoQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, rw ResponseWriter) error {
 	outSNAC := h.OServiceService.UserInfoQuery(ctx, instance, inFrame)
 	h.LogRequestAndResponse(ctx, inFrame, nil, outSNAC.Frame, outSNAC.Body)

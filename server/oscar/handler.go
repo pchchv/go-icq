@@ -405,6 +405,199 @@ func (h Handler) FeedbagUse(ctx context.Context, instance *state.SessionInstance
 	return h.FeedbagService.Use(ctx, instance)
 }
 
+// Handle directs an incoming OSCAR request to
+// the appropriate handler based on its group and subGroup identifiers found in the SNAC frame.
+// It returns an ErrRouteNotFound error if
+// no matching handler is found for the group:subGroup pair in the request.
+func (h Handler) Handle(ctx context.Context, server uint16, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter, listener config.Listener) error {
+	switch inFrame.FoodGroup {
+	case wire.Admin:
+		switch inFrame.SubGroup {
+		case wire.AdminAcctConfirmRequest:
+			return h.AdminConfirmRequest(ctx, instance, inFrame, r, rw)
+		case wire.AdminInfoChangeRequest:
+			return h.AdminInfoChangeRequest(ctx, instance, inFrame, r, rw)
+		case wire.AdminInfoQuery:
+			return h.AdminInfoQuery(ctx, instance, inFrame, r, rw)
+		}
+	case wire.Alert:
+		switch inFrame.SubGroup {
+		case wire.AlertNotifyCapabilities:
+			return h.AlertNotifyCapabilities(ctx, instance, inFrame, r, rw)
+		case wire.AlertNotifyDisplayCapabilities:
+			return h.AlertNotifyDisplayCapabilities(ctx, instance, inFrame, r, rw)
+		}
+	case wire.BART:
+		switch inFrame.SubGroup {
+		case wire.BARTDownloadQuery:
+			return h.BARTDownloadQuery(ctx, instance, inFrame, r, rw)
+		case wire.BARTDownload2Query:
+			return h.BARTDownload2Query(ctx, instance, inFrame, r, rw)
+		case wire.BARTUploadQuery:
+			return h.BARTUploadQuery(ctx, instance, inFrame, r, rw)
+		}
+	case wire.Buddy:
+		switch inFrame.SubGroup {
+		case wire.BuddyAddBuddies:
+			return h.BuddyAddBuddies(ctx, instance, inFrame, r, rw)
+		case wire.BuddyDelBuddies:
+			return h.BuddyDelBuddies(ctx, instance, inFrame, r, rw)
+		case wire.BuddyRightsQuery:
+			return h.BuddyRightsQuery(ctx, instance, inFrame, r, rw)
+		case wire.BuddyAddTempBuddies:
+			return h.BuddyAddTempBuddies(ctx, instance, inFrame, r, rw)
+		case wire.BuddyDelTempBuddies:
+			return h.BuddyDelTempBuddies(ctx, instance, inFrame, r, rw)
+		}
+	case wire.Chat:
+		switch inFrame.SubGroup {
+		case wire.ChatChannelMsgToHost:
+			return h.ChatChannelMsgToHost(ctx, instance, inFrame, r, rw)
+		}
+	case wire.ChatNav:
+		switch inFrame.SubGroup {
+		case wire.ChatNavCreateRoom:
+			return h.ChatNavCreateRoom(ctx, instance, inFrame, r, rw)
+		case wire.ChatNavRequestChatRights:
+			return h.ChatNavRequestChatRights(ctx, instance, inFrame, r, rw)
+		case wire.ChatNavRequestExchangeInfo:
+			return h.ChatNavRequestExchangeInfo(ctx, instance, inFrame, r, rw)
+		case wire.ChatNavRequestRoomInfo:
+			return h.ChatNavRequestRoomInfo(ctx, instance, inFrame, r, rw)
+		}
+	case wire.Feedbag:
+		switch inFrame.SubGroup {
+		case wire.FeedbagDeleteItem:
+			return h.FeedbagDeleteItem(ctx, instance, inFrame, r, rw)
+		case wire.FeedbagEndCluster:
+			return h.FeedbagEndCluster(ctx, instance, inFrame, r, rw)
+		case wire.FeedbagInsertItem:
+			return h.FeedbagInsertItem(ctx, instance, inFrame, r, rw)
+		case wire.FeedbagQuery:
+			return h.FeedbagQuery(ctx, instance, inFrame, r, rw)
+		case wire.FeedbagQueryIfModified:
+			return h.FeedbagQueryIfModified(ctx, instance, inFrame, r, rw)
+		case wire.FeedbagRespondAuthorizeToHost:
+			return h.FeedbagRespondAuthorizeToHost(ctx, instance, inFrame, r, rw)
+		case wire.FeedbagRightsQuery:
+			return h.FeedbagRightsQuery(ctx, instance, inFrame, r, rw)
+		case wire.FeedbagStartCluster:
+			return h.FeedbagStartCluster(ctx, instance, inFrame, r, rw)
+		case wire.FeedbagUpdateItem:
+			return h.FeedbagUpdateItem(ctx, instance, inFrame, r, rw)
+		case wire.FeedbagUse:
+			return h.FeedbagUse(ctx, instance, inFrame, r, rw)
+		}
+	case wire.Invite:
+		switch inFrame.SubGroup {
+		case wire.InviteRequestQuery, wire.InviteRequestReply:
+			return h.InviteRequest(ctx, instance, inFrame, r, rw)
+		}
+	case wire.ICQ:
+		switch inFrame.SubGroup {
+		case wire.ICQDBQuery:
+			return h.ICQDBQuery(ctx, instance, inFrame, r, rw)
+		}
+	case wire.ICBM:
+		switch inFrame.SubGroup {
+		case wire.ICBMAddParameters:
+			return h.ICBMAddParameters(ctx, instance, inFrame, r, rw)
+		case wire.ICBMChannelMsgToHost:
+			return h.ICBMChannelMsgToHost(ctx, instance, inFrame, r, rw)
+		case wire.ICBMClientErr:
+			return h.ICBMClientErr(ctx, instance, inFrame, r, rw)
+		case wire.ICBMClientEvent:
+			return h.ICBMClientEvent(ctx, instance, inFrame, r, rw)
+		case wire.ICBMEvilRequest:
+			return h.ICBMEvilRequest(ctx, instance, inFrame, r, rw)
+		case wire.ICBMParameterQuery:
+			return h.ICBMParameterQuery(ctx, instance, inFrame, r, rw)
+		case wire.ICBMOfflineRetrieve:
+			return h.ICBMOfflineRetrieve(ctx, instance, inFrame, rw)
+		}
+	case wire.Locate:
+		switch inFrame.SubGroup {
+		case wire.LocateGetDirInfo:
+			return h.LocateGetDirInfo(ctx, instance, inFrame, r, rw)
+		case wire.LocateRightsQuery:
+			return h.LocateRightsQuery(ctx, instance, inFrame, r, rw)
+		case wire.LocateSetDirInfo:
+			return h.LocateSetDirInfo(ctx, instance, inFrame, r, rw)
+		case wire.LocateSetInfo:
+			return h.LocateSetInfo(ctx, instance, inFrame, r, rw)
+		case wire.LocateSetKeywordInfo:
+			return h.LocateSetKeywordInfo(ctx, instance, inFrame, r, rw)
+		case wire.LocateUserInfoQuery:
+			return h.LocateUserInfoQuery(ctx, instance, inFrame, r, rw)
+		case wire.LocateUserInfoQuery2:
+			return h.LocateUserInfoQuery2(ctx, instance, inFrame, r, rw)
+		}
+	case wire.MDir:
+		return h.MDirRequest(ctx, instance, inFrame, r, rw)
+	case wire.ODir:
+		switch inFrame.SubGroup {
+		case wire.ODirInfoQuery:
+			return h.ODirInfoQuery(ctx, instance, inFrame, r, rw)
+		case wire.ODirKeywordListQuery:
+			return h.ODirKeywordListQuery(ctx, instance, inFrame, r, rw)
+		}
+	case wire.OService:
+		switch inFrame.SubGroup {
+		case wire.OServiceClientOnline:
+			return h.OServiceClientOnline(ctx, server, instance, inFrame, r, rw)
+		case wire.OServiceClientVersions:
+			return h.OServiceClientVersions(ctx, instance, inFrame, r, rw)
+		case wire.OServiceIdleNotification:
+			return h.OServiceIdleNotification(ctx, instance, inFrame, r, rw)
+		case wire.OServiceNoop:
+			return h.OServiceNoop(ctx, instance, inFrame, r, rw)
+		case wire.OServiceRateParamsQuery:
+			return h.OServiceRateParamsQuery(ctx, instance, inFrame, r, rw)
+		case wire.OServiceRateParamsSubAdd:
+			return h.OServiceRateParamsSubAdd(ctx, instance, inFrame, r, rw)
+		case wire.OServiceServiceRequest:
+			return h.OServiceServiceRequest(ctx, server, instance, inFrame, r, rw, listener)
+		case wire.OServiceSetPrivacyFlags:
+			return h.OServiceSetPrivacyFlags(ctx, instance, inFrame, r, rw)
+		case wire.OServiceSetUserInfoFields:
+			return h.OServiceSetUserInfoFields(ctx, instance, inFrame, r, rw)
+		case wire.OServiceUserInfoQuery:
+			return h.OServiceUserInfoQuery(ctx, instance, inFrame, r, rw)
+		case wire.OServiceProbeReq:
+			return h.OServiceProbeReq(ctx, instance, inFrame, r, rw)
+		}
+	case wire.PermitDeny:
+		switch inFrame.SubGroup {
+		case wire.PermitDenyAddDenyListEntries:
+			return h.PermitDenyAddDenyListEntries(ctx, instance, inFrame, r, rw)
+		case wire.PermitDenyAddPermListEntries:
+			return h.PermitDenyAddPermListEntries(ctx, instance, inFrame, r, rw)
+		case wire.PermitDenyDelDenyListEntries:
+			return h.PermitDenyDelDenyListEntries(ctx, instance, inFrame, r, rw)
+		case wire.PermitDenyDelPermListEntries:
+			return h.PermitDenyDelPermListEntries(ctx, instance, inFrame, r, rw)
+		case wire.PermitDenyRightsQuery:
+			return h.PermitDenyRightsQuery(ctx, instance, inFrame, r, rw)
+		case wire.PermitDenySetGroupPermitMask:
+			return h.PermitDenySetGroupPermitMask(ctx, instance, inFrame, r, rw)
+		}
+	case wire.Plugin:
+		return h.PluginRequest(ctx, instance, inFrame, r, rw)
+	case wire.Stats:
+		switch inFrame.SubGroup {
+		case wire.StatsReportEvents:
+			return h.StatsReportEvents(ctx, instance, inFrame, r, rw)
+		}
+	case wire.UserLookup:
+		switch inFrame.SubGroup {
+		case wire.UserLookupFindByEmail:
+			return h.UserLookupFindByEmail(ctx, instance, inFrame, r, rw)
+
+		}
+	}
+	return ErrRouteNotFound
+}
+
 func (h Handler) ICBMAddParameters(ctx context.Context, _ *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, _ ResponseWriter) error {
 	inBody := wire.SNAC_0x04_0x02_ICBMAddParameters{}
 	h.LogRequest(ctx, inFrame, inBody)

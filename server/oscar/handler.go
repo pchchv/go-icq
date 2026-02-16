@@ -1004,6 +1004,77 @@ func (h Handler) PermitDenyRightsQuery(ctx context.Context, _ *state.SessionInst
 	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
 }
 
+// PermitDenySetGroupPermitMask sets the classes of users I can interact with.
+// We don't apply any of these settings to the privacy mechanism,
+// so just log them for now.
+func (h Handler) PermitDenySetGroupPermitMask(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x09_0x04_PermitDenySetGroupPermitMask{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	var flags []string
+	if inBody.IsFlagSet(wire.OServiceUserFlagUnconfirmed) {
+		flags = append(flags, "wire.OServiceUserFlagUnconfirmed")
+	}
+
+	if inBody.IsFlagSet(wire.OServiceUserFlagAdministrator) {
+		flags = append(flags, "wire.OServiceUserFlagAdministrator")
+	}
+
+	if inBody.IsFlagSet(wire.OServiceUserFlagAOL) {
+		flags = append(flags, "wire.OServiceUserFlagAOL")
+	}
+
+	if inBody.IsFlagSet(wire.OServiceUserFlagOSCARPay) {
+		flags = append(flags, "wire.OServiceUserFlagOSCARPay")
+	}
+
+	if inBody.IsFlagSet(wire.OServiceUserFlagOSCARFree) {
+		flags = append(flags, "wire.OServiceUserFlagOSCARFree")
+	}
+
+	if inBody.IsFlagSet(wire.OServiceUserFlagUnavailable) {
+		flags = append(flags, "wire.OServiceUserFlagUnavailable")
+	}
+
+	if inBody.IsFlagSet(wire.OServiceUserFlagICQ) {
+		flags = append(flags, "wire.OServiceUserFlagICQ")
+	}
+
+	if inBody.IsFlagSet(wire.OServiceUserFlagWireless) {
+		flags = append(flags, "wire.OServiceUserFlagWireless")
+	}
+
+	if inBody.IsFlagSet(wire.OServiceUserFlagInternal) {
+		flags = append(flags, "wire.OServiceUserFlagInternal")
+	}
+
+	if inBody.IsFlagSet(wire.OServiceUserFlagFish) {
+		flags = append(flags, "wire.OServiceUserFlagFish")
+	}
+
+	if inBody.IsFlagSet(wire.OServiceUserFlagBot) {
+		flags = append(flags, "wire.OServiceUserFlagBot")
+	}
+
+	if inBody.IsFlagSet(wire.OServiceUserFlagBeast) {
+		flags = append(flags, "wire.OServiceUserFlagBeast")
+	}
+
+	if inBody.IsFlagSet(wire.OServiceUserFlagOneWayWireless) {
+		flags = append(flags, "wire.OServiceUserFlagOneWayWireless")
+	}
+
+	if inBody.IsFlagSet(wire.OServiceUserFlagOfficial) {
+		flags = append(flags, "wire.OServiceUserFlagOfficial")
+	}
+
+	h.Logger.Info("set pd group mask", "flags", flags)
+	h.LogRequest(ctx, inFrame, inBody)
+	return nil
+}
+
 func (h Handler) PluginRequest(ctx context.Context, _ *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, _ ResponseWriter) error {
 	h.LogRequest(ctx, inFrame, nil)
 	return nil

@@ -834,7 +834,12 @@ const (
 	ICQDBQueryMetaReplyUserFound       uint16 = 0x01A4
 	ICQDBQueryMetaReplyLastUserFound   uint16 = 0x01AE
 	ICQDBQueryMetaReplyXMLData         uint16 = 0x08A2
+	ICQDBQueryMetaReqDirectoryQuery    uint16 = 0x0FA0
+	ICQDBQueryMetaReqDirectoryUpdate   uint16 = 0x0FD2
+	ICQDBQueryMetaReplySetICQPhone     uint16 = 0x031E
+	ICQDBQueryMetaReqSetICQPhone       uint16 = 0x0654
 
+	OServiceTLVTagsMOTDMessage       uint16 = 0x0B
 	ODirErr                          uint16 = 0x0001
 	ODirInfoQuery                    uint16 = 0x0002
 	ODirInfoReply                    uint16 = 0x0003
@@ -911,6 +916,10 @@ const (
 	LoginTLVTagsRoastedKerberosPassword uint16 = 0x1335
 	LoginTLVTagsRoastedTOCPassword      uint16 = 0x1337
 	LoginTLVTagsPlaintextPassword       uint16 = 0x1338
+	LoginTLVTagsMaxSendSize             uint16 = 0x8001
+	LoginTLVTagsMaxRecvSize             uint16 = 0x8003
+	LoginTLVTagsHostSuffix              uint16 = 0x8004
+	LoginTLVTagsUseBigTime              uint16 = 0x2038
 	LoginErrInvalidUsernameOrPassword   uint16 = 0x0001
 	LoginErrInvalidPassword             uint16 = 0x0005 // invalid password
 	LoginErrInvalidAccount              uint16 = 0x0007
@@ -1962,6 +1971,11 @@ type SNAC_0x0B_0x04_StatsReportAck struct {
 
 type SNAC_0x0D_0x03_ChatNavRequestExchangeInfo struct {
 	Exchange uint16
+}
+
+type SNAC_0x01_0x13_OServiceMOTD struct {
+	MessageType uint16
+	TLVRestBlock
 }
 
 type SNAC_0x0D_0x04_ChatNavRequestRoomInfo struct {

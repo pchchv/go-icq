@@ -1079,3 +1079,14 @@ func (h Handler) PluginRequest(ctx context.Context, _ *state.SessionInstance, in
 	h.LogRequest(ctx, inFrame, nil)
 	return nil
 }
+
+func (h Handler) StatsReportEvents(ctx context.Context, _ *state.SessionInstance, inFrame wire.SNACFrame, r io.Reader, rw ResponseWriter) error {
+	inBody := wire.SNAC_0x0B_0x03_StatsReportEvents{}
+	if err := wire.UnmarshalBE(&inBody, r); err != nil {
+		return err
+	}
+
+	outSNAC := h.StatsService.ReportEvents(ctx, inFrame, inBody)
+	h.LogRequestAndResponse(ctx, inFrame, inBody, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}

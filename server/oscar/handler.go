@@ -997,3 +997,14 @@ func (h Handler) PermitDenyDelPermListEntries(ctx context.Context, instance *sta
 	h.LogRequest(ctx, inFrame, inBody)
 	return h.PermitDenyService.DelPermListEntries(ctx, instance, inBody)
 }
+
+func (h Handler) PermitDenyRightsQuery(ctx context.Context, _ *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, rw ResponseWriter) error {
+	outSNAC := h.PermitDenyService.RightsQuery(ctx, inFrame)
+	h.LogRequestAndResponse(ctx, inFrame, nil, outSNAC.Frame, outSNAC.Body)
+	return rw.SendSNAC(outSNAC.Frame, outSNAC.Body)
+}
+
+func (h Handler) PluginRequest(ctx context.Context, _ *state.SessionInstance, inFrame wire.SNACFrame, _ io.Reader, _ ResponseWriter) error {
+	h.LogRequest(ctx, inFrame, nil)
+	return nil
+}

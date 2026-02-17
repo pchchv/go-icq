@@ -12,6 +12,14 @@ const (
 	XtrazFuncUserRemove uint16 = 0x0004 // user removal notification
 )
 
+// XtrazNotifyResponse represents a parsed Xtraz notification response (<NR> type).
+type XtrazNotifyResponse struct {
+	UIN     string
+	Index   uint8
+	Title   string
+	Message string
+}
+
 // XtrazNotifyRequest represents a parsed Xtraz notification request (<N> type).
 type XtrazNotifyRequest struct {
 	PluginID  string

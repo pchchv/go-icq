@@ -1494,6 +1494,12 @@ type ICQ_0x07DA_0x0104_DBQueryMetaReplyShortInfo struct {
 	Gender        uint8
 }
 
+// ICQ_0x07D0_0x0654_DBQueryMetaReqSetICQPhone represents a request to set
+// ICQPhone information.
+type ICQ_0x07D0_0x0654_DBQueryMetaReqSetICQPhone struct {
+	// acknowledge the data, do nothing
+}
+
 type ODirKeywordListItem struct {
 	// Type is the item type (parent category = 1, keyword = 2).
 	Type uint8
@@ -2258,6 +2264,9 @@ type SNAC_0x09_0x04_PermitDenySetGroupPermitMask struct {
 
 func (s SNAC_0x09_0x04_PermitDenySetGroupPermitMask) IsFlagSet(flag uint16) bool {
 	return flag&uint16(s.PermMask) == flag
+}
+
+type SNAC_0x13_0x12_FeedbagEndCluster struct {
 }
 
 // ICBMCh1Fragment represents an ICBM channel 1 (instant message)

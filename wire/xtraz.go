@@ -12,6 +12,15 @@ const (
 	XtrazFuncUserRemove uint16 = 0x0004 // user removal notification
 )
 
+// XtrazNotifyRequest represents a parsed Xtraz notification request (<N> type).
+type XtrazNotifyRequest struct {
+	PluginID  string
+	ServiceID string
+	RequestID string
+	TransID   string // transaction ID
+	SenderID  string // sender's UIN
+}
+
 // MangleXtrazXML encodes XML for Xtraz transport using HTML entities.
 func MangleXtrazXML(plain string) string {
 	return html.EscapeString(plain)

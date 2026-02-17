@@ -150,3 +150,20 @@ func ParseXtrazNotifyResponse(xmlData []byte) (*XtrazNotifyResponse, error) {
 		Message: root.Desc,
 	}, nil
 }
+
+// ParseXtrazNotifyRequest parses an Xtraz notification request from XML.
+// The input is expected to be unmangled.
+func ParseXtrazNotifyRequest(xmlData []byte) (*XtrazNotifyRequest, error) {
+	var req xmlNotifyRequest
+	if err := xml.Unmarshal(xmlData, &req); err != nil {
+		return nil, err
+	}
+
+	return &XtrazNotifyRequest{
+		PluginID:  req.Query.PluginID,
+		ServiceID: req.Notify.Srv.ID,
+		RequestID: req.Notify.Srv.Req.ID,
+		TransID:   req.Notify.Srv.Req.Trans,
+		SenderID:  req.Notify.Srv.Req.SenderID,
+	}, nil
+}

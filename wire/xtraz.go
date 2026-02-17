@@ -2,8 +2,10 @@ package wire
 
 import (
 	"encoding/xml"
+	"errors"
 	"html"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -44,6 +46,9 @@ const (
 	XStatusParty2       uint8  = 31
 	XStatusCoffee2      uint8  = 32
 )
+
+// ErrXtrazRootNotFound is returned when the Root element is not found in an Xtraz response.
+var ErrXtrazRootNotFound = errors.New("xtraz: Root element not found in response")
 
 // XtrazNotifyResponse represents a parsed Xtraz notification response (<NR> type).
 type XtrazNotifyResponse struct {
@@ -118,4 +123,30 @@ func BuildXtrazNotifyRequest(senderUIN string) string {
 		`<req><id>AwayStat</id><trans>1</trans>` +
 		`<senderId>` + senderUIN + `</senderId></req></srv></NOTIFY></N>`
 	return MangleXtrazXML(xml)
+}
+
+// ParseXtrazNotifyResponse parses an Xtraz notification response from XML.
+// The input should be unmangled.
+func ParseXtrazNotifyResponse(xmlData []byte) (*XtrazNotifyResponse, error) {
+	// the response XML has a nested structure,
+	// is needed to extract the Root element
+	xmlStr := string(xmlData)
+	rootStart := strings.Index(xmlStr, "<Root>")
+	rootEnd := strings.Index(xmlStr, "</Root>")
+	if rootStart == -1 || rootEnd == -1 {
+		return nil, ErrXtrazRootNotFound
+	}
+
+	var root xmlNotifyResponseRoot
+	rootXML := xmlStr[rootStart : rootEnd+len("</Root>")]
+	if err := xml.Unmarshal([]byte(rootXML), &root); err != nil {
+		return nil, err
+	}
+
+	return &XtrazNotifyResponse{
+		UIN:     root.UIN,
+		Index:   root.Index,
+		Title:   root.Title,
+		Message: root.Desc,
+	}, nil
 }

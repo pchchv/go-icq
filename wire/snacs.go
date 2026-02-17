@@ -2340,6 +2340,16 @@ func GetClearIconHash() []byte {
 	return []byte{0x02, 0x01, 0xd2, 0x04, 0x72}
 }
 
+// MarshalICBMFragmentList serializes an ICBM fragment list for an ICBM channel 1 message.
+// This is the inverse of UnmarshalICBMMessageText's internal unmarshaling.
+func MarshalICBMFragmentList(frags []ICBMCh1Fragment) ([]byte, error) {
+	buf := bytes.Buffer{}
+	if err := MarshalBE(frags, &buf); err != nil {
+		return nil, fmt.Errorf("unable to marshal ICBM fragments: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
 // UnmarshalChatMessageText extracts message text from a chat message.
 // Param b is a slice from TLV wire.ChatTLVMessageInfo.
 func UnmarshalChatMessageText(b []byte) (string, error) {

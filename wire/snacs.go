@@ -1100,6 +1100,11 @@ func (t TLVUserInfo) IsAway() bool {
 	return flags&OServiceUserFlagUnavailable == OServiceUserFlagUnavailable
 }
 
+func (t TLVUserInfo) IsInvisible() bool {
+	mask, _ := t.Uint32BE(OServiceUserInfoStatus)
+	return mask&OServiceUserStatusInvisible == OServiceUserStatusInvisible
+}
+
 type MultiConnFlag uint8
 
 // FeedbagPDMode represents a buddy list permit/deny mode setting that

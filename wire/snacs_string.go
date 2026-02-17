@@ -16,6 +16,7 @@ var (
 		ICQDBQueryMetaReqSetInterests:      "ICQDBQueryMetaReqSetInterests",
 		ICQDBQueryMetaReqSetAffiliations:   "ICQDBQueryMetaReqSetAffiliations",
 		ICQDBQueryMetaReqSetPermissions:    "ICQDBQueryMetaReqSetPermissions",
+		ICQDBQueryMetaReqSetICQPhone:       "ICQDBQueryMetaReqSetICQPhone",
 		ICQDBQueryMetaReqFullInfo:          "ICQDBQueryMetaReqFullInfo",
 		ICQDBQueryMetaReqFullInfo2:         "ICQDBQueryMetaReqFullInfo2",
 		ICQDBQueryMetaReqSearchByDetails:   "ICQDBQueryMetaReqSearchByDetails",
@@ -34,6 +35,8 @@ var (
 		ICQDBQueryMetaReqStat0ad2:          "ICQDBQueryMetaReqStat0ad2",
 		ICQDBQueryMetaReqStat0ad7:          "ICQDBQueryMetaReqStat0ad7",
 		ICQDBQueryMetaReqStat0758:          "ICQDBQueryMetaReqStat0758",
+		ICQDBQueryMetaReqDirectoryQuery:    "ICQDBQueryMetaReqDirectoryQuery",
+		ICQDBQueryMetaReqDirectoryUpdate:   "ICQDBQueryMetaReqDirectoryUpdate",
 		ICQDBQueryMetaReplySetBasicInfo:    "ICQDBQueryMetaReplySetBasicInfo",
 		ICQDBQueryMetaReplySetWorkInfo:     "ICQDBQueryMetaReplySetWorkInfo",
 		ICQDBQueryMetaReplySetMoreInfo:     "ICQDBQueryMetaReplySetMoreInfo",
@@ -42,6 +45,7 @@ var (
 		ICQDBQueryMetaReplySetInterests:    "ICQDBQueryMetaReplySetInterests",
 		ICQDBQueryMetaReplySetAffiliations: "ICQDBQueryMetaReplySetAffiliations",
 		ICQDBQueryMetaReplySetPermissions:  "ICQDBQueryMetaReplySetPermissions",
+		ICQDBQueryMetaReplySetICQPhone:     "ICQDBQueryMetaReplySetICQPhone",
 		ICQDBQueryMetaReplyBasicInfo:       "ICQDBQueryMetaReplyBasicInfo",
 		ICQDBQueryMetaReplyWorkInfo:        "ICQDBQueryMetaReplyWorkInfo",
 		ICQDBQueryMetaReplyMoreInfo:        "ICQDBQueryMetaReplyMoreInfo",
@@ -55,6 +59,7 @@ var (
 		ICQDBQueryMetaReplyXMLData:         "ICQDBQueryMetaReplyXMLData",
 	}
 	foodGroupName = map[uint16]string{
+		BOS:         "BOS",
 		OService:    "OService",
 		Locate:      "Locate",
 		Buddy:       "Buddy",
@@ -380,7 +385,7 @@ func ICQDBQueryName(query uint16) string {
 	return name
 }
 
-// ICQDBQueryMetaName gets the string representation of a
+// ICQDBQueryMetaName gets the string representation of an
 // ICQ DB meta query const.
 func ICQDBQueryMetaName(query uint16) string {
 	if name := icqDBQueryMeta[query]; name != "" {

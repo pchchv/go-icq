@@ -1,6 +1,7 @@
 package wire
 
 import (
+	"encoding/xml"
 	"html"
 	"strconv"
 )
@@ -10,6 +11,38 @@ const (
 	XtrazFuncNotify     uint16 = 0x0008 // XStatus notifications
 	XtrazFuncInvitation uint16 = 0x0001 // chat invitation
 	XtrazFuncUserRemove uint16 = 0x0004 // user removal notification
+	XStatusAngry        uint8  = 1
+	XStatusDuck         uint8  = 2
+	XStatusTired        uint8  = 3
+	XStatusParty        uint8  = 4
+	XStatusBeer         uint8  = 5
+	XStatusThinking     uint8  = 6
+	XStatusEating       uint8  = 7
+	XStatusTV           uint8  = 8
+	XStatusFriends      uint8  = 9
+	XStatusCoffee       uint8  = 10
+	XStatusMusic        uint8  = 11
+	XStatusBusiness     uint8  = 12
+	XStatusCamera       uint8  = 13
+	XStatusFunny        uint8  = 14
+	XStatusPhone        uint8  = 15
+	XStatusGames        uint8  = 16
+	XStatusCollege      uint8  = 17
+	XStatusShopping     uint8  = 18
+	XStatusSick         uint8  = 19
+	XStatusSleeping     uint8  = 20
+	XStatusSurfing      uint8  = 21
+	XStatusInternet     uint8  = 22
+	XStatusEngineering  uint8  = 23
+	XStatusTyping       uint8  = 24
+	XStatusPPC          uint8  = 25
+	XStatusMobile       uint8  = 26
+	XStatusLove         uint8  = 27
+	XStatusSearching    uint8  = 28
+	XStatusEvil         uint8  = 29
+	XStatusDepression   uint8  = 30
+	XStatusParty2       uint8  = 31
+	XStatusCoffee2      uint8  = 32
 )
 
 // XtrazNotifyResponse represents a parsed Xtraz notification response (<NR> type).

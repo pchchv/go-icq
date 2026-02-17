@@ -77,3 +77,14 @@ func TestUnmangleXtrazXML(t *testing.T) {
 		})
 	}
 }
+
+func TestXtrazCapabilityGUID(t *testing.T) {
+	// verify the GUID matches the expected GUID
+	expected := "3b60b3ef-d82a-6c45-a4e0-9c5a5e67e865"
+	assert.Equal(t, expected, CapXtrazScript.String())
+}
+
+func TestXStatusConstants(t *testing.T) {
+	assert.Equal(t, uint8(1), XStatusAngry)
+	assert.Equal(t, uint8(32), XStatusCoffee2)
+}

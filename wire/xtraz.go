@@ -29,6 +29,14 @@ type XtrazNotifyRequest struct {
 	SenderID  string // sender's UIN
 }
 
+// xmlNotifyResponseRoot is the internal XML structure for the <Root> element in responses.
+type xmlNotifyResponseRoot struct {
+	UIN   string `xml:"uin"`
+	Index uint8  `xml:"index"`
+	Title string `xml:"title"`
+	Desc  string `xml:"desc"`
+}
+
 // MangleXtrazXML encodes XML for Xtraz transport using HTML entities.
 func MangleXtrazXML(plain string) string {
 	return html.EscapeString(plain)

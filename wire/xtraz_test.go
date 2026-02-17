@@ -155,3 +155,73 @@ func TestBuildXtrazNotifyResponse(t *testing.T) {
 	assert.Equal(t, uin, parsed.UIN)
 	assert.Equal(t, index, parsed.Index)
 }
+
+func TestParseXtrazNotifyRequest(t *testing.T) {
+	tests := []struct {
+		name    string
+		xml     string
+		want    *XtrazNotifyRequest
+		wantErr bool
+	}{
+		{
+			name: "parse valid XStatus request",
+			xml: `<N><QUERY><PluginID>srvMng</PluginID></QUERY>` +
+				`<NOTIFY><srv><id>cAwaySrv</id>` +
+				`<req><id>AwayStat</id><trans>1</trans><senderId>123456</senderId></req>` +
+				`</srv></NOTIFY></N>`,
+			want: &XtrazNotifyRequest{
+				PluginID:  "srvMng",
+				ServiceID: "cAwaySrv",
+				RequestID: "AwayStat",
+				TransID:   "1",
+				SenderID:  "123456",
+			},
+			wantErr: false,
+		},
+		{
+			name:    "parse invalid XML",
+			xml:     "<invalid>",
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "parse empty XML",
+			xml:     "",
+			want:    nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseXtrazNotifyRequest([]byte(tt.xml))
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestBuildXtrazNotifyRequest(t *testing.T) {
+	senderUIN := "123456"
+	result := BuildXtrazNotifyRequest(senderUIN)
+
+	// unmangle and verify the structure
+	unmangled := UnmangleXtrazXML(result)
+	assert.Contains(t, unmangled, "<N>")
+	assert.Contains(t, unmangled, "<PluginID>srvMng</PluginID>")
+	assert.Contains(t, unmangled, "<senderId>123456</senderId>")
+	assert.Contains(t, unmangled, "<id>AwayStat</id>")
+	assert.Contains(t, unmangled, "<id>cAwaySrv</id>")
+
+	// verify it can be parsed back
+	parsed, err := ParseXtrazNotifyRequest([]byte(unmangled))
+	assert.NoError(t, err)
+	assert.Equal(t, "srvMng", parsed.PluginID)
+	assert.Equal(t, "cAwaySrv", parsed.ServiceID)
+	assert.Equal(t, "AwayStat", parsed.RequestID)
+	assert.Equal(t, senderUIN, parsed.SenderID)
+}

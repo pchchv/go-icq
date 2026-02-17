@@ -37,6 +37,24 @@ type xmlNotifyResponseRoot struct {
 	Desc  string `xml:"desc"`
 }
 
+// xmlNotifyRequest is the internal XML structure for parsing <N> requests.
+type xmlNotifyRequest struct {
+	XMLName xml.Name `xml:"N"`
+	Query   struct {
+		PluginID string `xml:"PluginID"`
+	} `xml:"QUERY"`
+	Notify struct {
+		Srv struct {
+			ID  string `xml:"id"`
+			Req struct {
+				ID       string `xml:"id"`
+				Trans    string `xml:"trans"`
+				SenderID string `xml:"senderId"`
+			} `xml:"req"`
+		} `xml:"srv"`
+	} `xml:"NOTIFY"`
+}
+
 // MangleXtrazXML encodes XML for Xtraz transport using HTML entities.
 func MangleXtrazXML(plain string) string {
 	return html.EscapeString(plain)

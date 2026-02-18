@@ -2,6 +2,7 @@ package state
 
 import (
 	"net/netip"
+	"slices"
 	"sync"
 	"time"
 
@@ -462,6 +463,16 @@ func (s *Session) Caps() [][16]byte {
 		ret = append(ret, c)
 	}
 
+	// sort capabilities to ensure deterministic order
+	slices.SortFunc(ret, func(a, b [16]byte) int {
+		for i := 0; i < 16; i++ {
+			if a[i] != b[i] {
+				return int(a[i]) - int(b[i])
+			}
+		}
+		return 0
+	})
+
 	return ret
 }
 
@@ -660,6 +671,16 @@ func (s *Session) Invisible() bool {
 	}
 
 	return true
+}
+
+// HasCap returns true if any instance in the session has the given capability UUID.
+func (s *Session) HasCap(cap [16]byte) bool {
+	for _, c := range s.Caps() {
+		if c == cap {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Session) userInfo() wire.TLVList {
@@ -1057,7 +1078,7 @@ func (s *SessionInstance) SetRemoteAddr(remoteAddr *netip.AddrPort) {
 }
 
 // SetUserInfoFlag sets a flag in the user info bitmask.
-func (s *SessionInstance) SetUserInfoFlag(flag uint16) (flags uint16) {
+func (s *SessionInstance) SetUserInfoFlag(flag uint16) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -1066,7 +1087,6 @@ func (s *SessionInstance) SetUserInfoFlag(flag uint16) (flags uint16) {
 	}
 
 	s.userInfoBitmask |= flag
-	return s.userInfoBitmask
 }
 
 // SetIdle sets the instance's idle state.

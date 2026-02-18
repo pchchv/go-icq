@@ -1860,6 +1860,34 @@ func (us SQLiteUserStore) BuddyIconMetadata(ctx context.Context, screenName Iden
 	}, nil
 }
 
+func (us SQLiteUserStore) SetPermissions(ctx context.Context, name IdentScreenName, data ICQPermissions) error {
+	q := `
+		UPDATE users SET
+			icq_permissions_authRequired = ?,
+			icq_permissions_webAware = ?,
+			icq_permissions_allowSpam = ?
+		WHERE identScreenName = ?
+	`
+	res, err := us.db.ExecContext(ctx,
+		q,
+		data.AuthRequired,
+		data.WebAware,
+		data.AllowSpam,
+		name.String(),
+	)
+	if err != nil {
+		return fmt.Errorf("exec: %w", err)
+	}
+	c, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("rows affected: %w", err)
+	}
+	if c == 0 {
+		return ErrNoUser
+	}
+	return nil
+}
+
 func (us SQLiteUserStore) runMigrations() error {
 	migrationFS, err := fs.Sub(migrations, "migrations")
 	if err != nil {
@@ -1949,6 +1977,8 @@ func (us SQLiteUserStore) queryUsers(ctx context.Context, whereClause string, qu
 			icq_moreInfo_lang3,
 			icq_notes,
 			icq_permissions_authRequired,
+			icq_permissions_webAware,
+			icq_permissions_allowSpam,
 			icq_workInfo_address,
 			icq_workInfo_city,
 			icq_workInfo_company,
@@ -2046,6 +2076,8 @@ func (us SQLiteUserStore) queryUsers(ctx context.Context, whereClause string, qu
 			&u.ICQMoreInfo.Lang3,
 			&u.ICQNotes.Notes,
 			&u.ICQPermissions.AuthRequired,
+			&u.ICQPermissions.WebAware,
+			&u.ICQPermissions.AllowSpam,
 			&u.ICQWorkInfo.Address,
 			&u.ICQWorkInfo.City,
 			&u.ICQWorkInfo.Company,

@@ -9,7 +9,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/google/uuid"
 	"github.com/pchchv/go-icq/wire"
 )
 
@@ -208,6 +207,10 @@ type ICQPermissions struct {
 	// AuthRequired indicates where users must ask this permission to add them
 	// to their contact list.
 	AuthRequired bool
+	// WebAware indicates whether the user's online status is visible via web.
+	WebAware bool
+	// AllowSpam indicates whether to allow messages from users not on the contact list.
+	AllowSpam bool
 }
 
 // ICQUserNotes contains personal notes or additional information added by the user.
@@ -381,25 +384,6 @@ type User struct {
 	LastWarnLevel uint16
 	// OfflineMsgCount is the count of offline messages for the user.
 	OfflineMsgCount int
-}
-
-// NewStubUser creates a new user with canned credentials.
-// The default password is "welcome1".
-// This is typically used for development purposes.
-func NewStubUser(screenName DisplayScreenName) (User, error) {
-	uid, err := uuid.NewRandom()
-	if err != nil {
-		return User{}, err
-	}
-
-	u := User{
-		IdentScreenName:   NewIdentScreenName(string(screenName)),
-		DisplayScreenName: screenName,
-		AuthKey:           uid.String(),
-		IsICQ:             screenName.IsUIN(),
-	}
-	err = u.HashPassword("welcome1")
-	return u, err
 }
 
 // HashPassword computes MD5 hashes of the user's password.

@@ -462,6 +462,16 @@ func (s *Session) Caps() [][16]byte {
 		ret = append(ret, c)
 	}
 
+	// sort capabilities to ensure deterministic order
+	slices.SortFunc(ret, func(a, b [16]byte) int {
+		for i := 0; i < 16; i++ {
+			if a[i] != b[i] {
+				return int(a[i]) - int(b[i])
+			}
+		}
+		return 0
+	})
+
 	return ret
 }
 

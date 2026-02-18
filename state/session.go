@@ -1057,7 +1057,7 @@ func (s *SessionInstance) SetRemoteAddr(remoteAddr *netip.AddrPort) {
 }
 
 // SetUserInfoFlag sets a flag in the user info bitmask.
-func (s *SessionInstance) SetUserInfoFlag(flag uint16) (flags uint16) {
+func (s *SessionInstance) SetUserInfoFlag(flag uint16) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -1066,7 +1066,6 @@ func (s *SessionInstance) SetUserInfoFlag(flag uint16) (flags uint16) {
 	}
 
 	s.userInfoBitmask |= flag
-	return s.userInfoBitmask
 }
 
 // SetIdle sets the instance's idle state.

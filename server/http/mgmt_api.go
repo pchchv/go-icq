@@ -1012,7 +1012,7 @@ func getPublicChatHandler(w http.ResponseWriter, r *http.Request, chatRoomRetrie
 	writeUnescapeChatURL(w, out)
 }
 
-// deletePublicChatHandler handles the DELETE /chat/room/public endpoint.41
+// deletePublicChatHandler handles the DELETE /chat/room/public endpoint.
 func deletePublicChatHandler(w http.ResponseWriter, r *http.Request, chatRoomDeleter ChatRoomDeleter, logger *slog.Logger) {
 	input := chatRoomDelete{}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {

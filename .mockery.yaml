@@ -42,12 +42,6 @@ packages:
       UserManager:
         config:
           filename: "mock_user_manager_test.go"
-      FeedbagManager:
-        config:
-          filename: "mock_feedbag_manager_test.go"
-      ChatRoomRegistry:
-        config:
-          filename: "mock_chat_room_registry_test.go"
   github.com/pchchv/go-icq/server/kerberos:
     interfaces:
       AuthService:

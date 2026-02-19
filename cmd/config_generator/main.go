@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
+
+	"github.com/mitchellh/go-wordwrap"
 )
 
 func main() {
@@ -27,4 +30,14 @@ func main() {
 func writeAssignment(w io.Writer, keyword string, varName string, val string) (err error) {
 	_, err = fmt.Fprintf(w, "%s%s=%s\n\n", keyword, varName, val)
 	return
+}
+
+func writeComment(w io.Writer, comment string, width uint, keyword string) error {
+	// adjust wrapping threshold to accommodate comment keyword length
+	width = width - uint(len(keyword))
+	comment = wordwrap.WrapString(comment, width)
+	// prepend lines with comment keyword
+	comment = strings.ReplaceAll(comment, "\n", fmt.Sprintf("\n%s", keyword))
+	_, err := fmt.Fprintf(w, "%s%s\n", keyword, comment)
+	return err
 }

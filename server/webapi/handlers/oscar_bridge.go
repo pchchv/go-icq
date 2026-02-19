@@ -82,7 +82,7 @@ type OSCARBridgeStore interface {
 
 // OSCARAuthService defines methods needed for OSCAR authentication and session management.
 type OSCARAuthService interface {
-	// RegisterBOSSession creates a new BOS (Basic OSCAR Service) sessio0n.
+	// RegisterBOSSession creates a new BOS (Basic OSCAR Service) session.
 	RegisterBOSSession(ctx context.Context, authCookie state.ServerCookie) (*state.SessionInstance, error)
 	// RetrieveBOSSession retrieves an existing BOS session.
 	RetrieveBOSSession(ctx context.Context, authCookie state.ServerCookie) (*state.SessionInstance, error)

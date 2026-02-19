@@ -34,7 +34,7 @@ type Server struct {
 	logger *slog.Logger
 }
 
-func NewManagementAPI(bld config.Build, listener string, userManager UserManager, sessionRetriever SessionRetriever, buddyBroadcaster BuddyBroadcaster, chatRoomRetriever ChatRoomRetriever, chatRoomCreator ChatRoomCreator, chatRoomDeleter ChatRoomDeleter, chatSessionRetriever ChatSessionRetriever, directoryManager DirectoryManager, messageRelayer MessageRelayer, bartAssetManager BARTAssetManager, feedbagRetriever FeedBagRetriever, feedbagManager FeedbagManager, accountManager AccountManager, profileRetriever ProfileRetriever, webAPIKeyManager WebAPIKeyManager, logger *slog.Logger) *Server {
+func NewManagementAPI(bld config.Build, listener string, userManager UserManager, sessionRetriever SessionRetriever, buddyBroadcaster BuddyBroadcaster, chatRoomRetriever ChatRoomRetriever, chatRoomCreator ChatRoomCreator, chatRoomDeleter ChatRoomDeleter, chatSessionRetriever ChatSessionRetriever, directoryManager DirectoryManager, messageRelayer MessageRelayer, bartAssetManager BARTAssetManager, feedbagRetriever FeedBagRetriever, feedbagManager FeedbagManager, accountManager AccountManager, profileRetriever ProfileRetriever, webAPIKeyManager WebAPIKeyManager, createAccount state.CreateAccountFunc, logger *slog.Logger) *Server {
 	mux := http.NewServeMux()
 	// handlers for '/user' route
 	mux.HandleFunc("DELETE /user", func(w http.ResponseWriter, r *http.Request) {
@@ -44,7 +44,7 @@ func NewManagementAPI(bld config.Build, listener string, userManager UserManager
 		getUserHandler(w, r, userManager, logger)
 	})
 	mux.HandleFunc("POST /user", func(w http.ResponseWriter, r *http.Request) {
-		postUserHandler(w, r, userManager, uuid.New, logger)
+		postUserHandler(w, r, createAccount, logger)
 	})
 
 	// handlers for '/user/password' route

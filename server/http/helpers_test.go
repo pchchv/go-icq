@@ -147,13 +147,6 @@ type setUserPasswordParams []struct {
 	err         error
 }
 
-// insertUserParams is the list of parameters passed at
-// the mock UserManager.InsertUser call site.
-type insertUserParams []struct {
-	u   state.User
-	err error
-}
-
 // deleteUserParams is the list of parameters passed at
 // the mock UserManager.DeleteUser call site.
 type deleteUserParams []struct {
@@ -167,7 +160,6 @@ type userManagerParams struct {
 	getUserParams
 	allUsersParams
 	deleteUserParams
-	insertUserParams
 	setUserPasswordParams
 }
 

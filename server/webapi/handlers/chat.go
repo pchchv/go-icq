@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -260,4 +262,39 @@ func (h *ChatHandler) SetTyping(w http.ResponseWriter, r *http.Request) {
 	// send response
 	SendResponse(w, r, response, h.Logger)
 	h.Logger.Debug("typing status updated", "chatsid", chatsid, "status", typingStatus)
+}
+
+// validateChatEventData validates and converts typed JSON data for chat events.
+func validateChatEventData(data json.RawMessage, eventType string) (interface{}, error) {
+	switch eventType {
+	case "message":
+		var msgData state.ChatMessageEventData
+		if err := json.Unmarshal(data, &msgData); err != nil {
+			return nil, err
+		}
+		return msgData, nil
+	case "userEntered", "userLeft":
+		var userData state.ChatUserEventData
+		if err := json.Unmarshal(data, &userData); err != nil {
+			return nil, err
+		}
+		return userData, nil
+	case "typing":
+		var typingData state.ChatTypingEventData
+		if err := json.Unmarshal(data, &typingData); err != nil {
+			return nil, err
+		}
+		return typingData, nil
+	case "userInRoom":
+		var participantData state.ChatParticipantList
+		if err := json.Unmarshal(data, &participantData); err != nil {
+			return nil, err
+		}
+		return participantData, nil
+	case "closed":
+		// no additional data for closed event
+		return nil, nil
+	default:
+		return nil, errors.New("unknown chat event type")
+	}
 }

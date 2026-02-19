@@ -411,48 +411,36 @@ func deleteBARTHandler(w http.ResponseWriter, r *http.Request, bartAssetManager 
 }
 
 // postUserHandler handles the POST /user endpoint.
-func postUserHandler(w http.ResponseWriter, r *http.Request, userManager UserManager, newUUID func() uuid.UUID, logger *slog.Logger) {
+func postUserHandler(w http.ResponseWriter, r *http.Request, createAccount state.CreateAccountFunc, logger *slog.Logger) {
 	input, err := userFromBody(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	sn := state.DisplayScreenName(input.ScreenName)
-	if sn.IsUIN() {
-		if err := sn.ValidateUIN(); err != nil {
-			http.Error(w, fmt.Sprintf("invalid uin: %s", err), http.StatusBadRequest)
-			return
-		}
-	} else if err := sn.ValidateAIMHandle(); err != nil {
-		http.Error(w, fmt.Sprintf("invalid screen name: %s", err), http.StatusBadRequest)
-		return
-	}
-
-	user := state.User{
-		AuthKey:           newUUID().String(),
-		DisplayScreenName: sn,
-		IdentScreenName:   sn.IdentScreenName(),
-		IsICQ:             sn.IsUIN(),
-	}
-	if err := user.HashPassword(input.Password); err != nil {
-		http.Error(w, fmt.Sprintf("invalid password: %s", err), http.StatusBadRequest)
-		return
-	}
-
-	err = userManager.InsertUser(r.Context(), user)
-	switch {
-	case errors.Is(err, state.ErrDupUser):
+	err = createAccount(r.Context(), state.DisplayScreenName(input.ScreenName), input.Password)
+	switch err {
+	case state.ErrDupUser:
 		http.Error(w, "user already exists", http.StatusConflict)
 		return
-	case err != nil:
+	case state.ErrAIMHandleInvalidFormat, state.ErrAIMHandleLength:
+		http.Error(w, fmt.Sprintf("invalid screen name: %s", err), http.StatusBadRequest)
+		return
+	case state.ErrICQUINInvalidFormat:
+		http.Error(w, fmt.Sprintf("invalid uin: %s", err), http.StatusBadRequest)
+		return
+	case state.ErrPasswordInvalid:
+		http.Error(w, fmt.Sprintf("invalid password: %s", err), http.StatusBadRequest)
+		return
+	case nil:
+		w.WriteHeader(http.StatusCreated)
+		_, _ = fmt.Fprintln(w, "User account created successfully.")
+		return
+	default:
 		logger.Error("error inserting user POST /user", "err", err.Error())
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	w.WriteHeader(http.StatusCreated)
-	_, _ = fmt.Fprintln(w, "User account created successfully.")
 }
 
 // getUserHandler handles the GET /user endpoint.

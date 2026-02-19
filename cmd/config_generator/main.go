@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -21,4 +22,9 @@ func main() {
 	}
 
 	defer f.Close()
+}
+
+func writeAssignment(w io.Writer, keyword string, varName string, val string) (err error) {
+	_, err = fmt.Fprintf(w, "%s%s=%s\n\n", keyword, varName, val)
+	return
 }

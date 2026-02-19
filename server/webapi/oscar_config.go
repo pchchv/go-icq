@@ -104,7 +104,7 @@ func (a *OSCARConfigAdapter) GetBOSAddress() (host string, port int) {
 		if port == 0 {
 			port = 5190
 		}
-		
+
 		return host, port
 	}
 

@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -33,7 +34,7 @@ type Server struct {
 	logger *slog.Logger
 }
 
-func NewManagementAPI(bld config.Build, listener string, userManager UserManager, sessionRetriever SessionRetriever, buddyBroadcaster BuddyBroadcaster, chatRoomRetriever ChatRoomRetriever, chatRoomCreator ChatRoomCreator, chatRoomDeleter ChatRoomDeleter, chatSessionRetriever ChatSessionRetriever, directoryManager DirectoryManager, messageRelayer MessageRelayer, bartAssetManager BARTAssetManager, feedbagRetriever FeedBagRetriever, feedbagManager FeedbagManager, accountManager AccountManager, profileRetriever ProfileRetriever, webAPIKeyManager WebAPIKeyManager, logger *slog.Logger) *Server {
+func NewManagementAPI(bld config.Build, listener string, userManager UserManager, sessionRetriever SessionRetriever, buddyBroadcaster BuddyBroadcaster, chatRoomRetriever ChatRoomRetriever, chatRoomCreator ChatRoomCreator, chatRoomDeleter ChatRoomDeleter, chatSessionRetriever ChatSessionRetriever, directoryManager DirectoryManager, messageRelayer MessageRelayer, bartAssetManager BARTAssetManager, feedbagRetriever FeedBagRetriever, feedbagManager FeedbagManager, accountManager AccountManager, profileRetriever ProfileRetriever, webAPIKeyManager WebAPIKeyManager, createAccount state.CreateAccountFunc, logger *slog.Logger) *Server {
 	mux := http.NewServeMux()
 	// handlers for '/user' route
 	mux.HandleFunc("DELETE /user", func(w http.ResponseWriter, r *http.Request) {
@@ -43,12 +44,17 @@ func NewManagementAPI(bld config.Build, listener string, userManager UserManager
 		getUserHandler(w, r, userManager, logger)
 	})
 	mux.HandleFunc("POST /user", func(w http.ResponseWriter, r *http.Request) {
-		postUserHandler(w, r, userManager, uuid.New, logger)
+		postUserHandler(w, r, createAccount, logger)
 	})
 
 	// handlers for '/user/password' route
 	mux.HandleFunc("PUT /user/password", func(w http.ResponseWriter, r *http.Request) {
 		putUserPasswordHandler(w, r, userManager, logger)
+	})
+
+	// handlers for '/user/login' route
+	mux.HandleFunc("GET /user/login", func(w http.ResponseWriter, r *http.Request) {
+		getUserLoginHandler(w, r, userManager, logger)
 	})
 
 	// handlers for '/user/{screenname}/account' route
@@ -197,6 +203,59 @@ func (s *Server) ListenAndServe() error {
 func (s *Server) Shutdown(ctx context.Context) error {
 	defer s.logger.Info("shutdown complete")
 	return s.server.Shutdown(ctx)
+}
+
+// getUserLoginHandler is a temporary endpoint for validating user credentials.
+// do not rely on this endpoint, as it will be eventually removed.
+func getUserLoginHandler(w http.ResponseWriter, r *http.Request, userManager UserManager, logger *slog.Logger) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		// no authentication header found
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Header().Set("WWW-Authenticate", `Basic realm="User Login"`)
+		_, _ = w.Write([]byte("401 Unauthorized\n"))
+		return
+	}
+
+	auth := strings.SplitN(authHeader, " ", 2)
+	if len(auth) != 2 || auth[0] != "Basic" {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("401 Unauthorized: Missing Basic prefix\n"))
+		return
+	}
+
+	payload, err := base64.StdEncoding.DecodeString(auth[1])
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("401 Unauthorized: Invalid Base64 Encoding\n"))
+		return
+	}
+
+	pair := strings.SplitN(string(payload), ":", 2)
+	if len(pair) != 2 {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("401 Unauthorized: Invalid Authentication Token\n"))
+		return
+	}
+
+	username, password := state.NewIdentScreenName(pair[0]), pair[1]
+	user, err := userManager.User(r.Context(), username)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("500 InternalServerError\n"))
+		logger.Error("error getting user", "err", err.Error())
+		return
+	}
+
+	if user == nil || !user.ValidateHash(wire.StrongMD5PasswordHash(password, user.AuthKey)) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("401 Unauthorized: Invalid Credentials\n"))
+		return
+	}
+
+	// successfully authenticated
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("200 OK: Successfully Authenticated\n"))
 }
 
 // postBARTHandler handles the POST /bart endpoint.
@@ -352,48 +411,36 @@ func deleteBARTHandler(w http.ResponseWriter, r *http.Request, bartAssetManager 
 }
 
 // postUserHandler handles the POST /user endpoint.
-func postUserHandler(w http.ResponseWriter, r *http.Request, userManager UserManager, newUUID func() uuid.UUID, logger *slog.Logger) {
+func postUserHandler(w http.ResponseWriter, r *http.Request, createAccount state.CreateAccountFunc, logger *slog.Logger) {
 	input, err := userFromBody(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	sn := state.DisplayScreenName(input.ScreenName)
-	if sn.IsUIN() {
-		if err := sn.ValidateUIN(); err != nil {
-			http.Error(w, fmt.Sprintf("invalid uin: %s", err), http.StatusBadRequest)
-			return
-		}
-	} else if err := sn.ValidateAIMHandle(); err != nil {
-		http.Error(w, fmt.Sprintf("invalid screen name: %s", err), http.StatusBadRequest)
-		return
-	}
-
-	user := state.User{
-		AuthKey:           newUUID().String(),
-		DisplayScreenName: sn,
-		IdentScreenName:   sn.IdentScreenName(),
-		IsICQ:             sn.IsUIN(),
-	}
-	if err := user.HashPassword(input.Password); err != nil {
-		http.Error(w, fmt.Sprintf("invalid password: %s", err), http.StatusBadRequest)
-		return
-	}
-
-	err = userManager.InsertUser(r.Context(), user)
-	switch {
-	case errors.Is(err, state.ErrDupUser):
+	err = createAccount(r.Context(), state.DisplayScreenName(input.ScreenName), input.Password)
+	switch err {
+	case state.ErrDupUser:
 		http.Error(w, "user already exists", http.StatusConflict)
 		return
-	case err != nil:
+	case state.ErrAIMHandleInvalidFormat, state.ErrAIMHandleLength:
+		http.Error(w, fmt.Sprintf("invalid screen name: %s", err), http.StatusBadRequest)
+		return
+	case state.ErrICQUINInvalidFormat:
+		http.Error(w, fmt.Sprintf("invalid uin: %s", err), http.StatusBadRequest)
+		return
+	case state.ErrPasswordInvalid:
+		http.Error(w, fmt.Sprintf("invalid password: %s", err), http.StatusBadRequest)
+		return
+	case nil:
+		w.WriteHeader(http.StatusCreated)
+		_, _ = fmt.Fprintln(w, "User account created successfully.")
+		return
+	default:
 		logger.Error("error inserting user POST /user", "err", err.Error())
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	w.WriteHeader(http.StatusCreated)
-	_, _ = fmt.Fprintln(w, "User account created successfully.")
 }
 
 // getUserHandler handles the GET /user endpoint.
@@ -1012,7 +1059,7 @@ func getPublicChatHandler(w http.ResponseWriter, r *http.Request, chatRoomRetrie
 	writeUnescapeChatURL(w, out)
 }
 
-// deletePublicChatHandler handles the DELETE /chat/room/public endpoint.41
+// deletePublicChatHandler handles the DELETE /chat/room/public endpoint.
 func deletePublicChatHandler(w http.ResponseWriter, r *http.Request, chatRoomDeleter ChatRoomDeleter, logger *slog.Logger) {
 	input := chatRoomDelete{}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {

@@ -748,6 +748,14 @@ func (h Handler) ICQDBQuery(ctx context.Context, instance *state.SessionInstance
 			if err := h.ICQService.SetPermissions(ctx, instance, req, icqMD.Seq); err != nil {
 				return err
 			}
+		case wire.ICQDBQueryMetaReqSetICQPhone:
+			req := wire.ICQ_0x07D0_0x0654_DBQueryMetaReqSetICQPhone{}
+			if err := wire.UnmarshalLE(&req, buf); err != nil {
+				return err
+			}
+			if err := h.ICQService.SetICQPhone(ctx, instance, req, icqMD.Seq); err != nil {
+				return err
+			}
 		case wire.ICQDBQueryMetaReqSearchByUIN:
 			req := wire.ICQ_0x07D0_0x051F_DBQueryMetaReqSearchByUIN{}
 			if err := wire.UnmarshalLE(&req, buf); err != nil {

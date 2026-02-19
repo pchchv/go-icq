@@ -2989,6 +2989,34 @@ func TestHandler_ICQDBQuery(t *testing.T) {
 			},
 		},
 		{
+			name: "MetaReqSetICQPhone - happy path",
+			reqParams: reqParams{
+				instance: state.NewSession().AddInstance(),
+				inBody: wire.SNAC_0x15_0x02_BQuery{
+					TLVRestBlock: wire.TLVRestBlock{
+						TLVList: wire.TLVList{
+							wire.NewTLVBE(wire.ICQTLVTagsMetadata, wire.ICQMessageReplyEnvelope{
+								Message: ICQMetaRequest{
+									ICQMetadata: wire.ICQMetadata{
+										ReqType: wire.ICQDBQueryMetaReq,
+										Seq:     1,
+									},
+									ReqSubType:  wire.ICQDBQueryMetaReqSetICQPhone,
+									MetaRequest: wire.ICQ_0x07D0_0x0654_DBQueryMetaReqSetICQPhone{},
+								},
+							}),
+						},
+					},
+				},
+				seq: 1,
+			},
+			allMockParams: allMockParams{
+				setICQPhone: &mockParam{
+					req: wire.ICQ_0x07D0_0x0654_DBQueryMetaReqSetICQPhone{},
+				},
+			},
+		},
+		{
 			name: "MetaReqSearchByUIN - happy path",
 			reqParams: reqParams{
 				instance: state.NewSession().AddInstance(),
@@ -3636,10 +3664,11 @@ func TestHandler_ICQDBQuery(t *testing.T) {
 				seq:     1,
 				wantErr: errUnknownICQMetaReqType,
 			},
-		},
+		}, // todo: add to a separate test
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+
 			icqService := newMockICQService(t)
 			switch {
 			case tt.allMockParams.fullUserInfo != nil:
@@ -3658,6 +3687,10 @@ func TestHandler_ICQDBQuery(t *testing.T) {
 				icqService.EXPECT().
 					SetPermissions(mock.Anything, tt.reqParams.instance, tt.allMockParams.setPermissions.req, tt.reqParams.seq).
 					Return(tt.allMockParams.setPermissions.wantErr)
+			case tt.allMockParams.setICQPhone != nil:
+				icqService.EXPECT().
+					SetICQPhone(mock.Anything, tt.reqParams.instance, tt.allMockParams.setICQPhone.req, tt.reqParams.seq).
+					Return(tt.allMockParams.setICQPhone.wantErr)
 			case tt.allMockParams.findByUIN != nil:
 				icqService.EXPECT().
 					FindByUIN(mock.Anything, tt.reqParams.instance, tt.allMockParams.findByUIN.req, tt.reqParams.seq).

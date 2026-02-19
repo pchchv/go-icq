@@ -307,7 +307,7 @@ func IsValidCallback(callback string) bool {
 
 	// allow alphanumeric, underscore, dollar sign, and dot (for namespace)
 	for _, r := range callback {
-		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '_' && r != '$' && r != '.' {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '$' || r == '.') {
 			return false
 		}
 	}

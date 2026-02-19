@@ -158,7 +158,7 @@ func (h *MessagingHandler) SetTyping(w http.ResponseWriter, r *http.Request) {
 	h.sendSuccessResponse(w, r, nil)
 }
 
-// SendIM handles the /im/sendIM endpoint for sending instant messages
+// SendIM handles the /im/sendIM endpoint for sending instant messages.
 func (h *MessagingHandler) SendIM(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	// get session from aimsid

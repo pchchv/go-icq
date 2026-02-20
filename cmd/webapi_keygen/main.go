@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -203,6 +204,67 @@ func handleActivate(args []string) {
 		os.Exit(1)
 	default:
 		fmt.Fprintf(os.Stderr, "Error activating API key: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func handleUpdate(args []string) {
+	fs := flag.NewFlagSet("update", flag.ExitOnError)
+	if err := fs.Parse(args); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing arguments: %v\n", err)
+		os.Exit(1)
+	}
+
+	devID := fs.String("dev-id", "", "Developer ID to update (required)")
+	if *devID == "" {
+		fmt.Fprintln(os.Stderr, "Error: --dev-id is required")
+		os.Exit(1)
+	}
+
+	update := state.WebAPIKeyUpdate{}
+	if appName := fs.String("app-name", "", "New application name"); *appName != "" {
+		update.AppName = appName
+	}
+
+	if originsStr := fs.String("origins", "", "New comma-separated list of allowed origins"); *originsStr != "" {
+		origins := parseCSV(*originsStr)
+		update.AllowedOrigins = &origins
+	}
+
+	if rateLimit := fs.Int("rate-limit", -1, "New requests per minute limit"); *rateLimit > 0 {
+		update.RateLimit = rateLimit
+	}
+
+	if capabilitiesStr := fs.String("capabilities", "", "New comma-separated list of capabilities"); *capabilitiesStr != "" {
+		capabilities := parseCSV(*capabilitiesStr)
+		update.Capabilities = &capabilities
+	}
+
+	// check if any updates were provided
+	updateJSON, err := json.Marshal(update)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error marshaling update JSON: %v\n", err)
+		os.Exit(1)
+	} else if string(updateJSON) == "{}" {
+		fmt.Fprintln(os.Stderr, "Error: No update fields provided")
+		os.Exit(1)
+	}
+
+	store, err := connectToStore()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error connecting to database: %v\n", err)
+		os.Exit(1)
+	}
+
+	err = store.UpdateAPIKey(context.Background(), *devID, update)
+	switch err {
+	case nil:
+		fmt.Printf("Successfully updated API key: %s\n", *devID)
+	case state.ErrNoAPIKey:
+		fmt.Fprintf(os.Stderr, "Error: API key not found for dev_id: %s\n", *devID)
+		os.Exit(1)
+	default:
+		fmt.Fprintf(os.Stderr, "Error updating API key: %v\n", err)
 		os.Exit(1)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/google/uuid"
@@ -89,9 +90,49 @@ func handleGenerate(args []string) {
 	if len(capabilities) > 0 {
 		fmt.Printf("Capabilities:  %s\n", strings.Join(capabilities, ", "))
 	}
-	
+
 	fmt.Println("=====================================")
 	fmt.Println("\nIMPORTANT: Save the API key securely. It cannot be retrieved later.")
+}
+
+func handleList(args []string) {
+	store, err := connectToStore()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error connecting to database: %v\n", err)
+		os.Exit(1)
+	}
+
+	keys, err := store.ListAPIKeys(context.Background())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error listing API keys: %v\n", err)
+		os.Exit(1)
+	} else if len(keys) == 0 {
+		fmt.Println("No API keys found.")
+		return
+	}
+
+	// create a tabwriter for formatted output
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "DEV ID\tAPP NAME\tACTIVE\tRATE LIMIT\tCREATED\tLAST USED")
+	fmt.Fprintln(w, "------\t--------\t------\t----------\t-------\t---------")
+
+	for _, key := range keys {
+		lastUsed := "Never"
+		if key.LastUsed != nil {
+			lastUsed = key.LastUsed.Format("2006-01-02 15:04")
+		}
+
+		fmt.Fprintf(w, "%s\t%s\t%v\t%d/min\t%s\t%s\n",
+			truncateString(key.DevID, 20),
+			truncateString(key.AppName, 20),
+			key.IsActive,
+			key.RateLimit,
+			key.CreatedAt.Format("2006-01-02"),
+			lastUsed,
+		)
+	}
+
+	w.Flush()
 }
 
 func parseCSV(input string) []string {
@@ -117,4 +158,12 @@ func connectToStore() (*state.SQLiteUserStore, error) {
 	}
 
 	return state.NewSQLiteUserStore(dbPath)
+}
+
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+
+	return s[:maxLen-3] + "..."
 }

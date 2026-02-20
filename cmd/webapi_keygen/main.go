@@ -359,3 +359,33 @@ func truncateString(s string, maxLen int) string {
 
 	return s[:maxLen-3] + "..."
 }
+
+func printUsage() {
+	fmt.Println("Web API Key Generator for RAS")
+	fmt.Println("\nUsage: webapi_keygen <command> [options]")
+	fmt.Println("\nCommands:")
+	fmt.Println("  generate, gen     Generate a new API key")
+	fmt.Println("  list, ls          List all API keys")
+	fmt.Println("  show              Show details of a specific key")
+	fmt.Println("  revoke, delete    Deactivate an API key")
+	fmt.Println("  activate          Reactivate an API key")
+	fmt.Println("  update            Update API key settings")
+	fmt.Println("  help              Show this help message")
+	fmt.Println("\nGenerate Options:")
+	fmt.Println("  --app-name        Application name (required)")
+	fmt.Println("  --origins         Comma-separated list of allowed origins")
+	fmt.Println("  --rate-limit      Requests per minute (default: 60)")
+	fmt.Println("  --capabilities    Comma-separated list of capabilities")
+	fmt.Println("\nUpdate Options:")
+	fmt.Println("  --dev-id          Developer ID to update (required)")
+	fmt.Println("  --app-name        New application name")
+	fmt.Println("  --origins         New comma-separated list of allowed origins")
+	fmt.Println("  --rate-limit      New requests per minute limit")
+	fmt.Println("  --capabilities    New comma-separated list of capabilities")
+	fmt.Println("\nExamples:")
+	fmt.Println("  webapi_keygen generate --app-name \"My Web Client\" --origins \"https://example.com,https://app.example.com\"")
+	fmt.Println("  webapi_keygen list")
+	fmt.Println("  webapi_keygen show --dev-id dev_abc123")
+	fmt.Println("  webapi_keygen revoke --dev-id dev_abc123")
+	fmt.Println("  webapi_keygen update --dev-id dev_abc123 --rate-limit 120")
+}

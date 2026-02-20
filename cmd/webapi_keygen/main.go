@@ -1,3 +1,5 @@
+// webapi_keygen generates and manages Web API keys for the RAS Web AIM API.
+// Usage: go run ./cmd/webapi_keygen [command] [options]
 package main
 
 import (
@@ -13,6 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pchchv/env"
 	"github.com/pchchv/go-icq/state"
 )
 
@@ -388,4 +391,39 @@ func printUsage() {
 	fmt.Println("  webapi_keygen show --dev-id dev_abc123")
 	fmt.Println("  webapi_keygen revoke --dev-id dev_abc123")
 	fmt.Println("  webapi_keygen update --dev-id dev_abc123 --rate-limit 120")
+}
+
+func main() {
+	// load environment configuration
+	if err := env.Load("config/settings.env"); err != nil {
+		fmt.Printf("Config file not found, using environment variables\n")
+	}
+
+	if len(os.Args) < 2 {
+		printUsage()
+		os.Exit(1)
+	}
+
+	args := os.Args[2:]
+	command := os.Args[1]
+	switch command {
+	case "generate", "gen":
+		handleGenerate(args)
+	case "list", "ls":
+		handleList(args)
+	case "revoke", "delete", "rm":
+		handleRevoke(args)
+	case "activate":
+		handleActivate(args)
+	case "update":
+		handleUpdate(args)
+	case "show":
+		handleShow(args)
+	case "help", "-h", "--help":
+		printUsage()
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown command: %s\n\n", command)
+		printUsage()
+		os.Exit(1)
+	}
 }

@@ -32,6 +32,7 @@ require (
 	github.com/mitchellh/go-wordwrap v1.0.1
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pchchv/amf v1.0.0
+	github.com/pchchv/env v0.0.0-20230407190545-6b70f0aa859f
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	golang.org/x/net v0.50.0
 	golang.org/x/time v0.14.0

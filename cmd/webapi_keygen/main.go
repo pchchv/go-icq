@@ -135,6 +135,43 @@ func handleList(args []string) {
 	w.Flush()
 }
 
+func handleRevoke(args []string) {
+	fs := flag.NewFlagSet("revoke", flag.ExitOnError)
+	if err := fs.Parse(args); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing arguments: %v\n", err)
+		os.Exit(1)
+	}
+
+	devID := fs.String("dev-id", "", "Developer ID to revoke (required)")
+	if *devID == "" {
+		fmt.Fprintln(os.Stderr, "Error: --dev-id is required")
+		os.Exit(1)
+	}
+
+	store, err := connectToStore()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error connecting to database: %v\n", err)
+		os.Exit(1)
+	}
+
+	ctx := context.Background()
+	isActive := false
+	update := state.WebAPIKeyUpdate{
+		IsActive: &isActive,
+	}
+	err = store.UpdateAPIKey(ctx, *devID, update)
+	switch err {
+	case nil:
+		fmt.Printf("Successfully revoked API key: %s\n", *devID)
+	case state.ErrNoAPIKey:
+		fmt.Fprintf(os.Stderr, "Error: API key not found for dev_id: %s\n", *devID)
+		os.Exit(1)
+	default:
+		fmt.Fprintf(os.Stderr, "Error revoking API key: %v\n", err)
+		os.Exit(1)
+	}
+}
+
 func parseCSV(input string) []string {
 	if input == "" {
 		return []string{}

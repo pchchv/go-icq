@@ -154,12 +154,11 @@ func handleRevoke(args []string) {
 		os.Exit(1)
 	}
 
-	ctx := context.Background()
 	isActive := false
 	update := state.WebAPIKeyUpdate{
 		IsActive: &isActive,
 	}
-	err = store.UpdateAPIKey(ctx, *devID, update)
+	err = store.UpdateAPIKey(context.Background(), *devID, update)
 	switch err {
 	case nil:
 		fmt.Printf("Successfully revoked API key: %s\n", *devID)

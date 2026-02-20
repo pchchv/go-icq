@@ -269,6 +269,64 @@ func handleUpdate(args []string) {
 	}
 }
 
+func handleShow(args []string) {
+	fs := flag.NewFlagSet("show", flag.ExitOnError)
+	if err := fs.Parse(args); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing arguments: %v\n", err)
+		os.Exit(1)
+	}
+
+	devID := fs.String("dev-id", "", "Developer ID (required)")
+	if *devID == "" {
+		fmt.Fprintln(os.Stderr, "Error: --dev-id is required")
+		os.Exit(1)
+	}
+
+	store, err := connectToStore()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error connecting to database: %v\n", err)
+		os.Exit(1)
+	}
+
+	key, err := store.GetAPIKeyByDevID(context.Background(), *devID)
+	if err != nil {
+		if err == state.ErrNoAPIKey {
+			fmt.Fprintf(os.Stderr, "Error: API key not found for dev_id: %s\n", *devID)
+		} else {
+			fmt.Fprintf(os.Stderr, "Error retrieving API key: %v\n", err)
+		}
+		os.Exit(1)
+	}
+
+	// output detailed key information
+	fmt.Println("Web API Key Details:")
+	fmt.Println("=====================================")
+	fmt.Printf("Developer ID:  %s\n", key.DevID)
+	fmt.Printf("App Name:      %s\n", key.AppName)
+	fmt.Printf("Active:        %v\n", key.IsActive)
+	fmt.Printf("Rate Limit:    %d requests/minute\n", key.RateLimit)
+	fmt.Printf("Created:       %s\n", key.CreatedAt.Format("2006-01-02 15:04:05"))
+	if key.LastUsed != nil {
+		fmt.Printf("Last Used:     %s\n", key.LastUsed.Format("2006-01-02 15:04:05"))
+	} else {
+		fmt.Println("Last Used:     Never")
+	}
+
+	if len(key.AllowedOrigins) > 0 {
+		fmt.Printf("Origins:       %s\n", strings.Join(key.AllowedOrigins, ", "))
+	} else {
+		fmt.Println("Origins:       All origins allowed")
+	}
+
+	if len(key.Capabilities) > 0 {
+		fmt.Printf("Capabilities:  %s\n", strings.Join(key.Capabilities, ", "))
+	} else {
+		fmt.Println("Capabilities:  All capabilities enabled")
+	}
+
+	fmt.Println("=====================================")
+}
+
 func parseCSV(input string) []string {
 	if input == "" {
 		return []string{}

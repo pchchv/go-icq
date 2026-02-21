@@ -16,6 +16,15 @@ type buddyNotifier struct {
 	sessionRetriever    SessionRetriever
 }
 
+func newBuddyNotifier(bartItemManager BARTItemManager, relationshipFetcher RelationshipFetcher, messageRelayer MessageRelayer, sessionRetriever SessionRetriever) buddyNotifier {
+	return buddyNotifier{
+		bartItemManager:     bartItemManager,
+		relationshipFetcher: relationshipFetcher,
+		messageRelayer:      messageRelayer,
+		sessionRetriever:    sessionRetriever,
+	}
+}
+
 // BroadcastVisibility sends you and related users arrival/departure notifications
 // that reflect your buddy list and privacy preferences.
 //

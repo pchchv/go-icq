@@ -149,9 +149,41 @@ type FeedbagManager interface {
 	UseFeedbag(ctx context.Context, screenName state.IdentScreenName) error
 }
 
-// buddyBroadcaster defines methods for broadcasting buddy presence and visibility events
-// to other sessions. These events notify users when a buddy comes online, goes offline,
-// or changes visibility status.
+// ICQUserFinder defines methods for searching ICQ users by various attributes.
+type ICQUserFinder interface {
+	// FindByUIN returns the user with a matching UIN.
+	FindByUIN(ctx context.Context, UIN uint32) (state.User, error)
+	// FindByICQEmail returns the user with a matching ICQ-registered email address.
+	FindByICQEmail(ctx context.Context, email string) (state.User, error)
+	// FindByICQName returns users matching the given first name, last name, and/or nickname.
+	// Empty values are ignored and not included in the search criteria.
+	FindByICQName(ctx context.Context, firstName, lastName, nickName string) ([]state.User, error)
+	// FindByICQInterests returns users who share at least one keyword under the specified interest category code.
+	FindByICQInterests(ctx context.Context, code uint16, keywords []string) ([]state.User, error)
+	// FindByICQKeyword returns users who have the specified keyword in any interest category.
+	FindByICQKeyword(ctx context.Context, keyword string) ([]state.User, error)
+}
+
+// ICQUserUpdater defines methods for updating various fields of an ICQ user's profile.
+type ICQUserUpdater interface {
+	// SetAffiliations updates the user's affiliations, such as memberships in organizations or groups.
+	SetAffiliations(ctx context.Context, name state.IdentScreenName, data state.ICQAffiliations) error
+	// SetBasicInfo updates the user's basic profile information.
+	SetBasicInfo(ctx context.Context, name state.IdentScreenName, data state.ICQBasicInfo) error
+	// SetInterests updates the user's interests.
+	SetInterests(ctx context.Context, name state.IdentScreenName, data state.ICQInterests) error
+	// SetMoreInfo updates additional personal details beyond the basic profile.
+	SetMoreInfo(ctx context.Context, name state.IdentScreenName, data state.ICQMoreInfo) error
+	// SetUserNotes updates the user's profile notes.
+	SetUserNotes(ctx context.Context, name state.IdentScreenName, data state.ICQUserNotes) error
+	// SetWorkInfo updates the user's professional or employment-related details.
+	SetWorkInfo(ctx context.Context, name state.IdentScreenName, data state.ICQWorkInfo) error
+	// SetPermissions updates the user's privacy and permission settings.
+	SetPermissions(ctx context.Context, name state.IdentScreenName, data state.ICQPermissions) error
+}
+
+// buddyBroadcaster defines methods for broadcasting buddy presence and visibility events to other sessions.
+// These events notify users when a buddy comes online, goes offline, or changes visibility status.
 type buddyBroadcaster interface {
 	// BroadcastBuddyArrived notifies all relevant users that the given user has come online.
 	BroadcastBuddyArrived(ctx context.Context, screenName state.IdentScreenName, userInfo wire.TLVUserInfo) error

@@ -236,6 +236,14 @@ type ProfileManager interface {
 	User(ctx context.Context, screenName state.IdentScreenName) (*state.User, error)
 }
 
+// RelationshipFetcher is the interface for retrieving relationships between users.
+type RelationshipFetcher interface {
+	// AllRelationships retrieves the relationships between the specified user (`me`) and other users.
+	AllRelationships(ctx context.Context, me state.IdentScreenName, filter []state.IdentScreenName) ([]state.Relationship, error)
+	// Relationship retrieves the relationship between the specified user (`me`) and another user (`them`).
+	Relationship(ctx context.Context, me state.IdentScreenName, them state.IdentScreenName) (state.Relationship, error)
+}
+
 // buddyBroadcaster defines methods for broadcasting buddy presence and visibility events to other sessions.
 // These events notify users when a buddy comes online, goes offline, or changes visibility status.
 type buddyBroadcaster interface {

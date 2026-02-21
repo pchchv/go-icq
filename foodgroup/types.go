@@ -196,6 +196,46 @@ type MessageRelayer interface {
 	RelayToSelf(ctx context.Context, instance *state.SessionInstance, msg wire.SNACMessage)
 }
 
+// OfflineMessageManager defines operations for managing offline messages.
+// These messages are stored temporarily when a recipient is unavailable,
+// and are retrieved once the recipient comes online.
+// Offline messages are available in all ICQ versions and AIM 6+.
+type OfflineMessageManager interface {
+	// DeleteMessages removes all offline messages for the specified recipient.
+	DeleteMessages(ctx context.Context, recip state.IdentScreenName) error
+	// RetrieveMessages returns all offline messages for the specified recipient.
+	RetrieveMessages(ctx context.Context, recip state.IdentScreenName) ([]state.OfflineMessage, error)
+	// SaveMessage stores a new offline message for delivery when the recipient comes online and returns the sender's total queued message count for that recipient.
+	SaveMessage(ctx context.Context, offlineMessage state.OfflineMessage) (int, error)
+	// SetOfflineMsgCount sets the offline message count for a user.
+	SetOfflineMsgCount(ctx context.Context, screenName state.IdentScreenName, count int) error
+}
+
+// ProfileManager defines methods for managing and querying AIM user profiles,
+// including directory information, interest keywords, and free-form profile content.
+type ProfileManager interface {
+	// FindByAIMEmail returns the user with the given AIM-associated email address.
+	FindByAIMEmail(ctx context.Context, email string) (state.User, error)
+	// FindByAIMKeyword returns users who have the specified keyword in their profile interests.
+	FindByAIMKeyword(ctx context.Context, keyword string) ([]state.User, error)
+	// FindByAIMNameAndAddr returns users matching the specified name and address directory info.
+	// Fields left empty in the input are ignored in the query.
+	FindByAIMNameAndAddr(ctx context.Context, info state.AIMNameAndAddr) ([]state.User, error)
+	// InterestList returns the list of available interest categories and keywords
+	// that users can associate with their profiles.
+	InterestList(ctx context.Context) ([]wire.ODirKeywordListItem, error)
+	// Profile returns the user's profile information for the given screen name.
+	Profile(ctx context.Context, screenName state.IdentScreenName) (state.UserProfile, error)
+	// SetDirectoryInfo updates the user's directory listing with name, city, state, zip, and country info.
+	SetDirectoryInfo(ctx context.Context, screenName state.IdentScreenName, info state.AIMNameAndAddr) error
+	// SetKeywords sets up to five interest keywords for the user's profile.
+	SetKeywords(ctx context.Context, screenName state.IdentScreenName, keywords [5]string) error
+	// SetProfile sets the user's profile information.
+	SetProfile(ctx context.Context, screenName state.IdentScreenName, profile state.UserProfile) error
+	// User returns the full user record associated with the given screen name.
+	User(ctx context.Context, screenName state.IdentScreenName) (*state.User, error)
+}
+
 // buddyBroadcaster defines methods for broadcasting buddy presence and visibility events to other sessions.
 // These events notify users when a buddy comes online, goes offline, or changes visibility status.
 type buddyBroadcaster interface {

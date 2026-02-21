@@ -3,6 +3,7 @@ package foodgroup
 import (
 	"context"
 	"net/mail"
+	"time"
 
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
@@ -132,6 +133,20 @@ type CookieBaker interface {
 	// Issue creates a new authentication token from the given payload.
 	// The resulting token can later be verified using Crack.
 	Issue(data []byte) ([]byte, error)
+}
+
+// FeedbagManager is the interface for reading and modifying server-side buddy lists (feedbag).
+type FeedbagManager interface {
+	// Feedbag fetches the contents of a user's feedbag.
+	Feedbag(ctx context.Context, screenName state.IdentScreenName) ([]wire.FeedbagItem, error)
+	// FeedbagDelete deletes an entry from a user's feedbag.
+	FeedbagDelete(ctx context.Context, screenName state.IdentScreenName, items []wire.FeedbagItem) error
+	// FeedbagLastModified returns the last time a user's feedbag was updated.
+	FeedbagLastModified(ctx context.Context, screenName state.IdentScreenName) (time.Time, error)
+	// FeedbagUpsert upserts an entry to a user's feedbag.
+	FeedbagUpsert(ctx context.Context, screenName state.IdentScreenName, items []wire.FeedbagItem) error
+	// UseFeedbag sets the user's session to use feedbag instead of the default client-side buddy list.
+	UseFeedbag(ctx context.Context, screenName state.IdentScreenName) error
 }
 
 // buddyBroadcaster defines methods for broadcasting buddy presence and visibility events

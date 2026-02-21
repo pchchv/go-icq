@@ -72,6 +72,79 @@ func (s buddyNotifier) BroadcastVisibility(ctx context.Context, you *state.Sessi
 	return nil
 }
 
+// BroadcastBuddyArrived sends the latest user info to the user's adjacent users.
+// While updates are sent via the wire.BuddyArrived SNAC,
+// the message is not only used to indicate the user coming online.
+// It can also notify changes to buddy icons, warning levels, invisibility status, etc.
+func (s buddyNotifier) BroadcastBuddyArrived(ctx context.Context, screenName state.IdentScreenName, userInfo wire.TLVUserInfo) error {
+	if userInfo.IsInvisible() {
+		return nil
+	}
+
+	users, err := s.relationshipFetcher.AllRelationships(ctx, screenName, nil)
+	if err != nil {
+		return err
+	}
+
+	var recipients []state.IdentScreenName
+	for _, user := range users {
+		if user.YouBlock || user.BlocksYou || !user.IsOnTheirList {
+			continue
+		}
+		recipients = append(recipients, user.User)
+	}
+
+	s.messageRelayer.RelayToScreenNames(ctx, recipients, wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Buddy,
+			SubGroup:  wire.BuddyArrived,
+			RequestID: wire.ReqIDFromServer,
+		},
+		Body: wire.SNAC_0x03_0x0B_BuddyArrived{
+			TLVUserInfo: userInfo,
+		},
+	})
+	return nil
+}
+
+func (s buddyNotifier) BroadcastBuddyDeparted(ctx context.Context, instance *state.SessionInstance) error {
+	users, err := s.relationshipFetcher.AllRelationships(ctx, instance.IdentScreenName(), nil)
+	if err != nil {
+		return err
+	}
+
+	var recipients []state.IdentScreenName
+	for _, user := range users {
+		if user.YouBlock || user.BlocksYou || !user.IsOnTheirList {
+			continue
+		}
+		recipients = append(recipients, user.User)
+	}
+
+	s.messageRelayer.RelayToScreenNames(ctx, recipients, wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Buddy,
+			SubGroup:  wire.BuddyDeparted,
+			RequestID: wire.ReqIDFromServer,
+		},
+		Body: wire.SNAC_0x03_0x0C_BuddyDeparted{
+			TLVUserInfo: wire.TLVUserInfo{
+				// don't include the TLV block,
+				// otherwise the AIM client fails to process the block event
+				ScreenName:   instance.IdentScreenName().String(),
+				WarningLevel: instance.Warning(),
+				TLVBlock: wire.TLVBlock{
+					TLVList: wire.TLVList{
+						// this TLV needs to be set in order for departure events to work in ICQ
+						wire.NewTLVBE(wire.OServiceUserInfoUserFlags, uint16(0)),
+					},
+				},
+			},
+		},
+	})
+	return nil
+}
+
 // unicastBuddyArrived sends the latest user info to a particular user.
 // While updates are sent via the wire.BuddyArrived SNAC,
 // the message is not only used to indicate the user coming online.

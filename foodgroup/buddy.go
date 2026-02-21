@@ -28,6 +28,51 @@ func NewBuddyService(
 	}
 }
 
+// AddBuddies adds buddies to my client-side buddy list.
+func (s BuddyService) AddBuddies(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x03_0x04_BuddyAddBuddies) error {
+	for _, entry := range inBody.Buddies {
+		sn := state.NewIdentScreenName(entry.ScreenName)
+		if err := s.clientSideBuddyListManager.AddBuddy(ctx, instance.IdentScreenName(), sn); err != nil {
+			return err
+		}
+	}
+
+	if !instance.SignonComplete() {
+		// client has not completed sign-on sequence,
+		// so any arrival messages sent at this point would be ignored by the client
+		return nil
+	}
+
+	var toNotify []state.IdentScreenName
+	for _, entry := range inBody.Buddies {
+		toNotify = append(toNotify, state.NewIdentScreenName(entry.ScreenName))
+	}
+
+	if err := s.buddyBroadcaster.BroadcastVisibility(ctx, instance, toNotify, true); err != nil {
+		return fmt.Errorf("buddyBroadcaster.BroadcastVisibility: %w", err)
+	}
+
+	return nil
+}
+
+// DelBuddies deletes buddies from my client-side buddy list.
+func (s BuddyService) DelBuddies(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x03_0x05_BuddyDelBuddies) error {
+	var toNotify []state.IdentScreenName
+	for _, entry := range inBody.Buddies {
+		sn := state.NewIdentScreenName(entry.ScreenName)
+		if err := s.clientSideBuddyListManager.RemoveBuddy(ctx, instance.IdentScreenName(), sn); err != nil {
+			return err
+		}
+		toNotify = append(toNotify, sn)
+	}
+
+	if err := s.buddyBroadcaster.BroadcastVisibility(ctx, instance, toNotify, true); err != nil {
+		return fmt.Errorf("buddyBroadcaster.BroadcastVisibility: %w", err)
+	}
+
+	return nil
+}
+
 // buddyNotifier centralizes logic for sending buddy arrival and departure notifications.
 type buddyNotifier struct {
 	bartItemManager     BARTItemManager

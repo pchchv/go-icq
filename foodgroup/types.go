@@ -95,6 +95,45 @@ type ChatSessionRegistry interface {
 	RemoveSession(instance *state.SessionInstance)
 }
 
+// ClientSideBuddyListManager defines operations for managing a user's buddy list,
+// including permissions like allow/deny and buddy group modifications.
+//
+// This interface manages a client-side buddy list that is
+// temporarily copied to the server on a per-session basis.
+// The list is cleared when the user signs out.
+type ClientSideBuddyListManager interface {
+	// AddBuddy adds 'them' to 'me's buddy list.
+	AddBuddy(ctx context.Context, me state.IdentScreenName, them state.IdentScreenName) error
+	// DenyBuddy blocks messages and presence visibility from 'them' to 'me'.
+	DenyBuddy(ctx context.Context, me state.IdentScreenName, them state.IdentScreenName) error
+	// PermitBuddy allows messages and presence visibility from 'them' to 'me',
+	// potentially overriding deny settings.
+	PermitBuddy(ctx context.Context, me state.IdentScreenName, them state.IdentScreenName) error
+	// RemoveBuddy removes 'them' from 'me's buddy list.
+	// Does not affect permit/deny status.
+	RemoveBuddy(ctx context.Context, me state.IdentScreenName, them state.IdentScreenName) error
+	// RemoveDenyBuddy removes 'them' from 'me's deny list,
+	// restoring default visibility and messaging behavior.
+	RemoveDenyBuddy(ctx context.Context, me state.IdentScreenName, them state.IdentScreenName) error
+	// RemovePermitBuddy removes 'them' from 'me's permit list,
+	// restoring default visibility and messaging behavior.
+	RemovePermitBuddy(ctx context.Context, me state.IdentScreenName, them state.IdentScreenName) error
+	// SetPDMode sets the permit/deny mode (e.g., allow all, deny all, permit some) for 'me'.
+	// It clears any existing permit/deny records.
+	SetPDMode(ctx context.Context, me state.IdentScreenName, pdMode wire.FeedbagPDMode) error
+}
+
+// CookieBaker defines methods for issuing and verifying AIM authentication tokens ("cookies").
+// These tokens are used for authenticating client sessions with AIM services.
+type CookieBaker interface {
+	// Crack verifies and decodes a previously issued authentication token.
+	// Returns the original payload if the token is valid.
+	Crack(data []byte) ([]byte, error)
+	// Issue creates a new authentication token from the given payload.
+	// The resulting token can later be verified using Crack.
+	Issue(data []byte) ([]byte, error)
+}
+
 // buddyBroadcaster defines methods for broadcasting buddy presence and visibility events
 // to other sessions. These events notify users when a buddy comes online, goes offline,
 // or changes visibility status.

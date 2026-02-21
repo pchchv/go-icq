@@ -118,6 +118,19 @@ func (s BuddyService) RightsQuery(_ context.Context, frameIn wire.SNACFrame) wir
 	}
 }
 
+// BroadcastBuddyArrived broadcasts buddy arrival with custom user info (implements DepartureNotifier).
+func (s BuddyService) BroadcastBuddyArrived(ctx context.Context, screenName state.IdentScreenName, userInfo wire.TLVUserInfo) error {
+	return s.buddyBroadcaster.BroadcastBuddyArrived(ctx, screenName, userInfo)
+}
+
+func (s BuddyService) BroadcastBuddyDeparted(ctx context.Context, instance *state.SessionInstance) error {
+	return s.buddyBroadcaster.BroadcastBuddyDeparted(ctx, instance)
+}
+
+func (s BuddyService) BroadcastVisibility(ctx context.Context, you *state.SessionInstance, filter []state.IdentScreenName, doSendDepartures bool) error {
+	return s.buddyBroadcaster.BroadcastVisibility(ctx, you, filter, doSendDepartures)
+}
+
 // buddyNotifier centralizes logic for sending buddy arrival and departure notifications.
 type buddyNotifier struct {
 	bartItemManager     BARTItemManager

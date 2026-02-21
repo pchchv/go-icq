@@ -280,3 +280,14 @@ type buddyBroadcaster interface {
 	// If sendDepartures is true, departure events are sent as well.
 	BroadcastVisibility(ctx context.Context, you *state.SessionInstance, filter []state.IdentScreenName, sendDepartures bool) error
 }
+
+// UserManager defines methods for accessing and inserting AIM user records.
+type UserManager interface {
+	// InsertUser inserts a new user into the system.
+	// Return state.ErrDupUser if a user with the same screen name already exists.
+	InsertUser(ctx context.Context, u state.User) error
+	// User returns the user record associated with the given screen name.
+	User(ctx context.Context, screenName state.IdentScreenName) (*state.User, error)
+	// SetWarnLevel updates the last warn update time and warning level for a user.
+	SetWarnLevel(ctx context.Context, user state.IdentScreenName, lastWarnUpdate time.Time, lastWarnLevel uint16) error
+}

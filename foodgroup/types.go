@@ -182,6 +182,20 @@ type ICQUserUpdater interface {
 	SetPermissions(ctx context.Context, name state.IdentScreenName, data state.ICQPermissions) error
 }
 
+// MessageRelayer defines methods for delivering SNAC messages to one or more AIM screen names.
+type MessageRelayer interface {
+	// RelayToScreenNames sends the given SNAC message to all specified screen names.
+	RelayToScreenNames(ctx context.Context, screenNames []state.IdentScreenName, msg wire.SNACMessage)
+	// RelayToScreenName sends the given SNAC message to a single screen name.
+	RelayToScreenName(ctx context.Context, screenName state.IdentScreenName, msg wire.SNACMessage)
+	// RelayToOtherInstances forwards a SNAC to other concurrent instances for the same user
+	RelayToOtherInstances(ctx context.Context, instance *state.SessionInstance, msg wire.SNACMessage)
+	// RelayToScreenNameActiveOnly sends the given SNAC message to active sessions (not away or idle) for a single screen name.
+	RelayToScreenNameActiveOnly(ctx context.Context, screenName state.IdentScreenName, msg wire.SNACMessage)
+	// RelayToSelf forwards a SNAC to the current session instance.
+	RelayToSelf(ctx context.Context, instance *state.SessionInstance, msg wire.SNACMessage)
+}
+
 // buddyBroadcaster defines methods for broadcasting buddy presence and visibility events to other sessions.
 // These events notify users when a buddy comes online, goes offline, or changes visibility status.
 type buddyBroadcaster interface {

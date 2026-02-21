@@ -244,6 +244,31 @@ type RelationshipFetcher interface {
 	Relationship(ctx context.Context, me state.IdentScreenName, them state.IdentScreenName) (state.Relationship, error)
 }
 
+// SessionRegistry defines methods for managing active user sessions.
+// It ensures that only one session is active per screen name at any given time.
+type SessionRegistry interface {
+	// AddSession adds a new session to the pool, enforcing a one-session-per-screen-name policy.
+	// If a session for the given screen name is already active,
+	// this call blocks until the active session is removed via
+	// [SessionRegistry.RemoveSession] or the context is canceled.
+	//
+	// When multiple concurrent calls are made for the same screen name, only one will succeed;
+	// the others will return an error once the context is done.
+	// If doMultiSess is true, allows multiple sessions for the same screen name.
+	AddSession(ctx context.Context, screenName state.DisplayScreenName, doMultiSess bool) (*state.SessionInstance, error)
+	// RemoveSession removes the given session from the registry, allowing future sessions
+	// to be created for the same screen name.
+	RemoveSession(instance *state.SessionInstance)
+}
+
+// SessionRetriever defines a method for retrieving an active session associated with a given screen name.
+type SessionRetriever interface {
+	// RetrieveSession returns the session associated with the given screen name,
+	// or nil if no active session exists.
+	// Returns the Session object if there are active instances with complete signon.
+	RetrieveSession(screenName state.IdentScreenName) *state.Session
+}
+
 // buddyBroadcaster defines methods for broadcasting buddy presence and visibility events to other sessions.
 // These events notify users when a buddy comes online, goes offline, or changes visibility status.
 type buddyBroadcaster interface {

@@ -97,6 +97,27 @@ func (s BuddyService) DelTempBuddies(ctx context.Context, instance *state.Sessio
 	return s.DelBuddies(ctx, instance, b)
 }
 
+// RightsQuery returns buddy list service parameters.
+func (s BuddyService) RightsQuery(_ context.Context, frameIn wire.SNACFrame) wire.SNACMessage {
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Buddy,
+			SubGroup:  wire.BuddyRightsReply,
+			RequestID: frameIn.RequestID,
+		},
+		Body: wire.SNAC_0x03_0x03_BuddyRightsReply{
+			TLVRestBlock: wire.TLVRestBlock{
+				TLVList: wire.TLVList{
+					wire.NewTLVBE(wire.BuddyTLVTagsParmMaxBuddies, uint16(100)),
+					wire.NewTLVBE(wire.BuddyTLVTagsParmMaxWatchers, uint16(100)),
+					wire.NewTLVBE(wire.BuddyTLVTagsParmMaxIcqBroad, uint16(100)),
+					wire.NewTLVBE(wire.BuddyTLVTagsParmMaxTempBuddies, uint16(100)),
+				},
+			},
+		},
+	}
+}
+
 // buddyNotifier centralizes logic for sending buddy arrival and departure notifications.
 type buddyNotifier struct {
 	bartItemManager     BARTItemManager

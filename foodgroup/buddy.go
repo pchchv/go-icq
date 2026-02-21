@@ -73,6 +73,30 @@ func (s BuddyService) DelBuddies(ctx context.Context, instance *state.SessionIns
 	return nil
 }
 
+// AddTempBuddies adds temporary buddies to the user's buddy list that persist for the duration of the user's session.
+func (s BuddyService) AddTempBuddies(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x03_0x0F_BuddyAddTempBuddies) error {
+	var b wire.SNAC_0x03_0x04_BuddyAddBuddies
+	for _, buddy := range inBody.Buddies {
+		b.Buddies = append(b.Buddies, struct {
+			ScreenName string `oscar:"len_prefix=uint8"`
+		}{ScreenName: buddy.ScreenName})
+	}
+
+	return s.AddBuddies(ctx, instance, b)
+}
+
+// DelTempBuddies deletes temporary buddies from the user's buddy list.
+func (s BuddyService) DelTempBuddies(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x03_0x10_BuddyDelTempBuddies) error {
+	var b wire.SNAC_0x03_0x05_BuddyDelBuddies
+	for _, buddy := range inBody.Buddies {
+		b.Buddies = append(b.Buddies, struct {
+			ScreenName string `oscar:"len_prefix=uint8"`
+		}{ScreenName: buddy.ScreenName})
+	}
+
+	return s.DelBuddies(ctx, instance, b)
+}
+
 // buddyNotifier centralizes logic for sending buddy arrival and departure notifications.
 type buddyNotifier struct {
 	bartItemManager     BARTItemManager

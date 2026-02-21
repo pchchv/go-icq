@@ -8,6 +8,26 @@ import (
 	"github.com/pchchv/go-icq/wire"
 )
 
+// BuddyService provides functionality for the Buddy food group.
+type BuddyService struct {
+	clientSideBuddyListManager ClientSideBuddyListManager
+	buddyBroadcaster           buddyBroadcaster
+}
+
+// NewBuddyService creates a new instance of BuddyService.
+func NewBuddyService(
+	messageRelayer MessageRelayer,
+	clientSideBuddyListManager ClientSideBuddyListManager,
+	relationshipFetcher RelationshipFetcher,
+	sessionRetriever SessionRetriever,
+	bartItemManager BARTItemManager,
+) *BuddyService {
+	return &BuddyService{
+		buddyBroadcaster:           newBuddyNotifier(bartItemManager, relationshipFetcher, messageRelayer, sessionRetriever),
+		clientSideBuddyListManager: clientSideBuddyListManager,
+	}
+}
+
 // buddyNotifier centralizes logic for sending buddy arrival and departure notifications.
 type buddyNotifier struct {
 	bartItemManager     BARTItemManager

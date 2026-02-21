@@ -91,6 +91,28 @@ func (s PermitDenyService) AddPermListEntries(ctx context.Context, instance *sta
 	return s.maybeBroadcastVisibility(ctx, instance, nil)
 }
 
+// RightsQuery returns settings for the PermitDeny food group.
+// It returns SNAC wire.PermitDenyRightsReply.
+// The values in the return SNAC were arbitrarily chosen.
+func (s PermitDenyService) RightsQuery(ctx context.Context, inFrame wire.SNACFrame) wire.SNACMessage {
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.PermitDeny,
+			SubGroup:  wire.PermitDenyRightsReply,
+			RequestID: inFrame.RequestID,
+		},
+		Body: wire.SNAC_0x09_0x03_PermitDenyRightsReply{
+			TLVRestBlock: wire.TLVRestBlock{
+				TLVList: wire.TLVList{
+					wire.NewTLVBE(wire.PermitDenyTLVMaxDenies, uint16(100)),
+					wire.NewTLVBE(wire.PermitDenyTLVMaxPermits, uint16(100)),
+					wire.NewTLVBE(wire.PermitDenyTLVMaxTempPermits, uint16(100)),
+				},
+			},
+		},
+	}
+}
+
 // maybeBroadcastVisibility broadcasts visibility changes to a list users only if the client has finished signing in,
 // which prevents duplicate arrival notifications, which are ultimately sent at the end of the sign on flow.
 func (s PermitDenyService) maybeBroadcastVisibility(ctx context.Context, instance *state.SessionInstance, body []struct {

@@ -5,6 +5,7 @@ import (
 	"net/mail"
 
 	"github.com/pchchv/go-icq/state"
+	"github.com/pchchv/go-icq/wire"
 )
 
 // AccountManager is the interface for managing a user's account settings.
@@ -37,4 +38,32 @@ type AccountManager interface {
 	UpdateRegStatus(ctx context.Context, screenName state.IdentScreenName, regStatus uint16) error
 	// User returns all attributes for a user.
 	User(ctx context.Context, screenName state.IdentScreenName) (*state.User, error)
+}
+
+// BARTItemManager is the interface for managing BART (Buddy Art) assets.
+type BARTItemManager interface {
+	// BARTItem retrieves a BART asset by its hash.
+	BARTItem(ctx context.Context, hash []byte) ([]byte, error)
+	// BuddyIconMetadata retrieves a user's buddy icon metadata. It returns nil
+	// if the user does not have a buddy icon.
+	BuddyIconMetadata(ctx context.Context, screenName state.IdentScreenName) (*wire.BARTID, error)
+	// InsertBARTItem creates or updates a BART asset and blob hash.
+	InsertBARTItem(ctx context.Context, hash []byte, blob []byte, itemType uint16) error
+	// ListBARTItems returns BART assets filtered by type.
+	ListBARTItems(ctx context.Context, itemType uint16) ([]state.BARTItem, error)
+	// DeleteBARTItem deletes a BART asset by hash.
+	DeleteBARTItem(ctx context.Context, hash []byte) error
+}
+
+// buddyBroadcaster defines methods for broadcasting buddy presence and visibility events
+// to other sessions. These events notify users when a buddy comes online, goes offline,
+// or changes visibility status.
+type buddyBroadcaster interface {
+	// BroadcastBuddyArrived notifies all relevant users that the given user has come online.
+	BroadcastBuddyArrived(ctx context.Context, screenName state.IdentScreenName, userInfo wire.TLVUserInfo) error
+	// BroadcastBuddyDeparted notifies all relevant users that the given user has gone offline.
+	BroadcastBuddyDeparted(ctx context.Context, instance *state.SessionInstance) error
+	// BroadcastVisibility sends presence updates to the specified filter list.
+	// If sendDepartures is true, departure events are sent as well.
+	BroadcastVisibility(ctx context.Context, you *state.SessionInstance, filter []state.IdentScreenName, sendDepartures bool) error
 }

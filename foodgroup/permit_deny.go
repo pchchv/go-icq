@@ -113,6 +113,40 @@ func (s PermitDenyService) RightsQuery(ctx context.Context, inFrame wire.SNACFra
 	}
 }
 
+// DelDenyListEntries removes users from your deny list.
+// Your buddy list and your relations' buddy lists are updated to reflect the list update.
+func (s PermitDenyService) DelDenyListEntries(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x09_0x08_PermitDenyDelDenyListEntries) error {
+	if len(inBody.Users) == 0 {
+		return nil
+	}
+
+	for _, user := range inBody.Users {
+		sn := state.NewIdentScreenName(user.ScreenName)
+		if err := s.clientSideBuddyListManager.RemoveDenyBuddy(ctx, instance.IdentScreenName(), sn); err != nil {
+			return err
+		}
+	}
+
+	return s.maybeBroadcastVisibility(ctx, instance, inBody.Users)
+}
+
+// DelPermListEntries removes users from your permit list.
+// Your buddy list and your relations' buddy lists are updated to reflect the list update.
+func (s PermitDenyService) DelPermListEntries(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x09_0x06_PermitDenyDelPermListEntries) error {
+	if len(inBody.Users) == 0 {
+		return nil
+	}
+
+	for _, user := range inBody.Users {
+		sn := state.NewIdentScreenName(user.ScreenName)
+		if err := s.clientSideBuddyListManager.RemovePermitBuddy(ctx, instance.IdentScreenName(), sn); err != nil {
+			return err
+		}
+	}
+
+	return s.maybeBroadcastVisibility(ctx, instance, inBody.Users)
+}
+
 // maybeBroadcastVisibility broadcasts visibility changes to a list users only if the client has finished signing in,
 // which prevents duplicate arrival notifications, which are ultimately sent at the end of the sign on flow.
 func (s PermitDenyService) maybeBroadcastVisibility(ctx context.Context, instance *state.SessionInstance, body []struct {

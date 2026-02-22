@@ -1,7 +1,10 @@
 package foodgroup
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -363,6 +366,244 @@ func (s OServiceService) ClientVersions(ctx context.Context, instance *state.Ses
 			},
 		},
 	}
+}
+
+// HostOnline returns SNAC wire.OServiceHostOnline containing the list of
+// food groups supported by the particular service.
+func (s OServiceService) HostOnline(service uint16) wire.SNACMessage {
+	switch service {
+	case wire.Admin:
+		return wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.OService,
+				SubGroup:  wire.OServiceHostOnline,
+				RequestID: wire.ReqIDFromServer,
+			},
+			Body: wire.SNAC_0x01_0x03_OServiceHostOnline{
+				FoodGroups: []uint16{
+					wire.OService,
+					wire.Admin,
+				},
+			},
+		}
+	case wire.Alert:
+		return wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.OService,
+				SubGroup:  wire.OServiceHostOnline,
+				RequestID: wire.ReqIDFromServer,
+			},
+			Body: wire.SNAC_0x01_0x03_OServiceHostOnline{
+				FoodGroups: []uint16{
+					wire.Alert,
+					wire.OService,
+				},
+			},
+		}
+	case wire.BART:
+		return wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.OService,
+				SubGroup:  wire.OServiceHostOnline,
+				RequestID: wire.ReqIDFromServer,
+			},
+			Body: wire.SNAC_0x01_0x03_OServiceHostOnline{
+				FoodGroups: []uint16{
+					wire.BART,
+					wire.OService,
+				},
+			},
+		}
+	case wire.BOS:
+		return wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.OService,
+				SubGroup:  wire.OServiceHostOnline,
+				RequestID: wire.ReqIDFromServer,
+			},
+			Body: wire.SNAC_0x01_0x03_OServiceHostOnline{
+				FoodGroups: []uint16{
+					wire.Alert,
+					wire.BART,
+					wire.Buddy,
+					wire.Feedbag,
+					wire.ICBM,
+					wire.ICQ,
+					wire.Locate,
+					wire.OService,
+					wire.PermitDeny,
+					wire.UserLookup,
+					wire.Invite,
+					wire.Popup,
+					wire.Stats,
+				},
+			},
+		}
+	case wire.Chat:
+		return wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.OService,
+				SubGroup:  wire.OServiceHostOnline,
+				RequestID: wire.ReqIDFromServer,
+			},
+			Body: wire.SNAC_0x01_0x03_OServiceHostOnline{
+				FoodGroups: []uint16{
+					wire.OService,
+					wire.Chat,
+				},
+			},
+		}
+	case wire.ChatNav:
+		return wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.OService,
+				SubGroup:  wire.OServiceHostOnline,
+				RequestID: wire.ReqIDFromServer,
+			},
+			Body: wire.SNAC_0x01_0x03_OServiceHostOnline{
+				FoodGroups: []uint16{
+					wire.ChatNav,
+					wire.OService,
+				},
+			},
+		}
+	case wire.ODir:
+		return wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.OService,
+				SubGroup:  wire.OServiceHostOnline,
+				RequestID: wire.ReqIDFromServer,
+			},
+			Body: wire.SNAC_0x01_0x03_OServiceHostOnline{
+				FoodGroups: []uint16{
+					wire.ODir,
+					wire.OService,
+				},
+			},
+		}
+	}
+
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.OService,
+			SubGroup:  wire.OServiceErr,
+		},
+	}
+}
+
+// ServiceRequest handles service discovery, providing a host name and metadata for connecting to the food group service specified in inFrame.
+func (s OServiceService) ServiceRequest(ctx context.Context, service uint16, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x01_0x04_OServiceServiceRequest, listener config.Listener) (wire.SNACMessage, error) {
+	if service != wire.BOS {
+		return wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.OService,
+				SubGroup:  wire.OServiceErr,
+				RequestID: inFrame.RequestID,
+			},
+			Body: wire.SNACError{
+				Code: wire.ErrorCodeNotSupportedByHost,
+			},
+		}, nil
+	}
+
+	if inBody.HasTag(wire.OserviceTLVTagsSSLUseSSL) && !listener.HasSSL {
+		s.logger.DebugContext(ctx, "service request for SSL but the listener doesn't support SSL")
+		return wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.OService,
+				SubGroup:  wire.OServiceErr,
+				RequestID: inFrame.RequestID,
+			},
+			Body: wire.SNACError{
+				Code: wire.ErrorCodeGeneralFailure,
+			},
+		}, nil
+	}
+
+	fnIssueCookie := func(val any) ([]byte, error) {
+		buf := &bytes.Buffer{}
+		if err := wire.MarshalBE(val, buf); err != nil {
+			return nil, err
+		}
+		return s.cookieIssuer.Issue(buf.Bytes())
+	}
+	cookie, err := func() ([]byte, error) {
+		switch inBody.FoodGroup {
+		case wire.Admin, wire.Alert, wire.BART, wire.ChatNav, wire.ODir:
+			return fnIssueCookie(state.ServerCookie{
+				Service:    inBody.FoodGroup,
+				ScreenName: instance.DisplayScreenName(),
+				SessionNum: instance.Num(),
+			})
+		case wire.Chat:
+			roomMeta, ok := inBody.Bytes(0x01)
+			if !ok {
+				return nil, errors.New("missing room info")
+			}
+
+			roomSNAC := wire.SNAC_0x01_0x04_TLVRoomInfo{}
+			if err := wire.UnmarshalBE(&roomSNAC, bytes.NewBuffer(roomMeta)); err != nil {
+				return nil, err
+			}
+
+			room, err := s.chatRoomManager.ChatRoomByCookie(ctx, roomSNAC.Cookie)
+			if err != nil {
+				return nil, fmt.Errorf("unable to retrieve room info: %w", err)
+			}
+
+			return fnIssueCookie(state.ServerCookie{
+				Service:    wire.Chat,
+				ChatCookie: room.Cookie(),
+				ScreenName: instance.DisplayScreenName(),
+				SessionNum: instance.Num(),
+			})
+		default:
+			return nil, nil
+		}
+	}()
+
+	if err != nil {
+		return wire.SNACMessage{}, err
+	}
+
+	if cookie == nil {
+		s.logger.InfoContext(ctx, "client service request for unsupported service", "food_group", wire.FoodGroupName(inBody.FoodGroup))
+		return wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.OService,
+				SubGroup:  wire.OServiceErr,
+				RequestID: inFrame.RequestID,
+			},
+			Body: wire.SNACError{
+				Code: wire.ErrorCodeServiceUnavailable,
+			},
+		}, nil
+	}
+
+	host := listener.BOSAdvertisedHostPlain
+	stateCode := wire.OServiceServiceResponseSSLStateNotUsed
+	if inBody.HasTag(wire.OserviceTLVTagsSSLUseSSL) {
+		host = listener.BOSAdvertisedHostSSL
+		stateCode = wire.OServiceServiceResponseSSLStateResume
+	}
+
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.OService,
+			SubGroup:  wire.OServiceServiceResponse,
+			RequestID: inFrame.RequestID,
+		},
+		Body: wire.SNAC_0x01_0x05_OServiceServiceResponse{
+			TLVRestBlock: wire.TLVRestBlock{
+				TLVList: wire.TLVList{
+					wire.NewTLVBE(wire.OServiceTLVTagsGroupID, inBody.FoodGroup),
+					wire.NewTLVBE(wire.OServiceTLVTagsReconnectHere, host),
+					wire.NewTLVBE(wire.OServiceTLVTagsLoginCookie, cookie),
+					wire.NewTLVBE(wire.OServiceTLVTagsSSLState, stateCode),
+				},
+			},
+		},
+	}, nil
 }
 
 // newOServiceUserInfoUpdate constructs SNAC(0x01,0x0F) for user info updates.

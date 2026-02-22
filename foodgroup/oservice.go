@@ -55,6 +55,53 @@ func NewOServiceService(
 	}
 }
 
+// UserInfoQuery returns SNAC wire.OServiceUserInfoUpdate containing the user's info.
+func (s OServiceService) UserInfoQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame) wire.SNACMessage {
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.OService,
+			SubGroup:  wire.OServiceUserInfoUpdate,
+			RequestID: inFrame.RequestID,
+		},
+		Body: newOServiceUserInfoUpdate(instance),
+	}
+}
+
+// SetUserInfoFields updates user info fields (e.g., invisible, away) and
+// broadcasts presence changes to buddies.
+// Returns an updated user info message.
+func (s OServiceService) SetUserInfoFields(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x01_0x1E_OServiceSetUserInfoFields) (wire.SNACMessage, error) {
+	if status, hasStatus := inBody.Uint32BE(wire.OServiceUserInfoStatus); hasStatus {
+		instance.SetUserStatusBitmask(status)
+		if instance.Session().Invisible() {
+			if err := s.buddyBroadcaster.BroadcastBuddyDeparted(ctx, instance); err != nil {
+				return wire.SNACMessage{}, err
+			}
+		} else {
+			if err := s.buddyBroadcaster.BroadcastBuddyArrived(ctx, instance.IdentScreenName(), instance.Session().TLVUserInfo()); err != nil {
+				return wire.SNACMessage{}, err
+			}
+		}
+	}
+
+	// reflect the status of this instance back to the caller,
+	// even though it does not reflect aggregated state of the session
+	//
+	// this is necessary for the "invisible" button to properly toggle on the client
+	info := instance.Session().TLVUserInfo()
+	info.Replace(wire.NewTLVBE(wire.OServiceUserInfoStatus, instance.UserStatusBitmask()))
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.OService,
+			SubGroup:  wire.OServiceUserInfoUpdate,
+			RequestID: inFrame.RequestID,
+		},
+		Body: wire.SNAC_0x01_0x0F_OServiceUserInfoUpdate{
+			UserInfo: []wire.TLVUserInfo{info},
+		},
+	}, nil
+}
+
 // newOServiceUserInfoUpdate constructs SNAC(0x01,0x0F) for user info updates.
 // For OService version 4 and above, it appends a duplicate TLVUserInfo block.
 // AIM 6+ expects at least two user info blocks to support multi-session:

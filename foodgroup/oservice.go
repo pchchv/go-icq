@@ -254,6 +254,42 @@ func (s OServiceService) RateParamsSubAdd(ctx context.Context, instance *state.S
 	instance.Session().SubscribeRateLimits(ids)
 }
 
+// RateLimitUpdates produces update messages reflecting any recent changes in
+// rate limit class params or rate limit states for the current session.
+// Changes are reported relative to the previous invocation for this session.
+// Only newly observed transitions or updated rate parameters will be included.
+func (s OServiceService) RateLimitUpdates(ctx context.Context, instance *state.SessionInstance, now time.Time) []wire.SNACMessage {
+	msgs := make([]wire.SNACMessage, 0, 5)
+	classDelta, stateDelta := instance.Session().ObserveRateChanges(now)
+
+	for _, curRate := range classDelta {
+		s.logger.DebugContext(ctx, "rate limit class changed", "class", curRate.ID)
+		msgs = append(msgs, buildRateLimitUpdate(1, curRate, instance, now))
+	}
+
+	for _, curRate := range stateDelta {
+		s.logger.DebugContext(ctx, "rate limit state changed",
+			"class", curRate.ID,
+			"state", curRate.CurrentStatus)
+		var code uint16
+		switch curRate.CurrentStatus {
+		case wire.RateLimitStatusLimited:
+			code = 3
+		case wire.RateLimitStatusAlert:
+			code = 2
+		case wire.RateLimitStatusClear:
+			code = 4
+		case wire.RateLimitStatusDisconnect:
+			s.logger.DebugContext(ctx, "rate limit status disconnected, no point in returning status update")
+			continue
+		}
+
+		msgs = append(msgs, buildRateLimitUpdate(code, curRate, instance, now))
+	}
+
+	return msgs
+}
+
 // newOServiceUserInfoUpdate constructs SNAC(0x01,0x0F) for user info updates.
 // For OService version 4 and above, it appends a duplicate TLVUserInfo block.
 // AIM 6+ expects at least two user info blocks to support multi-session:
@@ -316,5 +352,51 @@ func newOServiceUserInfoUpdate(instance *state.SessionInstance) wire.SNAC_0x01_0
 
 	return wire.SNAC_0x01_0x0F_OServiceUserInfoUpdate{
 		UserInfo: userInfo,
+	}
+}
+
+// buildRateLimitUpdate constructs a SNAC message notifying the client of a
+// rate limit threshold update or a change in rate limiting status for a specific class.
+//
+// The message format varies depending on the client's supported protocol version.
+// If OService version 2 or higher is supported,
+// additional metadata such as time since last status change and whether SNACs are
+// currently being dropped will be included.
+func buildRateLimitUpdate(code uint16, curRate state.RateClassState, instance *state.SessionInstance, now time.Time) wire.SNACMessage {
+	var droppingSNACs uint8
+	if curRate.CurrentStatus == wire.RateLimitStatusLimited {
+		droppingSNACs = 1
+	}
+
+	rate := wire.RateParamsSNAC{
+		ID:              uint16(curRate.ID),
+		WindowSize:      uint32(curRate.WindowSize),
+		ClearLevel:      uint32(curRate.ClearLevel),
+		AlertLevel:      uint32(curRate.AlertLevel),
+		LimitLevel:      uint32(curRate.LimitLevel),
+		DisconnectLevel: uint32(curRate.DisconnectLevel),
+		CurrentLevel:    uint32(curRate.CurrentLevel),
+		MaxLevel:        uint32(curRate.MaxLevel),
+	}
+	if instance.FoodGroupVersions()[wire.OService] > 1 {
+		rate.V2Params = &struct {
+			LastTime      uint32
+			DroppingSNACs uint8
+		}{
+			LastTime:      uint32(max(0, now.Unix()-curRate.LastTime.Unix())),
+			DroppingSNACs: droppingSNACs,
+		}
+	}
+
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.OService,
+			SubGroup:  wire.OServiceRateParamChange,
+			RequestID: wire.ReqIDFromServer,
+		},
+		Body: wire.SNAC_0x01_0x0A_OServiceRateParamsChange{
+			Code: code,
+			Rate: rate,
+		},
 	}
 }

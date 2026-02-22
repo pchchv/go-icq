@@ -716,3 +716,29 @@ func buildRateLimitUpdate(code uint16, curRate state.RateClassState, instance *s
 		},
 	}
 }
+
+func systemMessage(msg string) (wire.SNACMessage, error) {
+	frags, err := wire.ICBMFragmentList(msg)
+	if err != nil {
+		return wire.SNACMessage{}, fmt.Errorf("creating ICBM fragments: %w", err)
+	}
+
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.ICBM,
+			SubGroup:  wire.ICBMChannelMsgToClient,
+			RequestID: wire.ReqIDFromServer,
+		},
+		Body: wire.SNAC_0x04_0x07_ICBMChannelMsgToClient{
+			ChannelID: wire.ICBMChannelIM,
+			TLVUserInfo: wire.TLVUserInfo{
+				ScreenName: "OOS System Msg",
+			},
+			TLVRestBlock: wire.TLVRestBlock{
+				TLVList: []wire.TLV{
+					wire.NewTLVBE(wire.ICBMTLVAOLIMData, frags),
+				},
+			},
+		},
+	}, nil
+}

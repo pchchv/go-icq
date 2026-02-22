@@ -290,6 +290,81 @@ func (s OServiceService) RateLimitUpdates(ctx context.Context, instance *state.S
 	return msgs
 }
 
+// ProbeReq responds to client probe requests.
+// Some ICQ clients send probe requests to test server connectivity before authenticating.
+// This returns a simple ProbeAck to indicate the server is responsive.
+func (s OServiceService) ProbeReq(ctx context.Context, inFrame wire.SNACFrame) wire.SNACMessage {
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.OService,
+			SubGroup:  wire.OServiceProbeAck,
+			RequestID: inFrame.RequestID,
+		},
+	}
+}
+
+// ClientVersions informs the server what food group versions the
+// client supports and returns to the client what food group versions it supports.
+// This method simply regurgitates versions supplied by the client in
+// inBody back to the client in a OServiceHostVersions SNAC.
+// The server doesn't attempt to accommodate any particular food group version.
+// The server implicitly accommodates any food group version for Windows AIM clients 5.x.
+// It returns SNAC wire.OServiceHostVersions containing the
+// server's supported food group versions followed by
+// SNAC wire.OServiceMotd containing Message of the Day.
+// MOTD is sent here because some clients such as Jimm wait for it before sending RateParamsQuery,
+// causing the login flow to stall if omitted.
+func (s OServiceService) ClientVersions(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x01_0x17_OServiceClientVersions) []wire.SNACMessage {
+	var versions [wire.MDir + 1]uint16
+	if len(inBody.Versions)%2 != 0 {
+		s.logger.ErrorContext(ctx, "got uneven food group length")
+		return nil
+	}
+
+	for i := 0; i < len(inBody.Versions); i += 2 {
+		fg := inBody.Versions[i]
+		if fg < wire.OService || fg > wire.MDir {
+			s.logger.ErrorContext(ctx, "invalid food group ID", "id", fg)
+			continue
+		}
+
+		if ver := inBody.Versions[i+1]; ver < 1 {
+			s.logger.ErrorContext(ctx, "invalid food group version", "version", ver)
+		} else {
+			versions[fg] = ver
+		}
+	}
+
+	instance.SetFoodGroupVersions(versions)
+	return []wire.SNACMessage{
+		{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.OService,
+				SubGroup:  wire.OServiceHostVersions,
+				RequestID: inFrame.RequestID,
+			},
+			Body: wire.SNAC_0x01_0x18_OServiceHostVersions{
+				Versions: inBody.Versions,
+			},
+		},
+		{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.OService,
+				SubGroup:  wire.OServiceMotd,
+				RequestID: wire.ReqIDFromServer,
+			},
+			Body: wire.SNAC_0x01_0x13_OServiceMOTD{
+				MessageType: 0x0004,
+				TLVRestBlock: wire.TLVRestBlock{
+					TLVList: wire.TLVList{
+						wire.NewTLVBE(wire.OServiceTLVTagsMOTDMessage, "Welcome to Open OSCAR Server"),
+					},
+				},
+			},
+		},
+	}
+}
+
 // newOServiceUserInfoUpdate constructs SNAC(0x01,0x0F) for user info updates.
 // For OService version 4 and above, it appends a duplicate TLVUserInfo block.
 // AIM 6+ expects at least two user info blocks to support multi-session:

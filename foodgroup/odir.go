@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 )
 
@@ -41,4 +42,51 @@ func (s ODirService) KeywordListQuery(ctx context.Context, inFrame wire.SNACFram
 			Interests: interests,
 		},
 	}, nil
+}
+
+// newAIMNameAndAddrFromTLVList constructs an AIMNameAndAddr structure from the
+// TLV list containing user directory fields like first name, last name, etc.
+func newAIMNameAndAddrFromTLVList(tlvList wire.TLVList) state.AIMNameAndAddr {
+	a := state.AIMNameAndAddr{}
+	if firstName, hasFirstName := tlvList.String(wire.ODirTLVFirstName); hasFirstName {
+		a.FirstName = firstName
+	}
+
+	if lastName, hasLastName := tlvList.String(wire.ODirTLVLastName); hasLastName {
+		a.LastName = lastName
+	}
+
+	if middleName, hasMiddleName := tlvList.String(wire.ODirTLVMiddleName); hasMiddleName {
+		a.MiddleName = middleName
+	}
+
+	if maidenName, hasMaidenName := tlvList.String(wire.ODirTLVMaidenName); hasMaidenName {
+		a.MaidenName = maidenName
+	}
+
+	if country, hasCountry := tlvList.String(wire.ODirTLVCountry); hasCountry {
+		a.Country = country
+	}
+
+	if st, hasState := tlvList.String(wire.ODirTLVState); hasState {
+		a.State = st
+	}
+
+	if city, hasCity := tlvList.String(wire.ODirTLVCity); hasCity {
+		a.City = city
+	}
+
+	if nickName, hasNickName := tlvList.String(wire.ODirTLVNickName); hasNickName {
+		a.NickName = nickName
+	}
+
+	if zipCode, hasZIPCode := tlvList.String(wire.ODirTLVZIP); hasZIPCode {
+		a.ZIPCode = zipCode
+	}
+
+	if address, hasAddress := tlvList.String(wire.ODirTLVAddress); hasAddress {
+		a.Address = address
+	}
+
+	return a
 }

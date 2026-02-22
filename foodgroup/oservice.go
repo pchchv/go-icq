@@ -129,6 +129,131 @@ func (s OServiceService) IdleNotification(ctx context.Context, instance *state.S
 	return s.buddyBroadcaster.BroadcastBuddyArrived(ctx, instance.IdentScreenName(), instance.Session().TLVUserInfo())
 }
 
+// RateParamsQuery returns SNAC rate limits.
+// It returns SNAC wire.OServiceRateParamsReply containing rate limits for all food groups supported by this server.
+//
+// The purpose of this method is to convey per-SNAC server-side rate limits to the client.
+// The response consists of two main parts: rate classes and rate groups.
+// Rate classes define limits based on specific parameters,
+// while rate groups associate these limits with relevant SNAC types.
+//
+// The current implementation does not enforce server-side rate limiting.
+// Instead, the provided values inform the client about the recommended client-side rate limits.
+//
+// AIM clients silently fail when they expect a rate limit rule that does not exist in this response.
+// When support for a new food group is added to the server, update this function accordingly.
+func (s OServiceService) RateParamsQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame) wire.SNACMessage {
+	// not contain LastTime and CurrentStatus fields.
+	var limits = wire.SNAC_0x01_0x07_OServiceRateParamsReply{
+		RateClasses: []wire.RateParamsSNAC{},
+		RateGroups: []struct {
+			ID    uint16
+			Pairs []struct {
+				FoodGroup uint16
+				SubGroup  uint16
+			} `oscar:"count_prefix=uint16"`
+		}{
+			{
+				ID: 1,
+				Pairs: []struct {
+					FoodGroup uint16
+					SubGroup  uint16
+				}{},
+			},
+			{
+				ID: 2,
+				Pairs: []struct {
+					FoodGroup uint16
+					SubGroup  uint16
+				}{},
+			},
+			{
+				ID: 3,
+				Pairs: []struct {
+					FoodGroup uint16
+					SubGroup  uint16
+				}{},
+			},
+			{
+				ID: 4,
+				Pairs: []struct {
+					FoodGroup uint16
+					SubGroup  uint16
+				}{},
+			},
+			{
+				ID: 5,
+				Pairs: []struct {
+					FoodGroup uint16
+					SubGroup  uint16
+				}{},
+			},
+		},
+	}
+
+	for _, class := range instance.RateLimitStates() {
+		str := wire.RateParamsSNAC{
+			ID:              uint16(class.ID),
+			WindowSize:      uint32(class.WindowSize),
+			ClearLevel:      uint32(class.ClearLevel),
+			AlertLevel:      uint32(class.AlertLevel),
+			LimitLevel:      uint32(class.LimitLevel),
+			DisconnectLevel: uint32(class.DisconnectLevel),
+			CurrentLevel:    uint32(class.CurrentLevel),
+			MaxLevel:        uint32(class.MaxLevel),
+		}
+		if instance.FoodGroupVersions()[wire.OService] > 1 {
+			str.V2Params = &struct {
+				LastTime      uint32
+				DroppingSNACs uint8
+			}{
+				LastTime: uint32(s.timeNow().Add(-time.Second).Unix()),
+			}
+		}
+		limits.RateClasses = append(limits.RateClasses, str)
+	}
+
+	for snacClass := range s.snacRateLimits.All() {
+		classID := int(snacClass.RateLimitClass) - 1
+		limits.RateGroups[classID].Pairs = append(limits.RateGroups[classID].Pairs,
+			struct {
+				FoodGroup uint16
+				SubGroup  uint16
+			}{FoodGroup: snacClass.FoodGroup, SubGroup: snacClass.SubGroup})
+	}
+
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.OService,
+			SubGroup:  wire.OServiceRateParamsReply,
+			RequestID: inFrame.RequestID,
+		},
+		Body: limits,
+	}
+}
+
+// RateParamsSubAdd subscribes to rate parameter changes.
+// AOL's OSCAR spec says that notifications will be queued after calling this method.
+// I don't see the point of doing that since all clients appear to call RateParamsQuery at sign-on for all rate classes.
+func (s OServiceService) RateParamsSubAdd(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x01_0x08_OServiceRateParamsSubAdd) {
+	ids := make([]wire.RateLimitClassID, 0, len(inBody.ClassIDs))
+	for _, id := range inBody.ClassIDs {
+		if id < 1 || id > 5 {
+			s.logger.DebugContext(ctx, "snac class ID out of range")
+			continue
+		}
+
+		ids = append(ids, wire.RateLimitClassID(id))
+	}
+
+	if len(ids) == 0 {
+		return
+	}
+
+	s.logger.DebugContext(ctx, "subscribing to rate limit updates", "classes", ids)
+	instance.Session().SubscribeRateLimits(ids)
+}
+
 // newOServiceUserInfoUpdate constructs SNAC(0x01,0x0F) for user info updates.
 // For OService version 4 and above, it appends a duplicate TLVUserInfo block.
 // AIM 6+ expects at least two user info blocks to support multi-session:

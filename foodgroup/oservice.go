@@ -1,6 +1,7 @@
 package foodgroup
 
 import (
+	"context"
 	"log/slog"
 	"time"
 
@@ -100,6 +101,32 @@ func (s OServiceService) SetUserInfoFields(ctx context.Context, instance *state.
 			UserInfo: []wire.TLVUserInfo{info},
 		},
 	}, nil
+}
+
+// SetPrivacyFlags sets client privacy settings.
+// Currently, there's no action to take when these flags are set.
+// This method simply logs the flags set by the client.
+func (s OServiceService) SetPrivacyFlags(ctx context.Context, inBody wire.SNAC_0x01_0x14_OServiceSetPrivacyFlags) {
+	attrs := slog.Group("request", slog.String("food_group", wire.FoodGroupName(wire.OService)), slog.String("sub_group", wire.SubGroupName(wire.OService, wire.OServiceSetPrivacyFlags)))
+	if inBody.MemberFlag() {
+		s.logger.LogAttrs(ctx, slog.LevelDebug, "client set member privacy flag, but we're not going to do anything", attrs)
+	}
+	if inBody.IdleFlag() {
+		s.logger.LogAttrs(ctx, slog.LevelDebug, "client set idle privacy flag, but we're not going to do anything", attrs)
+	}
+}
+
+// IdleNotification sets the user idle time.
+// Set session idle time to the value of bodyIn.IdleTime.
+// Return a user arrival message to all users who have this user on their buddy list.
+func (s OServiceService) IdleNotification(ctx context.Context, instance *state.SessionInstance, inBody wire.SNAC_0x01_0x11_OServiceIdleNotification) error {
+	if inBody.IdleTime == 0 {
+		instance.UnsetIdle()
+	} else {
+		instance.SetIdle(time.Duration(inBody.IdleTime) * time.Second)
+	}
+
+	return s.buddyBroadcaster.BroadcastBuddyArrived(ctx, instance.IdentScreenName(), instance.Session().TLVUserInfo())
 }
 
 // newOServiceUserInfoUpdate constructs SNAC(0x01,0x0F) for user info updates.

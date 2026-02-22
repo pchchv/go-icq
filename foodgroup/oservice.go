@@ -742,3 +742,36 @@ func systemMessage(msg string) (wire.SNACMessage, error) {
 		},
 	}, nil
 }
+
+// sendOfflineMessageNotification sends an IM notifying the user of their
+// offline message count and resets the count to zero.
+func (s OServiceService) sendOfflineMessageNotification(ctx context.Context, instance *state.SessionInstance) error {
+	if err := s.offlineMessageManager.SetOfflineMsgCount(ctx, instance.IdentScreenName(), 0); err != nil {
+		return fmt.Errorf("deleting offline messages: %w", err)
+	}
+
+	message, err := systemMessage(fmt.Sprintf("You just received %d IM(s) while you were offline. If you do "+
+		"not wish to receive offline messages, please go to "+
+		"<a href=\"https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1&pp=ygUJcmljayByb2xsoAcB\">IM Settings</a>.",
+		instance.OfflineMsgCount()))
+	if err != nil {
+		return err
+	}
+
+	s.messageRelayer.RelayToScreenName(ctx, instance.IdentScreenName(), message)
+	instance.Session().SetOfflineMsgCount(0)
+	return nil
+}
+
+// sendMultipleInstanceNotification sends an IM notifying the user that their account is signed in to multiple locations.
+func (s OServiceService) sendMultipleInstanceNotification(ctx context.Context, instance *state.SessionInstance) error {
+	message, err := systemMessage(fmt.Sprintf("Your screen name (%s) is now signed into Open OSCAR Server in %d locations. Click "+
+		"<a href=\"https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=RDdQw4w9WgXcQ&start_radio=1&pp=ygUJcmljayByb2xsoAcB\">here</a> "+
+		"for more information.", instance.DisplayScreenName(), instance.Session().InstanceCount()))
+	if err != nil {
+		return err
+	}
+
+	s.messageRelayer.RelayToOtherInstances(ctx, instance, message)
+	return nil
+}

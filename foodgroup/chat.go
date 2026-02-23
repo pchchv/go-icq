@@ -40,3 +40,31 @@ func sendChatRoomInfoUpdate(ctx context.Context, instance *state.SessionInstance
 		},
 	})
 }
+
+func alertUserJoined(ctx context.Context, instance *state.SessionInstance, chatMessageRelayer ChatMessageRelayer) {
+	chatMessageRelayer.RelayToAllExcept(ctx, instance.ChatRoomCookie(), instance.IdentScreenName(), wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Chat,
+			SubGroup:  wire.ChatUsersJoined,
+		},
+		Body: wire.SNAC_0x0E_0x03_ChatUsersJoined{
+			Users: []wire.TLVUserInfo{
+				instance.Session().TLVUserInfo(),
+			},
+		},
+	})
+}
+
+func alertUserLeft(ctx context.Context, instance *state.SessionInstance, chatMessageRelayer ChatMessageRelayer) {
+	chatMessageRelayer.RelayToAllExcept(ctx, instance.ChatRoomCookie(), instance.IdentScreenName(), wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Chat,
+			SubGroup:  wire.ChatUsersLeft,
+		},
+		Body: wire.SNAC_0x0E_0x04_ChatUsersLeft{
+			Users: []wire.TLVUserInfo{
+				instance.Session().TLVUserInfo(),
+			},
+		},
+	})
+}

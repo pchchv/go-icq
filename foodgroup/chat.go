@@ -22,3 +22,21 @@ func setOnlineChatUsers(ctx context.Context, instance *state.SessionInstance, ch
 		Body: snacPayloadOut,
 	})
 }
+
+func sendChatRoomInfoUpdate(ctx context.Context, instance *state.SessionInstance, chatMessageRelayer ChatMessageRelayer, room state.ChatRoom) {
+	chatMessageRelayer.RelayToScreenName(ctx, instance.ChatRoomCookie(), instance.IdentScreenName(), wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Chat,
+			SubGroup:  wire.ChatRoomInfoUpdate,
+		},
+		Body: wire.SNAC_0x0E_0x02_ChatRoomInfoUpdate{
+			Exchange:       room.Exchange(),
+			Cookie:         room.Cookie(),
+			InstanceNumber: room.InstanceNumber(),
+			DetailLevel:    room.DetailLevel(),
+			TLVBlock: wire.TLVBlock{
+				TLVList: room.TLVList(),
+			},
+		},
+	})
+}

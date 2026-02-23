@@ -87,3 +87,17 @@ func alertUserLeft(ctx context.Context, instance *state.SessionInstance, chatMes
 		},
 	})
 }
+
+func newChatTLVBlock(body wire.SNAC_0x0E_0x05_ChatChannelMsgToHost, instance *state.SessionInstance, msg any) wire.TLVRestBlock {
+	block := wire.TLVRestBlock{}
+	// the order of these TLVs matters for AIM 2.x. if out of order, screen
+	// names do not appear with each chat message.
+	block.Append(wire.NewTLVBE(wire.ChatTLVSenderInformation, instance.Session().TLVUserInfo()))
+	if body.HasTag(wire.ChatTLVPublicWhisperFlag) {
+		// send message to all chat room participants
+		block.Append(wire.NewTLVBE(wire.ChatTLVPublicWhisperFlag, []byte{}))
+	}
+
+	block.Append(wire.NewTLVBE(wire.ChatTLVMessageInfo, msg))
+	return block
+}

@@ -2,10 +2,29 @@ package foodgroup
 
 import (
 	"context"
+	"math/rand/v2"
 
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 )
+
+// ChatService provides functionality for the Chat food group,
+// which is responsible for sending and receiving chat messages.
+type ChatService struct {
+	chatMessageRelayer ChatMessageRelayer
+	randRollDie        func(sides int) int
+}
+
+// NewChatService creates a new instance of ChatService.
+func NewChatService(chatMessageRelayer ChatMessageRelayer) *ChatService {
+	return &ChatService{
+		chatMessageRelayer: chatMessageRelayer,
+		randRollDie: func(sides int) int {
+			// generate random number between 1 and sides
+			return rand.IntN(sides) + 1
+		},
+	}
+}
 
 func setOnlineChatUsers(ctx context.Context, instance *state.SessionInstance, chatMessageRelayer ChatMessageRelayer) {
 	snacPayloadOut := wire.SNAC_0x0E_0x03_ChatUsersJoined{}

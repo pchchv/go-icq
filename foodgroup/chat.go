@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"math/rand/v2"
 	"regexp"
 	"strconv"
@@ -17,8 +18,8 @@ import (
 )
 
 var (
-// rollDiceRgxp matches a roll dice chat command.
-// ex: //roll //roll-sides3 //roll-dice2 //role-sides3-dice2
+	// rollDiceRgxp matches a roll dice chat command.
+	// ex: //roll //roll-sides3 //roll-dice2 //role-sides3-dice2
 	rollDiceRgxp = regexp.MustCompile(`^//roll(?:-(dice|sides)([0-9]{1,3}))?(?:-(dice|sides)([0-9]{1,3}))?\s*$`)
 	// sessOnlineHost represents the OnlineHost user that announcements die roll results.
 	sessOnlineHost = func() *state.SessionInstance {
@@ -46,6 +47,56 @@ func NewChatService(chatMessageRelayer ChatMessageRelayer) *ChatService {
 			return rand.IntN(sides) + 1
 		},
 	}
+}
+
+// ChannelMsgToHost relays wire.ChatChannelMsgToClient to chat room participants.
+// If TLV wire.ChatTLVWhisperToUser is set,
+// "whisper" the message to just that user and omit the remaining participants.
+// If TLV wire.ChatTLVEnableReflectionFlag is set, return the message ("reflect") back to the caller.
+func (s ChatService) ChannelMsgToHost(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x0E_0x05_ChatChannelMsgToHost) (ret *wire.SNACMessage, err error) {
+	frameOut := wire.SNACFrame{
+		FoodGroup: wire.Chat,
+		SubGroup:  wire.ChatChannelMsgToClient,
+	}
+	bodyOut := wire.SNAC_0x0E_0x06_ChatChannelMsgToClient{
+		Cookie:  inBody.Cookie,
+		Channel: inBody.Channel,
+	}
+	if bodyOut.Channel == math.MaxUint16 {
+		// fix incorrect channel bug in macOS client v4.0.9.
+		bodyOut.Channel = wire.ICBMChannelMIME
+	}
+
+	if bodyOut.TLVRestBlock, err = s.transformChatMessage(inBody, instance); err != nil {
+		return nil, err
+	}
+
+	if inBody.HasTag(wire.ChatTLVWhisperToUser) && !inBody.HasTag(wire.ChatTLVPublicWhisperFlag) {
+		// forward a whisper message to just one recipient
+		r, _ := inBody.String(wire.ChatTLVWhisperToUser)
+		recip := state.NewIdentScreenName(r)
+		s.chatMessageRelayer.RelayToScreenName(ctx, instance.ChatRoomCookie(), recip, wire.SNACMessage{
+			Frame: frameOut,
+			Body:  bodyOut,
+		})
+	} else {
+		// forward message all participants, except sender
+		s.chatMessageRelayer.RelayToAllExcept(ctx, instance.ChatRoomCookie(), instance.IdentScreenName(), wire.SNACMessage{
+			Frame: frameOut,
+			Body:  bodyOut,
+		})
+	}
+
+	if _, ackMsg := inBody.Bytes(wire.ChatTLVEnableReflectionFlag); ackMsg {
+		// reflect the message back to the sender
+		ret = &wire.SNACMessage{
+			Frame: frameOut,
+			Body:  bodyOut,
+		}
+		ret.Frame.RequestID = inFrame.RequestID
+	}
+
+	return ret, nil
 }
 
 // rollDice generates a chat response for the results of a die roll.

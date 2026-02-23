@@ -368,6 +368,90 @@ func (s OServiceService) ClientVersions(ctx context.Context, instance *state.Ses
 	}
 }
 
+// ClientOnline runs when the current user is ready to join.
+// If BOS:
+//   - Announce current user's arrival to users who have the current user on their buddy list
+//
+// If Chat:
+//   - Send current user the chat room metadata
+//   - Announce current user's arrival to other chat room participants
+//   - Send current user the chat room participant list
+func (s OServiceService) ClientOnline(ctx context.Context, service uint16, inBody wire.SNAC_0x01_0x02_OServiceClientOnline, instance *state.SessionInstance) error {
+	instance.SetSignonComplete()
+	switch service {
+	case wire.BOS:
+		if err := s.buddyBroadcaster.BroadcastVisibility(ctx, instance, nil, false); err != nil {
+			return fmt.Errorf("unable to send buddy arrival notification: %w", err)
+		}
+
+		msg := wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.Stats,
+				SubGroup:  wire.StatsSetMinReportInterval,
+				RequestID: wire.ReqIDFromServer,
+			},
+			Body: wire.SNAC_0x0B_0x02_StatsSetMinReportInterval{
+				MinReportInterval: 1,
+			},
+		}
+
+		s.messageRelayer.RelayToScreenName(ctx, instance.IdentScreenName(), msg)
+		// set stored profile
+		if instance.KerberosAuth() {
+			// normally, the SupportHostSig TLV indicates that the profile should be stored server-side
+			//
+			// however, some AIM 6 clients expect server-side profiles but do not send this TLV
+			//
+			// in order to cover all bases, just save the profile for all kerberos-based clients
+			profile, err := s.profileManager.Profile(ctx, instance.IdentScreenName())
+			if err != nil {
+				return fmt.Errorf("unable to reload profile: %w", err)
+			} else if !profile.IsZero() {
+				instance.SetProfile(profile)
+				// notify client that the server-side profile is ready for retrieval
+				s.messageRelayer.RelayToSelf(ctx, instance, wire.SNACMessage{
+					Frame: wire.SNACFrame{
+						FoodGroup: wire.OService,
+						SubGroup:  wire.OServiceUserInfoUpdate,
+					},
+					Body: newOServiceUserInfoUpdate(instance),
+				})
+			}
+		}
+
+		if instance.OfflineMsgCount() > 0 {
+			if err := s.sendOfflineMessageNotification(ctx, instance); err != nil {
+				return fmt.Errorf("send offline message notification: %w", err)
+			}
+		}
+
+		if !s.cfg.DisableMultiLoginNotif && instance.Session().InstanceCount() > 1 {
+			if err := s.sendMultipleInstanceNotification(ctx, instance); err != nil {
+				return fmt.Errorf("send multiple instance notification: %w", err)
+			}
+		}
+
+		return nil
+	case wire.Chat:
+		room, err := s.chatRoomManager.ChatRoomByCookie(ctx, instance.ChatRoomCookie())
+		if err != nil {
+			return fmt.Errorf("error getting chat room: %w", err)
+		}
+
+		// do not change the order of the following 3 methods
+		//
+		// macOS client v4.0.9 requires this exact sequence,
+		// otherwise the chat session prematurely closes seconds after users join a chat room
+		setOnlineChatUsers(ctx, instance, s.chatMessageRelayer)
+		sendChatRoomInfoUpdate(ctx, instance, s.chatMessageRelayer, room)
+		alertUserJoined(ctx, instance, s.chatMessageRelayer)
+		return nil
+	default:
+		s.logger.DebugContext(ctx, "client is online", "group_versions", inBody.GroupVersions)
+		return nil
+	}
+}
+
 // HostOnline returns SNAC wire.OServiceHostOnline containing the list of
 // food groups supported by the particular service.
 func (s OServiceService) HostOnline(service uint16) wire.SNACMessage {

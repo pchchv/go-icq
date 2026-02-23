@@ -4,19 +4,31 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"math/rand/v2"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 	"golang.org/x/net/html"
 )
 
+var (
 // rollDiceRgxp matches a roll dice chat command.
 // ex: //roll //roll-sides3 //roll-dice2 //role-sides3-dice2
-var rollDiceRgxp = regexp.MustCompile(`^//roll(?:-(dice|sides)([0-9]{1,3}))?(?:-(dice|sides)([0-9]{1,3}))?\s*$`)
+	rollDiceRgxp = regexp.MustCompile(`^//roll(?:-(dice|sides)([0-9]{1,3}))?(?:-(dice|sides)([0-9]{1,3}))?\s*$`)
+	// sessOnlineHost represents the OnlineHost user that announcements die roll results.
+	sessOnlineHost = func() *state.SessionInstance {
+		sn := state.DisplayScreenName("OnlineHost")
+		sess := state.NewSession()
+		sess.SetDisplayScreenName(sn)
+		sess.SetIdentScreenName(sn.IdentScreenName())
+		return sess.AddInstance()
+	}()
+)
 
 // ChatService provides functionality for the Chat food group,
 // which is responsible for sending and receiving chat messages.
@@ -34,6 +46,77 @@ func NewChatService(chatMessageRelayer ChatMessageRelayer) *ChatService {
 			return rand.IntN(sides) + 1
 		},
 	}
+}
+
+// rollDice generates a chat response for the results of a die roll.
+func (s ChatService) rollDice(instance *state.SessionInstance, dice int, sides int) wire.TLVRestBlock {
+	sb := strings.Builder{}
+	sb.WriteString("<HTML><BODY BGCOLOR=\"#ffffff\"><FONT LANG=\"0\">")
+	sb.WriteString(fmt.Sprintf("%s rolled %d %d-sided dice:", instance.DisplayScreenName().String(), dice, sides))
+	for i := 0; i < dice; i++ {
+		sb.WriteString(fmt.Sprintf(" %d", s.randRollDie(sides)))
+	}
+
+	sb.WriteString("</FONT></BODY></HTML>")
+	block := wire.TLVRestBlock{}
+	block.Append(wire.NewTLVBE(wire.ChatTLVMessageInfoEncoding, "us-ascii"))
+	block.Append(wire.NewTLVBE(wire.ChatTLVMessageInfoLang, "en"))
+	block.Append(wire.NewTLVBE(wire.ChatTLVMessageInfoText, sb.String()))
+	return block
+}
+
+// transformChatMessage inspects and modifies the incoming chat message payload.
+//   - If message contains a properly formatted //roll command, return a roll
+//     die response.
+//   - Else return the unmodified incoming message.
+//
+// In the future, this function will validate the incoming message for correct form.
+func (s ChatService) transformChatMessage(inBody wire.SNAC_0x0E_0x05_ChatChannelMsgToHost, sender *state.SessionInstance) (wire.TLVRestBlock, error) {
+	messageBlob, hasMessage := inBody.Bytes(wire.ChatTLVMessageInfo)
+	if !hasMessage {
+		return wire.TLVRestBlock{}, errors.New("SNAC(0x0E,0x05) does not contain a message TLV")
+	}
+
+	msgBlock := wire.TLVRestBlock{}
+	if err := wire.UnmarshalBE(&msgBlock, bytes.NewBuffer(messageBlob)); err != nil {
+		return wire.TLVRestBlock{}, err
+	}
+
+	txt, err := extractChatMessage(msgBlock)
+	if err != nil {
+		return wire.TLVRestBlock{}, err
+	}
+
+	if doRoll, dice, sides := parseDiceCommand(txt); doRoll {
+		payload := s.rollDice(sender, dice, sides)
+		// send die roll results from OnlineHost user
+		return newChatTLVBlock(inBody, sessOnlineHost, payload), nil
+	}
+
+	if enc, ok := msgBlock.String(wire.ChatTLVMessageInfoEncoding); ok {
+		if enc == "ISO 8859" {
+			// fix malformed content encoding type sent by Kopete, which causes
+			// chat messages to show up blank in Windows AIM chat windows
+			msgBlock.Replace(wire.NewTLVBE(wire.ChatTLVMessageInfoEncoding, []byte("ISO-8859-1")))
+		}
+	}
+
+	newRestBlock := wire.TLVRestBlock{}
+	// Strip down to the essential TLVs for cross-client compatibility.
+	// Some newer clients include extra metadata that cause older clients
+	// to crash when they encounter unfamiliar TLVs. For example, chat messages
+	// sent by Windows AIM 5.9 will cause macOS AIM 2.x to crash. Rather than
+	// implement complex per-client filtering, we simply preserve only the three
+	// TLVs that every client expects.
+	for _, tlv := range msgBlock.TLVList {
+		if tlv.Tag == wire.ChatTLVMessageInfoText ||
+			tlv.Tag == wire.ChatTLVMessageInfoEncoding ||
+			tlv.Tag == wire.ChatTLVMessageInfoLang {
+			newRestBlock.TLVList = append(newRestBlock.TLVList, tlv)
+		}
+	}
+
+	return newChatTLVBlock(inBody, sender, newRestBlock), nil
 }
 
 func setOnlineChatUsers(ctx context.Context, instance *state.SessionInstance, chatMessageRelayer ChatMessageRelayer) {

@@ -265,3 +265,44 @@ func (s AdminService) InfoChangeRequest(ctx context.Context, instance *state.Ses
 		},
 	}, nil
 }
+
+// ConfirmRequest will mark the user account as confirmed if the user has an email address set.
+func (s AdminService) ConfirmRequest(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame) (wire.SNACMessage, error) {
+	// getAdminInfoReply returns an AdminAcctConfirmReply SNAC
+	var getAdminConfirmReply = func(status uint16) wire.SNACMessage {
+		return wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.Admin,
+				SubGroup:  wire.AdminAcctConfirmReply,
+				RequestID: inFrame.RequestID,
+			},
+			Body: wire.SNAC_0x07_0x07_AdminConfirmReply{
+				Status: status,
+			},
+		}
+	}
+
+	if _, err := s.accountManager.EmailAddress(ctx, instance.IdentScreenName()); err != nil {
+		if err == state.ErrNoEmailAddress {
+			return getAdminConfirmReply(wire.AdminAcctConfirmStatusServerError), nil
+		}
+		return wire.SNACMessage{}, err
+	}
+
+	if accountConfirmed, err := s.accountManager.ConfirmStatus(ctx, instance.IdentScreenName()); err != nil {
+		return wire.SNACMessage{}, err
+	} else if accountConfirmed {
+		return getAdminConfirmReply(wire.AdminAcctConfirmStatusAlreadyConfirmed), nil
+	}
+
+	if err := s.accountManager.UpdateConfirmStatus(ctx, instance.IdentScreenName(), true); err != nil {
+		return wire.SNACMessage{}, err
+	}
+
+	instance.ClearUserInfoFlag(wire.OServiceUserFlagUnconfirmed)
+	if err := s.buddyBroadcaster.BroadcastBuddyArrived(ctx, instance.IdentScreenName(), instance.Session().TLVUserInfo()); err != nil {
+		return wire.SNACMessage{}, err
+	}
+
+	return getAdminConfirmReply(wire.AdminAcctConfirmStatusEmailSent), nil
+}

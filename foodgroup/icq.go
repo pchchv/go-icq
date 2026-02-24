@@ -406,6 +406,72 @@ func (s ICQService) FindByUIN2(ctx context.Context, instance *state.SessionInsta
 	})
 }
 
+func (s ICQService) FindByWhitePages(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x055F_DBQueryMetaReqSearchWhitePages2, seq uint16) error {
+	users, err := func() ([]state.User, error) {
+		if keyword, hasKeyword := inBody.ICQString(wire.ICQTLVTagsWhitepagesSearchKeywords); hasKeyword {
+			if res, err := s.userFinder.FindByICQKeyword(ctx, keyword); err != nil {
+				return nil, fmt.Errorf("FindByICQKeyword failed: %w", err)
+			} else {
+				return res, nil
+			}
+		}
+
+		bNick, hasNick := inBody.ICQString(wire.ICQTLVTagsNickname)
+		bFirst, hasFirst := inBody.ICQString(wire.ICQTLVTagsFirstName)
+		bLast, hastLast := inBody.ICQString(wire.ICQTLVTagsLastName)
+		if hasNick || hasFirst || hastLast {
+			res, err := s.userFinder.FindByICQName(ctx, bFirst, bLast, bNick)
+			if err != nil {
+				return nil, fmt.Errorf("FindByICQName failed: %w", err)
+			}
+			return res, nil
+		}
+
+		return nil, nil
+	}()
+
+	resp := wire.ICQ_0x07DA_0x01AE_DBQueryMetaReplyLastUserFound{
+		ICQMetadata: wire.ICQMetadata{
+			UIN:     instance.UIN(),
+			ReqType: wire.ICQDBQueryMetaReply,
+			Seq:     seq,
+		},
+		Success:    wire.ICQStatusCodeOK,
+		ReqSubType: wire.ICQDBQueryMetaReplyLastUserFound,
+	}
+	if err != nil {
+		s.logger.Error("FindByWhitePages2 failed", "err", err.Error())
+		resp.Success = wire.ICQStatusCodeErr
+		return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+			Message: resp,
+		})
+	}
+
+	if len(users) == 0 {
+		resp.Success = wire.ICQStatusCodeFail
+		return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+			Message: resp,
+		})
+	}
+
+	for i := 0; i < len(users); i++ {
+		if i == len(users)-1 {
+			resp.LastResult()
+		} else {
+			resp.ReqSubType = wire.ICQDBQueryMetaReplyUserFound
+		}
+
+		resp.Details = s.createResult(users[i])
+		if err := s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+			Message: resp,
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (s ICQService) reply(ctx context.Context, instance *state.SessionInstance, message wire.ICQMessageReplyEnvelope) error {
 	s.messageRelayer.RelayToScreenName(ctx, instance.IdentScreenName(), wire.SNACMessage{
 		Frame: wire.SNACFrame{

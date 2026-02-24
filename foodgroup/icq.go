@@ -472,6 +472,79 @@ func (s ICQService) FindByWhitePages(ctx context.Context, instance *state.Sessio
 	return nil
 }
 
+func (s ICQService) OfflineMsgReq(ctx context.Context, instance *state.SessionInstance, seq uint16) error {
+	messages, err := s.offlineMessageManager.RetrieveMessages(ctx, instance.IdentScreenName())
+	if err != nil {
+		return fmt.Errorf("retrieving messages: %w", err)
+	}
+
+	for _, msgIn := range messages {
+		reply := wire.ICQ_0x0041_DBQueryOfflineMsgReply{
+			ICQMetadata: wire.ICQMetadata{
+				UIN:     instance.UIN(),
+				ReqType: wire.ICQDBQueryOfflineMsgReply,
+				Seq:     seq,
+			},
+			SenderUIN: msgIn.Sender.UIN(),
+			Year:      uint16(msgIn.Sent.Year()),
+			Month:     uint8(msgIn.Sent.Month()),
+			Day:       uint8(msgIn.Sent.Day()),
+			Hour:      uint8(msgIn.Sent.Hour()),
+			Minute:    uint8(msgIn.Sent.Minute()),
+		}
+		switch msgIn.Message.ChannelID {
+		case wire.ICBMChannelIM:
+			if payload, hasIM := msgIn.Message.Bytes(wire.ICBMTLVAOLIMData); hasIM {
+				// send regular IM
+				msgText, err := wire.UnmarshalICBMMessageText(payload)
+				if err != nil {
+					return fmt.Errorf("unmarshalling offline message: %w", err)
+				}
+
+				reply.MsgType = wire.ICBMExtendedMsgTypePlain
+				reply.Message = msgText
+			}
+		case wire.ICBMChannelICQ:
+			if b, hasAuthReq := msgIn.Message.Bytes(wire.ICBMTLVData); hasAuthReq {
+				// send authorization request
+				msg := wire.ICBMCh4Message{}
+				buf := bytes.NewBuffer(b)
+				if err := wire.UnmarshalLE(&msg, buf); err != nil {
+					return err
+				}
+
+				reply.MsgType = msg.MessageType
+				reply.Flags = msg.Flags
+				reply.Message = msg.Message
+			}
+		}
+
+		if reply.MsgType == 0 {
+			return fmt.Errorf("did not find an appropriate saved message payload. channel: %d", msgIn.Message.ChannelID)
+		}
+
+		msgOut := wire.ICQMessageReplyEnvelope{
+			Message: reply,
+		}
+		if err := s.reply(ctx, instance, msgOut); err != nil {
+			return fmt.Errorf("sending offline message: %w", err)
+		}
+	}
+
+	eofMsg := wire.ICQMessageReplyEnvelope{
+		Message: wire.ICQ_0x0042_DBQueryOfflineMsgReplyLast{
+			ICQMetadata: wire.ICQMetadata{
+				UIN:     instance.UIN(),
+				ReqType: wire.ICQDBQueryOfflineMsgReplyLast,
+				Seq:     seq,
+			},
+			DroppedMessages: 0,
+		},
+	}
+
+	return s.reply(ctx, instance, eofMsg)
+}
+
 func (s ICQService) reply(ctx context.Context, instance *state.SessionInstance, message wire.ICQMessageReplyEnvelope) error {
 	s.messageRelayer.RelayToScreenName(ctx, instance.IdentScreenName(), wire.SNACMessage{
 		Frame: wire.SNACFrame{

@@ -545,6 +545,27 @@ func (s ICQService) OfflineMsgReq(ctx context.Context, instance *state.SessionIn
 	return s.reply(ctx, instance, eofMsg)
 }
 
+func (s ICQService) XMLReqData(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x0898_DBQueryMetaReqXMLReq, seq uint16) error {
+	return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+		Message: wire.ICQ_0x07DA_0x08A2_DBQueryMetaReplyXMLData{
+			ICQMetadata: wire.ICQMetadata{
+				UIN:     instance.UIN(),
+				ReqType: wire.ICQDBQueryMetaReply,
+				Seq:     seq,
+			},
+			ReqSubType: wire.ICQDBQueryMetaReplyXMLData,
+			Success:    wire.ICQStatusCodeFail,
+		},
+	})
+}
+
+func (s ICQService) DeleteMsgReq(ctx context.Context, instance *state.SessionInstance, seq uint16) error {
+	if err := s.offlineMessageManager.DeleteMessages(ctx, instance.IdentScreenName()); err != nil {
+		return fmt.Errorf("deleting messages: %w", err)
+	}
+	return nil
+}
+
 func (s ICQService) reply(ctx context.Context, instance *state.SessionInstance, message wire.ICQMessageReplyEnvelope) error {
 	s.messageRelayer.RelayToScreenName(ctx, instance.IdentScreenName(), wire.SNACMessage{
 		Frame: wire.SNACFrame{

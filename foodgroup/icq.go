@@ -128,6 +128,36 @@ func (s ICQService) SetInterests(ctx context.Context, instance *state.SessionIns
 	return s.reqAck(ctx, instance, seq, wire.ICQDBQueryMetaReplySetInterests)
 }
 
+func (s ICQService) SetMoreInfo(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x03FD_DBQueryMetaReqSetMoreInfo, seq uint16) error {
+	u := state.ICQMoreInfo{
+		Gender:       inBody.Gender,
+		HomePageAddr: inBody.HomePageAddr,
+		BirthYear:    inBody.BirthYear,
+		BirthMonth:   inBody.BirthMonth,
+		BirthDay:     inBody.BirthDay,
+		Lang1:        inBody.Lang1,
+		Lang2:        inBody.Lang2,
+		Lang3:        inBody.Lang3,
+	}
+	if err := s.userUpdater.SetMoreInfo(ctx, instance.IdentScreenName(), u); err != nil {
+		return err
+	}
+
+	return s.reqAck(ctx, instance, seq, wire.ICQDBQueryMetaReplySetMoreInfo)
+}
+
+func (s ICQService) SetPermissions(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x0424_DBQueryMetaReqSetPermissions, seq uint16) error {
+	u := state.ICQPermissions{
+		AuthRequired: inBody.Authorization == 1,
+		WebAware:     inBody.WebAware == 1,
+	}
+	if err := s.userUpdater.SetPermissions(ctx, instance.IdentScreenName(), u); err != nil {
+		return err
+	}
+
+	return s.reqAck(ctx, instance, seq, wire.ICQDBQueryMetaReplySetPermissions)
+}
+
 func (s ICQService) reply(ctx context.Context, instance *state.SessionInstance, message wire.ICQMessageReplyEnvelope) error {
 	s.messageRelayer.RelayToScreenName(ctx, instance.IdentScreenName(), wire.SNACMessage{
 		Frame: wire.SNACFrame{

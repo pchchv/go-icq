@@ -210,6 +210,99 @@ func (s LocateService) RightsQuery(_ context.Context, inFrame wire.SNACFrame) wi
 	}
 }
 
+// DirInfo returns directory information for a user.
+func (s LocateService) DirInfo(ctx context.Context, inFrame wire.SNACFrame, inBody wire.SNAC_0x02_0x0B_LocateGetDirInfo) (wire.SNACMessage, error) {
+	reply := wire.SNAC_0x02_0x0C_LocateGetDirReply{
+		Status: wire.LocateGetDirReplyOK,
+		TLVBlock: wire.TLVBlock{
+			TLVList: wire.TLVList{},
+		},
+	}
+
+	if user, err := s.profileManager.User(ctx, state.NewIdentScreenName(inBody.ScreenName)); err != nil {
+		return wire.SNACMessage{}, fmt.Errorf("User: %w", err)
+	} else if user != nil {
+		reply.Append(wire.NewTLVBE(wire.ODirTLVFirstName, user.AIMDirectoryInfo.FirstName))
+		reply.Append(wire.NewTLVBE(wire.ODirTLVLastName, user.AIMDirectoryInfo.LastName))
+		reply.Append(wire.NewTLVBE(wire.ODirTLVMiddleName, user.AIMDirectoryInfo.MiddleName))
+		reply.Append(wire.NewTLVBE(wire.ODirTLVMaidenName, user.AIMDirectoryInfo.MaidenName))
+		reply.Append(wire.NewTLVBE(wire.ODirTLVCountry, user.AIMDirectoryInfo.Country))
+		reply.Append(wire.NewTLVBE(wire.ODirTLVState, user.AIMDirectoryInfo.State))
+		reply.Append(wire.NewTLVBE(wire.ODirTLVCity, user.AIMDirectoryInfo.City))
+		reply.Append(wire.NewTLVBE(wire.ODirTLVNickName, user.AIMDirectoryInfo.NickName))
+		reply.Append(wire.NewTLVBE(wire.ODirTLVZIP, user.AIMDirectoryInfo.ZIPCode))
+		reply.Append(wire.NewTLVBE(wire.ODirTLVAddress, user.AIMDirectoryInfo.Address))
+	}
+
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Locate,
+			SubGroup:  wire.LocateGetDirReply,
+			RequestID: inFrame.RequestID,
+		},
+		Body: reply,
+	}, nil
+}
+
+// UserInfoQuery fetches display information about an arbitrary user (not the current user).
+// It returns wire.LocateUserInfoReply, which contains the profile, if requested, and/or the away message, if requested.
+func (s LocateService) UserInfoQuery(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x02_0x05_LocateUserInfoQuery) (wire.SNACMessage, error) {
+	var lookupSess *state.Session
+	lookupSN := state.NewIdentScreenName(inBody.ScreenName)
+	if lookupSN == instance.IdentScreenName() {
+		// looking up own profile
+		lookupSess = instance.Session()
+	} else {
+		rel, err := s.relationshipFetcher.Relationship(ctx, instance.IdentScreenName(), lookupSN)
+		if err != nil {
+			return wire.SNACMessage{}, err
+		} else if rel.YouBlock || rel.BlocksYou {
+			return newLocateErr(inFrame.RequestID, wire.ErrorCodeNotLoggedOn), nil
+		}
+
+		lookupSess = s.sessionRetriever.RetrieveSession(lookupSN)
+		if lookupSess == nil {
+			// user is offline
+			return newLocateErr(inFrame.RequestID, wire.ErrorCodeNotLoggedOn), nil
+		}
+	}
+
+	var list wire.TLVList
+	if inBody.RequestProfile() {
+		prof := lookupSess.Profile()
+		// if looking up own profile, return this instance's profile for consistency
+		if instance.IdentScreenName() == lookupSN {
+			prof = instance.Profile()
+		}
+
+		list.AppendList([]wire.TLV{
+			wire.NewTLVBE(wire.LocateTLVTagsInfoSigMime, prof.MIMEType),
+			wire.NewTLVBE(wire.LocateTLVTagsInfoSigData, prof.ProfileText),
+		})
+	}
+
+	if inBody.RequestAwayMessage() && lookupSess.Away() {
+		list.AppendList([]wire.TLV{
+			wire.NewTLVBE(wire.LocateTLVTagsInfoUnavailableMime, `text/aolrtf; charset="us-ascii"`),
+			wire.NewTLVBE(wire.LocateTLVTagsInfoUnavailableData, lookupSess.AwayMessage()),
+		})
+	}
+
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Locate,
+			SubGroup:  wire.LocateUserInfoReply,
+			RequestID: inFrame.RequestID,
+		},
+		Body: wire.SNAC_0x02_0x06_LocateUserInfoReply{
+			TLVUserInfo: lookupSess.TLVUserInfo(),
+			LocateInfo: wire.TLVRestBlock{
+				TLVList: list,
+			},
+		},
+	}, nil
+}
+
 func newLocateErr(requestID uint32, errCode uint16) wire.SNACMessage {
 	return wire.SNACMessage{
 		Frame: wire.SNACFrame{

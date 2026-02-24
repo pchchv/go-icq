@@ -2,12 +2,16 @@ package foodgroup
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 )
+
+var errICQBadRequest = errors.New("bad ICQ request")
 
 // ICQService provides functionality for the ICQ food group.
 type ICQService struct {
@@ -38,6 +42,56 @@ func NewICQService(
 		offlineMessageManager: offlineMessageManager,
 		timeNow:               time.Now,
 	}
+}
+
+func (s ICQService) SetAffiliations(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x041A_DBQueryMetaReqSetAffiliations, seq uint16) error {
+	if len(inBody.PastAffiliations) != 3 || len(inBody.Affiliations) != 3 {
+		return fmt.Errorf("%w: expected 3 past affiliations and 3 affiliations", errICQBadRequest)
+	}
+
+	u := state.ICQAffiliations{
+		PastCode1:       inBody.PastAffiliations[0].Code,
+		PastKeyword1:    inBody.PastAffiliations[0].Keyword,
+		PastCode2:       inBody.PastAffiliations[1].Code,
+		PastKeyword2:    inBody.PastAffiliations[1].Keyword,
+		PastCode3:       inBody.PastAffiliations[2].Code,
+		PastKeyword3:    inBody.PastAffiliations[2].Keyword,
+		CurrentCode1:    inBody.Affiliations[0].Code,
+		CurrentKeyword1: inBody.Affiliations[0].Keyword,
+		CurrentCode2:    inBody.Affiliations[1].Code,
+		CurrentKeyword2: inBody.Affiliations[1].Keyword,
+		CurrentCode3:    inBody.Affiliations[2].Code,
+		CurrentKeyword3: inBody.Affiliations[2].Keyword,
+	}
+	if err := s.userUpdater.SetAffiliations(ctx, instance.IdentScreenName(), u); err != nil {
+		return err
+	}
+
+	return s.reqAck(ctx, instance, seq, wire.ICQDBQueryMetaReplySetAffiliations)
+}
+
+func (s ICQService) SetBasicInfo(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x03EA_DBQueryMetaReqSetBasicInfo, seq uint16) error {
+	u := state.ICQBasicInfo{
+		CellPhone:    inBody.CellPhone,
+		CountryCode:  inBody.CountryCode,
+		EmailAddress: inBody.EmailAddress,
+		FirstName:    inBody.FirstName,
+		GMTOffset:    inBody.GMTOffset,
+		Address:      inBody.HomeAddress,
+		City:         inBody.City,
+		Fax:          inBody.Fax,
+		Phone:        inBody.Phone,
+		State:        inBody.State,
+		LastName:     inBody.LastName,
+		Nickname:     inBody.Nickname,
+		PublishEmail: inBody.PublishEmail == wire.ICQUserFlagPublishEmailYes,
+		ZIPCode:      inBody.ZIP,
+	}
+	if err := s.userUpdater.SetBasicInfo(ctx, instance.IdentScreenName(), u); err != nil {
+		return err
+	}
+
+	return s.reqAck(ctx, instance, seq, wire.ICQDBQueryMetaReplySetBasicInfo)
 }
 
 func (s ICQService) reply(ctx context.Context, instance *state.SessionInstance, message wire.ICQMessageReplyEnvelope) error {

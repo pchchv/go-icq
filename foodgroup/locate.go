@@ -184,3 +184,28 @@ func (s LocateService) SetKeywordInfo(ctx context.Context, instance *state.Sessi
 		},
 	}, nil
 }
+
+// RightsQuery returns SNAC wire.LocateRightsReply,
+// which contains Locate food group settings for the current user.
+func (s LocateService) RightsQuery(_ context.Context, inFrame wire.SNACFrame) wire.SNACMessage {
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Locate,
+			SubGroup:  wire.LocateRightsReply,
+			RequestID: inFrame.RequestID,
+		},
+		Body: wire.SNAC_0x02_0x03_LocateRightsReply{
+			TLVRestBlock: wire.TLVRestBlock{
+				TLVList: wire.TLVList{
+					// these are arbitrary values--AIM clients seem to perform
+					// OK with them
+					wire.NewTLVBE(wire.LocateTLVTagsRightsMaxSigLen, uint16(1000)),
+					wire.NewTLVBE(wire.LocateTLVTagsRightsMaxCapabilitiesLen, uint16(1000)),
+					wire.NewTLVBE(wire.LocateTLVTagsRightsMaxFindByEmailList, uint16(1000)),
+					wire.NewTLVBE(wire.LocateTLVTagsRightsMaxCertsLen, uint16(1000)),
+					wire.NewTLVBE(wire.LocateTLVTagsRightsMaxMaxShortCapabilities, uint16(1000)),
+				},
+			},
+		},
+	}
+}

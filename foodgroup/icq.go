@@ -345,6 +345,67 @@ func (s ICQService) FindByICQName(ctx context.Context, instance *state.SessionIn
 	return nil
 }
 
+func (s ICQService) FindByUIN(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x051F_DBQueryMetaReqSearchByUIN, seq uint16) error {
+	resp := wire.ICQ_0x07DA_0x01AE_DBQueryMetaReplyLastUserFound{
+		ICQMetadata: wire.ICQMetadata{
+			UIN:     instance.UIN(),
+			ReqType: wire.ICQDBQueryMetaReply,
+			Seq:     seq,
+		},
+		ReqSubType: wire.ICQDBQueryMetaReplyLastUserFound,
+		Success:    wire.ICQStatusCodeOK,
+	}
+	resp.LastResult()
+	res, err := s.userFinder.FindByUIN(ctx, inBody.UIN)
+	switch {
+	case errors.Is(err, state.ErrNoUser):
+		resp.Success = wire.ICQStatusCodeFail
+	case err != nil:
+		s.logger.Error("FindByUIN failed", "err", err.Error())
+		resp.Success = wire.ICQStatusCodeErr
+	default:
+		resp.Success = wire.ICQStatusCodeOK
+		resp.Details = s.createResult(res)
+	}
+
+	return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+		Message: resp,
+	})
+}
+
+func (s ICQService) FindByUIN2(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x0569_DBQueryMetaReqSearchByUIN2, seq uint16) error {
+	UIN, hasUIN := inBody.Uint32LE(wire.ICQTLVTagsUIN)
+	if !hasUIN {
+		return errors.New("unable to get UIN from request")
+	}
+
+	resp := wire.ICQ_0x07DA_0x01AE_DBQueryMetaReplyLastUserFound{
+		ICQMetadata: wire.ICQMetadata{
+			UIN:     instance.UIN(),
+			ReqType: wire.ICQDBQueryMetaReply,
+			Seq:     seq,
+		},
+		ReqSubType: wire.ICQDBQueryMetaReplyLastUserFound,
+		Success:    wire.ICQStatusCodeOK,
+	}
+	resp.LastResult()
+	res, err := s.userFinder.FindByUIN(ctx, UIN)
+	switch {
+	case errors.Is(err, state.ErrNoUser):
+		resp.Success = wire.ICQStatusCodeFail
+	case err != nil:
+		s.logger.Error("FindByUIN failed", "err", err.Error())
+		resp.Success = wire.ICQStatusCodeErr
+	default:
+		resp.Success = wire.ICQStatusCodeOK
+		resp.Details = s.createResult(res)
+	}
+
+	return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+		Message: resp,
+	})
+}
+
 func (s ICQService) reply(ctx context.Context, instance *state.SessionInstance, message wire.ICQMessageReplyEnvelope) error {
 	s.messageRelayer.RelayToScreenName(ctx, instance.IdentScreenName(), wire.SNACMessage{
 		Frame: wire.SNACFrame{

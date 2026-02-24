@@ -683,3 +683,52 @@ func (s ICQService) extraEmails(ctx context.Context, instance *state.SessionInst
 		},
 	})
 }
+
+func (s ICQService) homepageCat(ctx context.Context, instance *state.SessionInstance, user state.User, seq uint16) error {
+	return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+		Message: wire.ICQ_0x07DA_0x010E_DBQueryMetaReplyHomePageCat{
+			ICQMetadata: wire.ICQMetadata{
+				UIN:     instance.UIN(),
+				ReqType: wire.ICQDBQueryMetaReply,
+				Seq:     seq,
+			},
+			ReqSubType: wire.ICQDBQueryMetaReplyHomePageCat,
+			Success:    wire.ICQStatusCodeOK,
+		},
+	})
+}
+
+func (s ICQService) interests(ctx context.Context, instance *state.SessionInstance, user state.User, seq uint16) error {
+	return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+		Message: wire.ICQ_0x07DA_0x00F0_DBQueryMetaReplyInterests{
+			ICQMetadata: wire.ICQMetadata{
+				UIN:     instance.UIN(),
+				ReqType: wire.ICQDBQueryMetaReply,
+				Seq:     seq,
+			},
+			ReqSubType: wire.ICQDBQueryMetaReplyInterests,
+			Success:    wire.ICQStatusCodeOK,
+			Interests: []struct {
+				Code    uint16
+				Keyword string `oscar:"len_prefix=uint16,nullterm"`
+			}{
+				{
+					Code:    user.ICQInterests.Code1,
+					Keyword: user.ICQInterests.Keyword1,
+				},
+				{
+					Code:    user.ICQInterests.Code2,
+					Keyword: user.ICQInterests.Keyword2,
+				},
+				{
+					Code:    user.ICQInterests.Code3,
+					Keyword: user.ICQInterests.Keyword3,
+				},
+				{
+					Code:    user.ICQInterests.Code4,
+					Keyword: user.ICQInterests.Keyword4,
+				},
+			},
+		},
+	})
+}

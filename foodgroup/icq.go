@@ -1,10 +1,12 @@
 package foodgroup
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/pchchv/go-icq/state"
@@ -191,6 +193,44 @@ func (s ICQService) SetWorkInfo(ctx context.Context, instance *state.SessionInst
 	return s.reqAck(ctx, instance, seq, wire.ICQDBQueryMetaReplySetWorkInfo)
 }
 
+func (s ICQService) FindByEmail(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x0573_DBQueryMetaReqSearchByEmail3, seq uint16) error {
+	b, hasEmail := inBody.Bytes(wire.ICQTLVTagsEmail)
+	if !hasEmail {
+		return errors.New("unable to get email from request")
+	}
+
+	email := wire.ICQEmail{}
+	if err := wire.UnmarshalLE(&email, bytes.NewReader(b)); err != nil {
+		return fmt.Errorf("unmarshal email: %w", err)
+	}
+
+	resp := wire.ICQ_0x07DA_0x01AE_DBQueryMetaReplyLastUserFound{
+		ICQMetadata: wire.ICQMetadata{
+			UIN:     instance.UIN(),
+			ReqType: wire.ICQDBQueryMetaReply,
+			Seq:     seq,
+		},
+		ReqSubType: wire.ICQDBQueryMetaReplyLastUserFound,
+		Success:    wire.ICQStatusCodeOK,
+	}
+	resp.LastResult()
+	res, err := s.userFinder.FindByICQEmail(ctx, email.Email)
+	switch {
+	case errors.Is(err, state.ErrNoUser):
+		resp.Success = wire.ICQStatusCodeFail
+	case err != nil:
+		s.logger.Error("FindByICQEmail failed", "err", err.Error())
+		resp.Success = wire.ICQStatusCodeErr
+	default:
+		resp.Success = wire.ICQStatusCodeOK
+		resp.Details = s.createResult(res)
+	}
+
+	return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+		Message: resp,
+	})
+}
+
 func (s ICQService) reply(ctx context.Context, instance *state.SessionInstance, message wire.ICQMessageReplyEnvelope) error {
 	s.messageRelayer.RelayToScreenName(ctx, instance.IdentScreenName(), wire.SNACMessage{
 		Frame: wire.SNACFrame{
@@ -220,4 +260,27 @@ func (s ICQService) reqAck(ctx context.Context, instance *state.SessionInstance,
 			Success:    wire.ICQStatusCodeOK,
 		},
 	})
+}
+
+func (s ICQService) createResult(res state.User) wire.ICQUserSearchRecord {
+	uin, _ := strconv.Atoi(res.IdentScreenName.String())
+	searchRecord := wire.ICQUserSearchRecord{
+		UIN:       uint32(uin),
+		Nickname:  res.ICQBasicInfo.Nickname,
+		FirstName: res.ICQBasicInfo.FirstName,
+		LastName:  res.ICQBasicInfo.LastName,
+		Email:     res.ICQBasicInfo.EmailAddress,
+		Gender:    uint8(res.ICQMoreInfo.Gender),
+		Age:       res.Age(s.timeNow),
+	}
+	if res.ICQPermissions.AuthRequired {
+		searchRecord.Authorization = 1
+	}
+
+	userSess := s.sessionRetriever.RetrieveSession(res.IdentScreenName)
+	if userSess != nil {
+		searchRecord.OnlineStatus = 1
+	}
+
+	return searchRecord
 }

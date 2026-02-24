@@ -209,3 +209,16 @@ func (s LocateService) RightsQuery(_ context.Context, inFrame wire.SNACFrame) wi
 		},
 	}
 }
+
+func newLocateErr(requestID uint32, errCode uint16) wire.SNACMessage {
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Locate,
+			SubGroup:  wire.LocateErr,
+			RequestID: requestID,
+		},
+		Body: wire.SNACError{
+			Code: errCode,
+		},
+	}
+}

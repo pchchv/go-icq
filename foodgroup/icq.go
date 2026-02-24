@@ -619,3 +619,67 @@ func (s ICQService) createResult(res state.User) wire.ICQUserSearchRecord {
 
 	return searchRecord
 }
+
+func (s ICQService) affiliations(ctx context.Context, instance *state.SessionInstance, user state.User, seq uint16) error {
+	return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+		Message: wire.ICQ_0x07DA_0x00FA_DBQueryMetaReplyAffiliations{
+			ICQMetadata: wire.ICQMetadata{
+				UIN:     instance.UIN(),
+				ReqType: wire.ICQDBQueryMetaReply,
+				Seq:     seq,
+			},
+			ReqSubType: wire.ICQDBQueryMetaReplyAffiliations,
+			Success:    wire.ICQStatusCodeOK,
+			ICQ_0x07D0_0x041A_DBQueryMetaReqSetAffiliations: wire.ICQ_0x07D0_0x041A_DBQueryMetaReqSetAffiliations{
+				PastAffiliations: []struct {
+					Code    uint16
+					Keyword string `oscar:"len_prefix=uint16,nullterm"`
+				}{
+					{
+						Code:    user.ICQAffiliations.PastCode1,
+						Keyword: user.ICQAffiliations.PastKeyword1,
+					},
+					{
+						Code:    user.ICQAffiliations.PastCode2,
+						Keyword: user.ICQAffiliations.PastKeyword2,
+					},
+					{
+						Code:    user.ICQAffiliations.PastCode3,
+						Keyword: user.ICQAffiliations.PastKeyword3,
+					},
+				},
+				Affiliations: []struct {
+					Code    uint16
+					Keyword string `oscar:"len_prefix=uint16,nullterm"`
+				}{
+					{
+						Code:    user.ICQAffiliations.CurrentCode1,
+						Keyword: user.ICQAffiliations.CurrentKeyword1,
+					},
+					{
+						Code:    user.ICQAffiliations.CurrentCode2,
+						Keyword: user.ICQAffiliations.CurrentKeyword2,
+					},
+					{
+						Code:    user.ICQAffiliations.CurrentCode3,
+						Keyword: user.ICQAffiliations.CurrentKeyword3,
+					},
+				},
+			},
+		},
+	})
+}
+
+func (s ICQService) extraEmails(ctx context.Context, instance *state.SessionInstance, user state.User, seq uint16) error {
+	return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+		Message: wire.ICQ_0x07DA_0x00EB_DBQueryMetaReplyExtEmailInfo{
+			ICQMetadata: wire.ICQMetadata{
+				UIN:     instance.UIN(),
+				ReqType: wire.ICQDBQueryMetaReply,
+				Seq:     seq,
+			},
+			ReqSubType: wire.ICQDBQueryMetaReplyExtEmailInfo,
+			Success:    wire.ICQStatusCodeOK,
+		},
+	})
+}

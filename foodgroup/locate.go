@@ -3,6 +3,7 @@ package foodgroup
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/pchchv/go-icq/state"
@@ -131,4 +132,55 @@ func (s LocateService) SetInfo(ctx context.Context, instance *state.SessionInsta
 	}
 
 	return nil
+}
+
+// SetDirInfo sets directory information for current user (first name, last name, etc).
+func (s LocateService) SetDirInfo(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x02_0x09_LocateSetDirInfo) (wire.SNACMessage, error) {
+	info := newAIMNameAndAddrFromTLVList(inBody.TLVList)
+	if err := s.profileManager.SetDirectoryInfo(ctx, instance.IdentScreenName(), info); err != nil {
+		return wire.SNACMessage{}, err
+	}
+
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Locate,
+			SubGroup:  wire.LocateSetDirReply,
+			RequestID: inFrame.RequestID,
+		},
+		Body: wire.SNAC_0x02_0x0A_LocateSetDirReply{
+			Result: 1,
+		},
+	}, nil
+}
+
+// SetKeywordInfo sets profile keywords and interests.
+// This method does nothing and exists to placate the AIM client.
+// It returns wire.LocateSetKeywordReply with a canned success message.
+func (s LocateService) SetKeywordInfo(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x02_0x0F_LocateSetKeywordInfo) (wire.SNACMessage, error) {
+	var i int
+	var keywords [5]string
+	for _, tlv := range inBody.TLVList {
+		if tlv.Tag == wire.ODirTLVInterest {
+			keywords[i] = string(tlv.Value)
+			i++
+			if i == len(keywords) {
+				break
+			}
+		}
+	}
+
+	if err := s.profileManager.SetKeywords(ctx, instance.IdentScreenName(), keywords); err != nil {
+		return wire.SNACMessage{}, fmt.Errorf("SetKeywords: %w", err)
+	}
+
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Locate,
+			SubGroup:  wire.LocateSetKeywordReply,
+			RequestID: inFrame.RequestID,
+		},
+		Body: wire.SNAC_0x02_0x10_LocateSetKeywordReply{
+			Unknown: 1,
+		},
+	}, nil
 }

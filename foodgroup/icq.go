@@ -566,6 +566,76 @@ func (s ICQService) DeleteMsgReq(ctx context.Context, instance *state.SessionIns
 	return nil
 }
 
+func (s ICQService) ShortUserInfo(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x04BA_DBQueryMetaReqShortInfo, seq uint16) error {
+	user, err := s.userFinder.FindByUIN(ctx, inBody.UIN)
+	if err != nil {
+		return err
+	}
+
+	info := wire.ICQ_0x07DA_0x0104_DBQueryMetaReplyShortInfo{
+		ICQMetadata: wire.ICQMetadata{
+			UIN:     instance.UIN(),
+			ReqType: wire.ICQDBQueryMetaReply,
+			Seq:     seq,
+		},
+		ReqSubType: wire.ICQDBQueryMetaReplyShortInfo,
+		Success:    wire.ICQStatusCodeOK,
+		Nickname:   user.ICQBasicInfo.Nickname,
+		FirstName:  user.ICQBasicInfo.FirstName,
+		LastName:   user.ICQBasicInfo.LastName,
+		Email:      user.ICQBasicInfo.EmailAddress,
+		Gender:     uint8(user.ICQMoreInfo.Gender),
+	}
+	if user.ICQPermissions.AuthRequired {
+		info.Authorization = 1
+	}
+
+	return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+		Message: info,
+	})
+}
+
+func (s ICQService) FullUserInfo(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x051F_DBQueryMetaReqSearchByUIN, seq uint16) error {
+	user, err := s.userFinder.FindByUIN(ctx, inBody.UIN)
+	if err != nil {
+		return err
+	}
+
+	if err := s.affiliations(ctx, instance, user, seq); err != nil {
+		return err
+	}
+
+	if err := s.extraEmails(ctx, instance, user, seq); err != nil {
+		return err
+	}
+
+	if err := s.homepageCat(ctx, instance, user, seq); err != nil {
+		return err
+	}
+
+	if err := s.interests(ctx, instance, user, seq); err != nil {
+		return err
+	}
+
+	if err := s.moreUserInfo(ctx, instance, user, seq); err != nil {
+		return err
+	}
+
+	if err := s.notes(ctx, instance, user, seq); err != nil {
+		return err
+	}
+
+	if err := s.userInfo(ctx, instance, user, seq); err != nil {
+		return err
+	}
+
+	if err := s.workInfo(ctx, instance, user, seq); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s ICQService) reply(ctx context.Context, instance *state.SessionInstance, message wire.ICQMessageReplyEnvelope) error {
 	s.messageRelayer.RelayToScreenName(ctx, instance.IdentScreenName(), wire.SNACMessage{
 		Frame: wire.SNACFrame{

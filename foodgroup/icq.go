@@ -732,3 +732,49 @@ func (s ICQService) interests(ctx context.Context, instance *state.SessionInstan
 		},
 	})
 }
+
+func (s ICQService) moreUserInfo(ctx context.Context, instance *state.SessionInstance, user state.User, seq uint16) error {
+	return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+		Message: wire.ICQ_0x07DA_0x00DC_DBQueryMetaReplyMoreInfo{
+			ICQMetadata: wire.ICQMetadata{
+				UIN:     instance.UIN(),
+				ReqType: wire.ICQDBQueryMetaReply,
+				Seq:     seq,
+			},
+			ReqSubType: wire.ICQDBQueryMetaReplyMoreInfo,
+			Success:    wire.ICQStatusCodeOK,
+			ICQ_0x07D0_0x03FD_DBQueryMetaReqSetMoreInfo: wire.ICQ_0x07D0_0x03FD_DBQueryMetaReqSetMoreInfo{
+				Age:          uint8(user.Age(s.timeNow)),
+				Gender:       user.ICQMoreInfo.Gender,
+				HomePageAddr: user.ICQMoreInfo.HomePageAddr,
+				BirthYear:    user.ICQMoreInfo.BirthYear,
+				BirthMonth:   user.ICQMoreInfo.BirthMonth,
+				BirthDay:     user.ICQMoreInfo.BirthDay,
+				Lang1:        user.ICQMoreInfo.Lang1,
+				Lang2:        user.ICQMoreInfo.Lang2,
+				Lang3:        user.ICQMoreInfo.Lang3,
+			},
+			City:        user.ICQBasicInfo.City,
+			State:       user.ICQBasicInfo.State,
+			CountryCode: user.ICQBasicInfo.CountryCode,
+			TimeZone:    user.ICQBasicInfo.GMTOffset,
+		},
+	})
+}
+
+func (s ICQService) notes(ctx context.Context, instance *state.SessionInstance, user state.User, seq uint16) error {
+	return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+		Message: wire.ICQ_0x07DA_0x00E6_DBQueryMetaReplyNotes{
+			ICQMetadata: wire.ICQMetadata{
+				UIN:     instance.UIN(),
+				ReqType: wire.ICQDBQueryMetaReply,
+				Seq:     seq,
+			},
+			ReqSubType: wire.ICQDBQueryMetaReplyNotes,
+			Success:    wire.ICQStatusCodeOK,
+			ICQ_0x07D0_0x0406_DBQueryMetaReqSetNotes: wire.ICQ_0x07D0_0x0406_DBQueryMetaReqSetNotes{
+				Notes: user.ICQNotes.Notes,
+			},
+		},
+	})
+}

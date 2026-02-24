@@ -158,6 +158,39 @@ func (s ICQService) SetPermissions(ctx context.Context, instance *state.SessionI
 	return s.reqAck(ctx, instance, seq, wire.ICQDBQueryMetaReplySetPermissions)
 }
 
+func (s ICQService) SetUserNotes(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x0406_DBQueryMetaReqSetNotes, seq uint16) error {
+	u := state.ICQUserNotes{
+		Notes: inBody.Notes,
+	}
+	if err := s.userUpdater.SetUserNotes(ctx, instance.IdentScreenName(), u); err != nil {
+		return err
+	}
+
+	return s.reqAck(ctx, instance, seq, wire.ICQDBQueryMetaReplySetNotes)
+}
+
+func (s ICQService) SetWorkInfo(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x03F3_DBQueryMetaReqSetWorkInfo, seq uint16) error {
+	icqWorkInfo := state.ICQWorkInfo{
+		Company:        inBody.Company,
+		Department:     inBody.Department,
+		OccupationCode: inBody.OccupationCode,
+		Position:       inBody.Position,
+		Address:        inBody.Address,
+		City:           inBody.City,
+		CountryCode:    inBody.CountryCode,
+		Fax:            inBody.Fax,
+		Phone:          inBody.Phone,
+		State:          inBody.State,
+		WebPage:        inBody.WebPage,
+		ZIPCode:        inBody.ZIP,
+	}
+	if err := s.userUpdater.SetWorkInfo(ctx, instance.IdentScreenName(), icqWorkInfo); err != nil {
+		return err
+	}
+
+	return s.reqAck(ctx, instance, seq, wire.ICQDBQueryMetaReplySetWorkInfo)
+}
+
 func (s ICQService) reply(ctx context.Context, instance *state.SessionInstance, message wire.ICQMessageReplyEnvelope) error {
 	s.messageRelayer.RelayToScreenName(ctx, instance.IdentScreenName(), wire.SNACMessage{
 		Frame: wire.SNACFrame{

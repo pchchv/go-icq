@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pchchv/go-icq/state"
@@ -229,6 +230,119 @@ func (s ICQService) FindByEmail(ctx context.Context, instance *state.SessionInst
 	return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
 		Message: resp,
 	})
+}
+
+func (s ICQService) FindByICQEmail(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x0529_DBQueryMetaReqSearchByEmail, seq uint16) error {
+	resp := wire.ICQ_0x07DA_0x01AE_DBQueryMetaReplyLastUserFound{
+		ICQMetadata: wire.ICQMetadata{
+			UIN:     instance.UIN(),
+			ReqType: wire.ICQDBQueryMetaReply,
+			Seq:     seq,
+		},
+		ReqSubType: wire.ICQDBQueryMetaReplyLastUserFound,
+		Success:    wire.ICQStatusCodeOK,
+	}
+	resp.LastResult()
+	res, err := s.userFinder.FindByICQEmail(ctx, inBody.Email)
+	switch {
+	case errors.Is(err, state.ErrNoUser):
+		resp.Success = wire.ICQStatusCodeFail
+	case err != nil:
+		s.logger.Error("FindByICQEmail failed", "err", err.Error())
+		resp.Success = wire.ICQStatusCodeErr
+	default:
+		resp.Success = wire.ICQStatusCodeOK
+		resp.Details = s.createResult(res)
+	}
+
+	return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+		Message: resp,
+	})
+}
+
+func (s ICQService) FindByICQInterests(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x0533_DBQueryMetaReqSearchWhitePages, seq uint16) error {
+	resp := wire.ICQ_0x07DA_0x01AE_DBQueryMetaReplyLastUserFound{
+		ICQMetadata: wire.ICQMetadata{
+			UIN:     instance.UIN(),
+			ReqType: wire.ICQDBQueryMetaReply,
+			Seq:     seq,
+		},
+		Success:    wire.ICQStatusCodeOK,
+		ReqSubType: wire.ICQDBQueryMetaReplyLastUserFound,
+	}
+	interests := strings.Split(inBody.InterestsKeyword, ",")
+	res, err := s.userFinder.FindByICQInterests(ctx, inBody.InterestsCode, interests)
+	if err != nil {
+		s.logger.Error("FindByICQInterests failed", "err", err.Error())
+		resp.Success = wire.ICQStatusCodeErr
+		return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+			Message: resp,
+		})
+	} else if len(res) == 0 {
+		resp.Success = wire.ICQStatusCodeFail
+		return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+			Message: resp,
+		})
+	}
+
+	for i := 0; i < len(res); i++ {
+		if i == len(res)-1 {
+			resp.LastResult()
+		} else {
+			resp.ReqSubType = wire.ICQDBQueryMetaReplyUserFound
+		}
+
+		resp.Details = s.createResult(res[i])
+		if err := s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+			Message: resp,
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s ICQService) FindByICQName(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x0515_DBQueryMetaReqSearchByDetails, seq uint16) error {
+	resp := wire.ICQ_0x07DA_0x01AE_DBQueryMetaReplyLastUserFound{
+		ICQMetadata: wire.ICQMetadata{
+			UIN:     instance.UIN(),
+			ReqType: wire.ICQDBQueryMetaReply,
+			Seq:     seq,
+		},
+		Success:    wire.ICQStatusCodeOK,
+		ReqSubType: wire.ICQDBQueryMetaReplyLastUserFound,
+	}
+	res, err := s.userFinder.FindByICQName(ctx, inBody.FirstName, inBody.LastName, inBody.NickName)
+	if err != nil {
+		s.logger.Error("FindByICQName failed", "err", err.Error())
+		resp.Success = wire.ICQStatusCodeErr
+		return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+			Message: resp,
+		})
+	} else if len(res) == 0 {
+		resp.Success = wire.ICQStatusCodeFail
+		return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+			Message: resp,
+		})
+	}
+
+	for i := 0; i < len(res); i++ {
+		if i == len(res)-1 {
+			resp.LastResult()
+		} else {
+			resp.ReqSubType = wire.ICQDBQueryMetaReplyUserFound
+		}
+
+		resp.Details = s.createResult(res[i])
+		if err := s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+			Message: resp,
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s ICQService) reply(ctx context.Context, instance *state.SessionInstance, message wire.ICQMessageReplyEnvelope) error {

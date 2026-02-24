@@ -778,3 +778,68 @@ func (s ICQService) notes(ctx context.Context, instance *state.SessionInstance, 
 		},
 	})
 }
+
+func (s ICQService) userInfo(ctx context.Context, instance *state.SessionInstance, user state.User, seq uint16) error {
+	userInfo := wire.ICQ_0x07DA_0x00C8_DBQueryMetaReplyBasicInfo{
+		ICQMetadata: wire.ICQMetadata{
+			UIN:     instance.UIN(),
+			ReqType: wire.ICQDBQueryMetaReply,
+			Seq:     seq,
+		},
+		ReqSubType:  wire.ICQDBQueryMetaReplyBasicInfo,
+		Success:     wire.ICQStatusCodeOK,
+		Nickname:    user.ICQBasicInfo.Nickname,
+		FirstName:   user.ICQBasicInfo.FirstName,
+		LastName:    user.ICQBasicInfo.LastName,
+		Email:       user.ICQBasicInfo.EmailAddress,
+		City:        user.ICQBasicInfo.City,
+		State:       user.ICQBasicInfo.State,
+		Phone:       user.ICQBasicInfo.Phone,
+		Fax:         user.ICQBasicInfo.Fax,
+		Address:     user.ICQBasicInfo.Address,
+		CellPhone:   user.ICQBasicInfo.CellPhone,
+		ZIP:         user.ICQBasicInfo.ZIPCode,
+		CountryCode: user.ICQBasicInfo.CountryCode,
+		GMTOffset:   user.ICQBasicInfo.GMTOffset,
+		AuthFlag:    0, // todo figure these out
+		WebAware:    1, // todo figure these out
+		DCPerms:     0, // todo figure these out
+	}
+	if user.ICQBasicInfo.PublishEmail {
+		userInfo.PublishEmail = wire.ICQUserFlagPublishEmailYes
+	} else {
+		userInfo.PublishEmail = wire.ICQUserFlagPublishEmailNo
+	}
+
+	return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+		Message: userInfo,
+	})
+}
+
+func (s ICQService) workInfo(ctx context.Context, instance *state.SessionInstance, user state.User, seq uint16) error {
+	return s.reply(ctx, instance, wire.ICQMessageReplyEnvelope{
+		Message: wire.ICQ_0x07DA_0x00D2_DBQueryMetaReplyWorkInfo{
+			ICQMetadata: wire.ICQMetadata{
+				UIN:     instance.UIN(),
+				ReqType: wire.ICQDBQueryMetaReply,
+				Seq:     seq,
+			},
+			ReqSubType: wire.ICQDBQueryMetaReplyWorkInfo,
+			Success:    wire.ICQStatusCodeOK,
+			ICQ_0x07D0_0x03F3_DBQueryMetaReqSetWorkInfo: wire.ICQ_0x07D0_0x03F3_DBQueryMetaReqSetWorkInfo{
+				City:           user.ICQWorkInfo.City,
+				State:          user.ICQWorkInfo.State,
+				Phone:          user.ICQWorkInfo.Phone,
+				Fax:            user.ICQWorkInfo.Fax,
+				Address:        user.ICQWorkInfo.Address,
+				ZIP:            user.ICQWorkInfo.ZIPCode,
+				CountryCode:    user.ICQWorkInfo.CountryCode,
+				Company:        user.ICQWorkInfo.Company,
+				Department:     user.ICQWorkInfo.Department,
+				Position:       user.ICQWorkInfo.Position,
+				OccupationCode: user.ICQWorkInfo.OccupationCode,
+				WebPage:        user.ICQWorkInfo.WebPage,
+			},
+		},
+	})
+}

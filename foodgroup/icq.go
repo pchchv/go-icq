@@ -94,6 +94,40 @@ func (s ICQService) SetBasicInfo(ctx context.Context, instance *state.SessionIns
 	return s.reqAck(ctx, instance, seq, wire.ICQDBQueryMetaReplySetBasicInfo)
 }
 
+func (s ICQService) SetEmails(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x040B_DBQueryMetaReqSetEmails, seq uint16) error {
+	if len(inBody.Emails) > 0 {
+		s.logger.Debug("adding additional emails is not yet supported")
+	}
+	return s.reqAck(ctx, instance, seq, wire.ICQDBQueryMetaReplySetEmails)
+}
+
+func (s ICQService) SetICQPhone(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x0654_DBQueryMetaReqSetICQPhone, seq uint16) error {
+	s.logger.Debug("received SetICQPhone request")
+	return s.reqAck(ctx, instance, seq, wire.ICQDBQueryMetaReplySetICQPhone)
+}
+
+func (s ICQService) SetInterests(ctx context.Context, instance *state.SessionInstance, inBody wire.ICQ_0x07D0_0x0410_DBQueryMetaReqSetInterests, seq uint16) error {
+	if len(inBody.Interests) != 4 {
+		return fmt.Errorf("%w: expected 4 interests", errICQBadRequest)
+	}
+
+	u := state.ICQInterests{
+		Code1:    inBody.Interests[0].Code,
+		Keyword1: inBody.Interests[0].Keyword,
+		Code2:    inBody.Interests[1].Code,
+		Keyword2: inBody.Interests[1].Keyword,
+		Code3:    inBody.Interests[2].Code,
+		Keyword3: inBody.Interests[2].Keyword,
+		Code4:    inBody.Interests[3].Code,
+		Keyword4: inBody.Interests[3].Keyword,
+	}
+	if err := s.userUpdater.SetInterests(ctx, instance.IdentScreenName(), u); err != nil {
+		return err
+	}
+
+	return s.reqAck(ctx, instance, seq, wire.ICQDBQueryMetaReplySetInterests)
+}
+
 func (s ICQService) reply(ctx context.Context, instance *state.SessionInstance, message wire.ICQMessageReplyEnvelope) error {
 	s.messageRelayer.RelayToScreenName(ctx, instance.IdentScreenName(), wire.SNACMessage{
 		Frame: wire.SNACFrame{

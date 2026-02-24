@@ -1,9 +1,14 @@
 package foodgroup
 
 import (
+	"bytes"
 	"context"
+	"crypto/md5"
+	"errors"
+	"fmt"
 	"log/slog"
 
+	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 )
 
@@ -95,4 +100,57 @@ func (s BARTService) RetrieveItemV2(ctx context.Context, inFrame wire.SNACFrame,
 	}
 
 	return result, nil
+}
+
+func (s BARTService) UpsertItem(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x10_0x02_BARTUploadQuery) (wire.SNACMessage, error) {
+	h := md5.New()
+	if _, err := h.Write(inBody.Data); err != nil {
+		return wire.SNACMessage{}, err
+	}
+
+	hash := h.Sum(nil)
+	if err := s.bartItemManager.InsertBARTItem(ctx, hash, inBody.Data, inBody.Type); err != nil {
+		if !errors.Is(err, state.ErrBARTItemExists) {
+			return wire.SNACMessage{}, fmt.Errorf("failed to insert BART item: %w", err)
+		}
+	}
+
+	s.logger.DebugContext(ctx, "successfully uploaded BART item", "hash", fmt.Sprintf("%x", hash))
+	bartID, hasIcon := instance.Session().BuddyIcon()
+	if hasIcon && bytes.Equal(hash, bartID.Hash) {
+		// unset unknown flag
+		bartID.Flags ^= wire.BARTFlagsUnknown
+		instance.Session().SetBuddyIcon(bartID)
+		s.messageRelayer.RelayToScreenName(ctx, instance.IdentScreenName(), wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.OService,
+				SubGroup:  wire.OServiceUserInfoUpdate,
+			},
+			Body: newOServiceUserInfoUpdate(instance),
+		})
+
+		if err := s.buddyUpdateBroadcaster.BroadcastBuddyArrived(ctx, instance.IdentScreenName(), instance.Session().TLVUserInfo()); err != nil {
+			return wire.SNACMessage{}, err
+		}
+	} else {
+		bartID = wire.BARTID{
+			Type: inBody.Type,
+			BARTInfo: wire.BARTInfo{
+				Flags: wire.BARTFlagsCustom,
+				Hash:  hash,
+			},
+		}
+	}
+
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.BART,
+			SubGroup:  wire.BARTUploadReply,
+			RequestID: inFrame.RequestID,
+		},
+		Body: wire.SNAC_0x10_0x03_BARTUploadReply{
+			Code: wire.BARTReplyCodesSuccess,
+			ID:   bartID,
+		},
+	}, nil
 }

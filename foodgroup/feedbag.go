@@ -295,3 +295,14 @@ func feedbagBuddyPref(prefNum uint16, list wire.TLVList) (valid bool, value bool
 	value = buddyPrefEnabled[index]&mask != 0
 	return
 }
+
+// setSessionBuddyPrefs sets session preferences based on the feedbag buddy prefs item, if present.
+func setSessionBuddyPrefs(items []wire.FeedbagItem, instance *state.SessionInstance) {
+	for _, item := range items {
+		if item.ClassID == wire.FeedbagClassIdBuddyPrefs && item.HasTag(wire.FeedbagAttributesBuddyPrefs) {
+			buddyPrefs, _ := item.Uint32BE(wire.FeedbagAttributesBuddyPrefs)
+			instance.Session().SetTypingEventsEnabled(buddyPrefs&wire.FeedbagBuddyPrefsWantsTypingEvents == wire.FeedbagBuddyPrefsWantsTypingEvents)
+			break
+		}
+	}
+}

@@ -1,6 +1,7 @@
 package foodgroup
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"log/slog"
@@ -273,4 +274,33 @@ func calcElapsedWarningLevel(lastWarnUpdate time.Time, now time.Time, interval t
 	// total amount warning decreased since last signoff
 	warnDelta = int16(decayPeriods * warningDecayPct)
 	return
+}
+
+// addExternalIP appends the client's IP address to the TLV if it's an ICBM rendezvous proposal/accept message.
+func addExternalIP(instance *state.SessionInstance, tlv wire.TLV) (wire.TLV, error) {
+	frag := wire.ICBMCh2Fragment{}
+	if err := wire.UnmarshalBE(&frag, bytes.NewReader(tlv.Value)); err != nil {
+		return tlv, errors.New("wire.UnmarshalBE: " + err.Error())
+	}
+
+	if frag.Type != wire.ICBMRdvMessagePropose {
+		return tlv, nil
+	}
+
+	if frag.HasTag(wire.ICBMRdvTLVTagsRequesterIP) && instance.RemoteAddr() != nil && instance.RemoteAddr().Addr().Is4() {
+		ip := instance.RemoteAddr().Addr()
+		// replace the IP set by the client with the actual IP seen by the
+		// server. unlike AOL’s original behavior, this allows NATed clients
+		// to use rendezvous by replacing their LAN IP with the correct
+		// external IP.
+		frag.Replace(wire.NewTLVBE(wire.ICBMRdvTLVTagsRequesterIP, ip.AsSlice()))
+		// append the client’s IP as seen by the server. the recipient uses
+		// this to verify that the sender’s claimed IP matches what the server
+		// detects. although redundant since we override the requester IP
+		// above, it remains required for client compatibility.
+		frag.Append(wire.NewTLVBE(wire.ICBMRdvTLVTagsVerifiedIP, ip.AsSlice()))
+		return wire.NewTLVBE(tlv.Tag, frag), nil
+	}
+
+	return tlv, nil
 }

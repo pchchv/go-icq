@@ -16,6 +16,8 @@ import (
 )
 
 const (
+	evilDelta         = uint16(100)
+	evilDeltaAnon     = uint16(30)
 	warningDecayPct   = -50
 	rateDecayInterval = 5 * time.Minute
 )
@@ -270,6 +272,114 @@ func (s ICBMService) ClientErr(ctx context.Context, instance *state.SessionInsta
 		},
 	})
 	return nil
+}
+
+// EvilRequest handles user warning (a.k.a evil) notifications.
+// It receives wire.ICBMEvilRequest warning SNAC,
+// increments the warned user's warning level,
+// and sends the warned user a notification informing them that they have been warned.
+// The user may choose to warn anonymously or non-anonymously.
+// It returns SNAC wire.ICBMEvilReply to confirm that the warning was sent.
+// Users may not warn themselves or warn users they have blocked or are blocked by.
+func (s ICBMService) EvilRequest(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x04_0x08_ICBMEvilRequest) (wire.SNACMessage, error) {
+	identScreenName := state.NewIdentScreenName(inBody.ScreenName)
+	// don't let users warn themselves,
+	// it causes the AIM client to go into a weird state.
+	if identScreenName == instance.IdentScreenName() {
+		return *newICBMErr(inFrame.RequestID, wire.ErrorCodeNotSupportedByHost), nil
+	}
+
+	blocked, err := s.relationshipFetcher.Relationship(ctx, instance.IdentScreenName(), identScreenName)
+	if err != nil {
+		return wire.SNACMessage{}, err
+	} else if blocked.BlocksYou || blocked.YouBlock {
+		// user or target is blocked
+		return *newICBMErr(inFrame.RequestID, wire.ErrorCodeNotLoggedOn), nil
+	}
+
+	recipSess := s.sessionRetriever.RetrieveSession(identScreenName)
+	if recipSess == nil {
+		// target user is offline
+		return *newICBMErr(inFrame.RequestID, wire.ErrorCodeNotLoggedOn), nil
+	} else if recipSess.AllUserInfoBitmask(wire.OServiceUserFlagBot) {
+		// target user is a bot, bots can't be warned
+		return *newICBMErr(inFrame.RequestID, wire.ErrorCodeRequestDenied), nil
+	}
+
+	if !s.convoTracker.trackWarn(time.Now(), instance.IdentScreenName(), recipSess.IdentScreenName()) {
+		// user has warned target too many times or not enough messages have been received from target
+		return *newICBMErr(inFrame.RequestID, wire.ErrorCodeRequestDenied), nil
+	}
+
+	increase := evilDelta
+	if inBody.SendAs == 1 {
+		increase = evilDeltaAnon
+	}
+
+	// get the rate class for sending IMs, which gets limited when the user gets warned
+	classID, ok := s.snacRateLimits.RateClassLookup(wire.ICBM, wire.ICBMChannelMsgToHost)
+	if !ok {
+		panic("failed to retrieve rate class for ICBMChannelMsgToHost")
+	}
+
+	ok, newLevel := recipSess.ScaleWarningAndRateLimit(int16(increase), classID)
+	if !ok {
+		// target's warning is at 100%
+		return *newICBMErr(inFrame.RequestID, wire.ErrorCodeRequestDenied), nil
+	}
+
+	notif := wire.SNAC_0x01_0x10_OServiceEvilNotification{
+		NewEvil: newLevel,
+	}
+	// append info about user who sent the warning
+	if inBody.SendAs == 0 {
+		notif.Snitcher = &struct {
+			wire.TLVUserInfo
+		}{
+			TLVUserInfo: wire.TLVUserInfo{
+				ScreenName:   instance.DisplayScreenName().String(),
+				WarningLevel: instance.Warning(),
+			},
+		}
+	}
+
+	s.messageRelayer.RelayToScreenName(ctx, recipSess.IdentScreenName(), wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.OService,
+			SubGroup:  wire.OServiceEvilNotification,
+		},
+		Body: notif,
+	})
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.ICBM,
+			SubGroup:  wire.ICBMEvilReply,
+			RequestID: inFrame.RequestID,
+		},
+		Body: wire.SNAC_0x04_0x09_ICBMEvilReply{
+			EvilDeltaApplied: increase,
+			UpdatedEvilValue: newLevel,
+		},
+	}, nil
+}
+
+// ParameterQuery returns ICBM service parameters.
+func (s ICBMService) ParameterQuery(_ context.Context, inFrame wire.SNACFrame) wire.SNACMessage {
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.ICBM,
+			SubGroup:  wire.ICBMParameterReply,
+			RequestID: inFrame.RequestID,
+		},
+		Body: wire.SNAC_0x04_0x05_ICBMParameterReply{
+			MaxSlots:             100,
+			ICBMFlags:            3,
+			MaxIncomingICBMLen:   512,
+			MaxSourceEvil:        999,
+			MaxDestinationEvil:   999,
+			MinInterICBMInterval: 0,
+		},
+	}
 }
 
 func (s ICBMService) sendOfflineMessage(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x04_0x06_ICBMChannelMsgToHost) (*wire.SNACMessage, error) {

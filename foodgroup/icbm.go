@@ -678,3 +678,7 @@ func stripHTMLFromICBMTLV(tlv wire.TLV) (wire.TLV, error) {
 
 	return wire.NewTLVBE(tlv.Tag, newValue), nil
 }
+
+func timeTillNextInterval(lastWarned time.Time, now time.Time, interval time.Duration) time.Duration {
+	return interval - (now.Sub(lastWarned) % interval)
+}

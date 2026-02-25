@@ -1,11 +1,63 @@
 package foodgroup
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/patrickmn/go-cache"
 	"github.com/pchchv/go-icq/state"
+	"github.com/pchchv/go-icq/wire"
 )
+
+const rateDecayInterval = 5 * time.Minute
+
+// ICBMService provides functionality for the ICBM food group,
+// which is responsible for sending and receiving instant messages and
+// associated functionality such as warning, typing events, etc.
+type ICBMService struct {
+	relationshipFetcher   RelationshipFetcher
+	buddyBroadcaster      buddyBroadcaster
+	messageRelayer        MessageRelayer
+	offlineMessageSaver   OfflineMessageManager
+	userManager           UserManager
+	feedbagManager        FeedbagManager
+	timeNow               func() time.Time
+	sessionRetriever      SessionRetriever
+	snacRateLimits        wire.SNACRateLimits
+	convoTracker          *convoTracker
+	logger                *slog.Logger
+	interval              time.Duration
+	offlineMessageManager OfflineMessageManager
+}
+
+// NewICBMService returns a new instance of ICBMService.
+func NewICBMService(
+	bartItemManager BARTItemManager,
+	messageRelayer MessageRelayer,
+	offlineMessageSaver OfflineMessageManager,
+	relationshipFetcher RelationshipFetcher,
+	sessionRetriever SessionRetriever,
+	userManager UserManager,
+	feedbagManager FeedbagManager,
+	snacRateLimits wire.SNACRateLimits,
+	logger *slog.Logger,
+) *ICBMService {
+	return &ICBMService{
+		relationshipFetcher:   relationshipFetcher,
+		buddyBroadcaster:      newBuddyNotifier(bartItemManager, relationshipFetcher, messageRelayer, sessionRetriever),
+		messageRelayer:        messageRelayer,
+		offlineMessageSaver:   offlineMessageSaver,
+		offlineMessageManager: offlineMessageSaver,
+		userManager:           userManager,
+		feedbagManager:        feedbagManager,
+		timeNow:               time.Now,
+		sessionRetriever:      sessionRetriever,
+		snacRateLimits:        snacRateLimits,
+		convoTracker:          newConvoTracker(),
+		logger:                logger,
+		interval:              rateDecayInterval,
+	}
+}
 
 // ringBuffer is a fixed-size circular buffer with 3 slots for storing time values.
 type ringBuffer struct {

@@ -1,8 +1,10 @@
 package foodgroup
 
 import (
+	"context"
 	"log/slog"
 
+	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 )
 
@@ -32,6 +34,25 @@ func NewFeedbagService(
 		logger:           logger,
 		messageRelayer:   messageRelayer,
 	}
+}
+
+// StartCluster signals the beginning of a batch of feedbag operations that clients should
+// process together to prevent UI flicker during rapid updates.
+// It transmits the start message to other session instances.
+func (s FeedbagService) StartCluster(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x13_0x11_FeedbagStartCluster) {
+	s.messageRelayer.RelayToOtherInstances(ctx, instance, wire.SNACMessage{
+		Frame: inFrame,
+		Body:  inBody,
+	})
+}
+
+// EndCluster signals the completion of a batched feedbag operation group.
+// It transmits the end message to other session instances.
+func (s FeedbagService) EndCluster(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame) {
+	s.messageRelayer.RelayToOtherInstances(ctx, instance, wire.SNACMessage{
+		Frame: inFrame,
+		Body:  wire.SNAC_0x13_0x12_FeedbagEndCluster{},
+	})
 }
 
 // FeedbagBuddyPref returns a pref value stored in the user's feedbag.

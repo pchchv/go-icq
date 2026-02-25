@@ -489,6 +489,53 @@ func (s ICBMService) UpdateWarnLevel(ctx context.Context, instance *state.Sessio
 	}
 }
 
+func (s ICBMService) OfflineRetrieve(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame) (wire.SNACMessage, error) {
+	msgList, err := s.offlineMessageManager.RetrieveMessages(ctx, instance.IdentScreenName())
+	if err != nil {
+		return wire.SNACMessage{}, errors.New("retrieving messages: " + err.Error())
+	}
+
+	for _, event := range msgList {
+		clientIM := wire.SNAC_0x04_0x07_ICBMChannelMsgToClient{
+			Cookie:    event.Message.Cookie,
+			ChannelID: event.Message.ChannelID,
+			TLVUserInfo: wire.TLVUserInfo{
+				ScreenName: event.Sender.String(),
+			},
+			TLVRestBlock: wire.TLVRestBlock{},
+		}
+
+		for _, tlv := range event.Message.TLVRestBlock.TLVList {
+			clientIM.Append(tlv)
+		}
+
+		clientIM.Append(wire.NewTLVBE(wire.ICBMTLVSendTime, uint32(event.Sent.Unix())))
+		s.messageRelayer.RelayToScreenName(ctx, event.Recipient, wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.ICBM,
+				SubGroup:  wire.ICBMChannelMsgToClient,
+				RequestID: wire.ReqIDFromServer,
+			},
+			Body: clientIM,
+		})
+	}
+
+	if len(msgList) > 0 {
+		if err := s.offlineMessageManager.DeleteMessages(ctx, instance.IdentScreenName()); err != nil {
+			return wire.SNACMessage{}, errors.New("offlineMessageManager.DeleteMessages: " + err.Error())
+		}
+	}
+
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.ICBM,
+			SubGroup:  wire.ICBMOfflineRetrieveReply,
+			RequestID: inFrame.RequestID,
+		},
+		Body: wire.SNAC_0x04_0x17_ICBMOfflineRetrieveReply{},
+	}, nil
+}
+
 func (s ICBMService) sendOfflineMessage(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x04_0x06_ICBMChannelMsgToHost) (*wire.SNACMessage, error) {
 	recip := state.NewIdentScreenName(inBody.ScreenName)
 	offlineMsg := state.OfflineMessage{

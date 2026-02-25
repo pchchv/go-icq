@@ -1,6 +1,38 @@
 package foodgroup
 
-import "github.com/pchchv/go-icq/wire"
+import (
+	"log/slog"
+
+	"github.com/pchchv/go-icq/wire"
+)
+
+// FeedbagService provides functionality for the Feedbag food group,
+// which handles buddy list management.
+type FeedbagService struct {
+	bartItemManager  BARTItemManager
+	buddyBroadcaster buddyBroadcaster
+	feedbagManager   FeedbagManager
+	logger           *slog.Logger
+	messageRelayer   MessageRelayer
+}
+
+// NewFeedbagService creates a new instance of FeedbagService.
+func NewFeedbagService(
+	logger *slog.Logger,
+	messageRelayer MessageRelayer,
+	feedbagManager FeedbagManager,
+	bartItemManager BARTItemManager,
+	relationshipFetcher RelationshipFetcher,
+	sessionRetriever SessionRetriever,
+) FeedbagService {
+	return FeedbagService{
+		bartItemManager:  bartItemManager,
+		buddyBroadcaster: newBuddyNotifier(bartItemManager, relationshipFetcher, messageRelayer, sessionRetriever),
+		feedbagManager:   feedbagManager,
+		logger:           logger,
+		messageRelayer:   messageRelayer,
+	}
+}
 
 // FeedbagBuddyPref returns a pref value stored in the user's feedbag.
 //

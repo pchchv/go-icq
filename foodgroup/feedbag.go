@@ -260,6 +260,51 @@ func (s FeedbagService) UpsertItem(ctx context.Context, instance *state.SessionI
 	return nil, nil
 }
 
+// DeleteItem removes items from feedbag (buddy list).
+// Sends user buddy arrival notifications for each online & visible buddy added to the feedbag.
+// Sends buddy arrival notifications to each unblocked buddy if current user is visible.
+// It returns wire.FeedbagStatus, which contains update confirmation.
+func (s FeedbagService) DeleteItem(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x13_0x0A_FeedbagDeleteItem) (*wire.SNACMessage, error) {
+	if err := s.feedbagManager.FeedbagDelete(ctx, instance.IdentScreenName(), inBody.Items); err != nil {
+		return nil, err
+	}
+
+	snacPayloadOut := wire.SNAC_0x13_0x0E_FeedbagStatus{}
+	for range inBody.Items {
+		snacPayloadOut.Results = append(snacPayloadOut.Results, 0x0000) // success by default
+	}
+
+	var filter []state.IdentScreenName
+	s.messageRelayer.RelayToSelf(ctx, instance, wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Feedbag,
+			SubGroup:  wire.FeedbagStatus,
+			RequestID: inFrame.RequestID,
+		},
+		Body: snacPayloadOut,
+	})
+	s.messageRelayer.RelayToOtherInstances(ctx, instance, wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: inFrame.FoodGroup,
+			SubGroup:  inFrame.SubGroup,
+			RequestID: wire.ReqIDFromServer,
+		},
+		Body: inBody,
+	})
+	for _, item := range inBody.Items {
+		switch item.ClassID {
+		case wire.FeedbagClassIdBuddy, wire.FeedbagClassIDDeny, wire.FeedbagClassIDPermit:
+			filter = append(filter, state.NewIdentScreenName(item.Name))
+		}
+	}
+
+	if err := s.buddyBroadcaster.BroadcastVisibility(ctx, instance, filter, true); err != nil {
+		return nil, err
+	}
+
+	return nil, nil
+}
+
 // setBARTItem informs clients about buddy icon update.
 // If the BART store doesn't have the icon, then tell the client to upload the buddy icon.
 // If the icon already exists, tell the user's buddies about the icon change.

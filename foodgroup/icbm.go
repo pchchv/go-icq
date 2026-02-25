@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/patrickmn/go-cache"
+	"github.com/pchchv/go-icq/state"
 )
 
 // convoTracker keeps track of messages initiated from a sender to a recipient.
@@ -24,4 +25,8 @@ func newConvoTracker() *convoTracker {
 		warns:  cache.New(window, window),
 		window: window,
 	}
+}
+
+func (w *convoTracker) key(sender state.IdentScreenName, recip state.IdentScreenName) string {
+	return sender.String() + recip.String()
 }

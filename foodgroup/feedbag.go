@@ -305,6 +305,61 @@ func (s FeedbagService) DeleteItem(ctx context.Context, instance *state.SessionI
 	return nil, nil
 }
 
+// RespondAuthorizeToHost forwards an authorization response from the user whose authorization was
+// requested to the user who made the authorization request.
+// Right now we send an ICBM request so that responses can work for both ICQ 2000b and ICQ 2001a.
+// This function should eventually only send an ICBM message to non-feedbag clients and SNAC(0x0013,0x001B) to feedbag clients.
+func (s FeedbagService) RespondAuthorizeToHost(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x13_0x1A_FeedbagRespondAuthorizeToHost) error {
+	response := wire.ICBMCh4Message{
+		UIN:     instance.UIN(),
+		Message: inBody.Reason,
+	}
+
+	switch inBody.Accepted {
+	case 0:
+		response.MessageType = wire.ICBMMsgTypeAuthDeny
+	case 1:
+		response.MessageType = wire.ICBMMsgTypeAuthOK
+	default:
+		return fmt.Errorf("invalid accepted flag %d", inBody.Accepted)
+	}
+
+	s.messageRelayer.RelayToScreenName(ctx, state.NewIdentScreenName(inBody.ScreenName), wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.ICBM,
+			SubGroup:  wire.ICBMChannelMsgToClient,
+		},
+		Body: wire.SNAC_0x04_0x07_ICBMChannelMsgToClient{
+			ChannelID:   wire.ICBMChannelICQ,
+			TLVUserInfo: instance.Session().TLVUserInfo(),
+			TLVRestBlock: wire.TLVRestBlock{
+				TLVList: wire.TLVList{
+					wire.NewTLVLE(wire.ICBMTLVData, response),
+					wire.NewTLVBE(wire.ICBMTLVStore, []byte{}),
+				},
+			},
+		},
+	})
+	return nil
+}
+
+// Use sends a user the contents of their buddy list.
+// It's invoked at sign-on by AIM clients that use the feedbag food group for buddy list management
+// (as opposed to client-side management).
+func (s FeedbagService) Use(ctx context.Context, instance *state.SessionInstance) error {
+	if err := s.feedbagManager.UseFeedbag(ctx, instance.IdentScreenName()); err != nil {
+		return errors.New("could not use feedbag: " + err.Error())
+	}
+
+	items, err := s.feedbagManager.Feedbag(ctx, instance.IdentScreenName())
+	if err != nil {
+		return errors.New("feedbagManager.Feedbag: " + err.Error())
+	}
+
+	setSessionBuddyPrefs(items, instance)
+	return nil
+}
+
 // setBARTItem informs clients about buddy icon update.
 // If the BART store doesn't have the icon, then tell the client to upload the buddy icon.
 // If the icon already exists, tell the user's buddies about the icon change.

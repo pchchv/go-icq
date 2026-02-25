@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/patrickmn/go-cache"
@@ -379,6 +380,112 @@ func (s ICBMService) ParameterQuery(_ context.Context, inFrame wire.SNACFrame) w
 			MaxDestinationEvil:   999,
 			MinInterICBMInterval: 0,
 		},
+	}
+}
+
+// UpdateWarnLevel periodically updates the warning level relative to time elapsed between warnings.
+func (s ICBMService) UpdateWarnLevel(ctx context.Context, instance *state.SessionInstance) {
+	var doReset, inProgress bool
+	var ticker *time.Ticker
+	var tickC <-chan time.Time // nil when idle, enables/disables the select case
+	if instance.Warning() > 0 {
+		u, err := s.userManager.User(ctx, instance.IdentScreenName())
+		if err != nil {
+			s.logger.ErrorContext(ctx, "failed to get user", "err", err)
+			return
+		}
+
+		newInterval := timeTillNextInterval(u.LastWarnUpdate, s.timeNow(), s.interval)
+		interval := s.interval
+		if newInterval > 0 {
+			interval = newInterval
+		}
+
+		s.logger.DebugContext(ctx, "starting warning level update with interval adjusted to next boundary",
+			"user", instance.IdentScreenName(),
+			"adjusted_interval", interval,
+			"default_interval", s.interval,
+			"time_since_last_update", s.timeNow().Sub(u.LastWarnUpdate),
+		)
+		// startTicker now returns the new ticker and channel so caller can use them
+		ticker, tickC = startTicker(s, ctx, interval, &inProgress)
+		doReset = true
+	}
+
+	// get the rate class for sending IMs, which gets limited when the user gets warned
+	classID, ok := s.snacRateLimits.RateClassLookup(wire.ICBM, wire.ICBMChannelMsgToHost)
+	if !ok {
+		panic("failed to retrieve rate class for ICBMChannelMsgToHost")
+	}
+
+	warnCh := make(chan struct{}, 1)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer close(warnCh)
+		for {
+			select {
+			case <-instance.Closed():
+				return
+			case <-ctx.Done():
+				return
+			case warning := <-instance.WarningCh():
+				if warning > 0 {
+					warnCh <- struct{}{}
+				}
+
+				if err := s.userManager.SetWarnLevel(ctx, instance.IdentScreenName(), s.timeNow(), warning); err != nil {
+					s.logger.ErrorContext(ctx, "failed to set warn level", "err", err)
+				}
+
+				info := instance.Session().TLVUserInfo()
+				// lock in the current warning level to avoid race conditions
+				// where the warning level might change during this broadcast
+				// operation
+				info.WarningLevel = warning
+				if err := s.buddyBroadcaster.BroadcastBuddyArrived(ctx, instance.IdentScreenName(), info); err != nil {
+					s.logger.ErrorContext(ctx, "BroadcastBuddyArrived failed", "err", err)
+				} else {
+					s.logger.DebugContext(ctx, "warning lowered", "remaining", warning)
+				}
+			}
+		}
+	}()
+
+	defer wg.Wait()
+
+	for {
+		select {
+		case <-instance.Closed():
+			stopTicker(s, ctx, &ticker, &tickC, &inProgress)
+			return
+		case <-ctx.Done():
+			stopTicker(s, ctx, &ticker, &tickC, &inProgress)
+			return
+		case <-warnCh:
+			if inProgress {
+				s.logger.DebugContext(ctx, "warning decay already in progress")
+				continue
+			}
+			// start a fresh ticker and keep track of the returned values
+			ticker, tickC = startTicker(s, ctx, s.interval, &inProgress)
+		case <-tickC:
+			if doReset {
+				ticker.Reset(s.interval)
+				doReset = false
+			}
+
+			ok, warning := instance.Session().ScaleWarningAndRateLimit(warningDecayPct, classID)
+			if !ok {
+				s.logger.ErrorContext(ctx, "warning increment out of rage", "level", warning)
+				stopTicker(s, ctx, &ticker, &tickC, &inProgress)
+				return
+			} else if warning == 0 {
+				s.logger.DebugContext(ctx, "warning decay complete")
+				stopTicker(s, ctx, &ticker, &tickC, &inProgress)
+			}
+		}
 	}
 }
 

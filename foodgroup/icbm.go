@@ -1,6 +1,8 @@
 package foodgroup
 
 import (
+	"context"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -60,6 +62,93 @@ func NewICBMService(
 		logger:                logger,
 		interval:              rateDecayInterval,
 	}
+}
+
+// RestoreWarningLevel restores the warning level from the last stored value at login time,
+// accounting for time passed between logins.
+func (s ICBMService) RestoreWarningLevel(ctx context.Context, instance *state.SessionInstance) error {
+	u, err := s.userManager.User(ctx, instance.IdentScreenName())
+	if err != nil {
+		return errors.New("failed to get user: " + err.Error())
+	} else if u == nil {
+		return state.ErrNoUser
+	} else if u.LastWarnLevel == 0 {
+		// user had no warning at the end of last session
+		return nil
+	}
+
+	// get the rate class for sending IMs, which gets limited when the user gets warned
+	classID, ok := s.snacRateLimits.RateClassLookup(wire.ICBM, wire.ICBMChannelMsgToHost)
+	if !ok {
+		panic("failed to retrieve rate class for ICBMChannelMsgToHost")
+	}
+
+	// increment warning level by the amount of time that has passed since last
+	// login, proportionally increasing the warning level
+	warnDelta := calcElapsedWarningLevel(u.LastWarnUpdate, s.timeNow(), s.interval)
+	newWarning := int16(u.LastWarnLevel) + warnDelta
+	instance.Session().SetWarning(0)
+	instance.Session().ScaleWarningAndRateLimit(newWarning, classID)
+	if instance.Warning() > 0 {
+		s.logger.DebugContext(
+			ctx, "restored warning level with time decay applied since last login",
+			"stored_level", u.LastWarnLevel,
+			"time_since_update", s.timeNow().Sub(u.LastWarnUpdate),
+			"decay_delta", warnDelta,
+			"final_level", instance.Warning(),
+		)
+	} else {
+		s.logger.DebugContext(
+			ctx, "warning level decayed to zero since last login",
+			"stored_level", u.LastWarnLevel,
+			"time_since_update", s.timeNow().Sub(u.LastWarnUpdate),
+			"decay_delta", warnDelta,
+		)
+	}
+
+	return nil
+}
+
+func (s ICBMService) sendOfflineMessage(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x04_0x06_ICBMChannelMsgToHost) (*wire.SNACMessage, error) {
+	recip := state.NewIdentScreenName(inBody.ScreenName)
+	offlineMsg := state.OfflineMessage{
+		Message:   inBody,
+		Recipient: recip,
+		Sender:    instance.IdentScreenName(),
+		Sent:      s.timeNow().UTC(),
+	}
+	if _, err := s.offlineMessageSaver.SaveMessage(ctx, offlineMsg); err != nil {
+		if errors.Is(err, state.ErrOfflineInboxFull) {
+			return newICBMErr(
+				inFrame.RequestID,
+				wire.ErrorCodeNotLoggedOn,
+				wire.NewTLVBE(wire.ErrorTLVErrorSubcode, wire.ICBMSubErrOfflineIMExceedMax),
+			), nil
+		}
+		return nil, errors.New("save ICBM offline message failed: " + err.Error())
+	}
+
+	if instance.UIN() > 0 {
+		return newICBMErr(inFrame.RequestID, wire.ErrorCodeNotLoggedOn), nil
+	}
+
+	if _, requestedConfirmation := inBody.TLVRestBlock.Bytes(wire.ICBMTLVRequestHostAck); requestedConfirmation {
+		// ack message back to sender
+		return &wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.ICBM,
+				SubGroup:  wire.ICBMHostAck,
+				RequestID: inFrame.RequestID,
+			},
+			Body: wire.SNAC_0x04_0x0C_ICBMHostAck{
+				Cookie:     inBody.Cookie,
+				ChannelID:  inBody.ChannelID,
+				ScreenName: inBody.ScreenName,
+			},
+		}, nil
+	}
+
+	return nil, nil
 }
 
 // ringBuffer is a fixed-size circular buffer with 3 slots for storing time values.

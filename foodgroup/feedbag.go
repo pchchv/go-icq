@@ -3,6 +3,7 @@ package foodgroup
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
@@ -53,6 +54,36 @@ func (s FeedbagService) EndCluster(ctx context.Context, instance *state.SessionI
 		Frame: inFrame,
 		Body:  wire.SNAC_0x13_0x12_FeedbagEndCluster{},
 	})
+}
+
+// Query fetches the user's feedbag (buddy list).
+// It returns wire.FeedbagReply, which contains feedbag entries.
+func (s FeedbagService) Query(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame) (wire.SNACMessage, error) {
+	fb, err := s.feedbagManager.Feedbag(ctx, instance.IdentScreenName())
+	if err != nil {
+		return wire.SNACMessage{}, err
+	}
+
+	lm := time.UnixMilli(0)
+	if len(fb) > 0 {
+		lm, err = s.feedbagManager.FeedbagLastModified(ctx, instance.IdentScreenName())
+		if err != nil {
+			return wire.SNACMessage{}, err
+		}
+	}
+
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Feedbag,
+			SubGroup:  wire.FeedbagReply,
+			RequestID: inFrame.RequestID,
+		},
+		Body: wire.SNAC_0x13_0x06_FeedbagReply{
+			Version:    0,
+			Items:      fb,
+			LastUpdate: uint32(lm.Unix()),
+		},
+	}, nil
 }
 
 // FeedbagBuddyPref returns a pref value stored in the user's feedbag.

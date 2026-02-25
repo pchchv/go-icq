@@ -113,6 +113,119 @@ func (s ICBMService) RestoreWarningLevel(ctx context.Context, instance *state.Se
 	return nil
 }
 
+// ChannelMsgToHost relays the instant message SNAC wire.ICBMChannelMsgToHost from the sender to the intended recipient.
+// It returns wire.ICBMHostAck if the wire.ICBMChannelMsgToHost message contains a request acknowledgement flag.
+func (s ICBMService) ChannelMsgToHost(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x04_0x06_ICBMChannelMsgToHost) (*wire.SNACMessage, error) {
+	recip := state.NewIdentScreenName(inBody.ScreenName)
+	if rel, err := s.relationshipFetcher.Relationship(ctx, instance.IdentScreenName(), recip); err != nil {
+		return nil, err
+	} else if rel.BlocksYou {
+		return newICBMErr(inFrame.RequestID, wire.ErrorCodeNotLoggedOn), nil
+	} else if rel.YouBlock {
+		return newICBMErr(inFrame.RequestID, wire.ErrorCodeInLocalPermitDeny), nil
+	}
+
+	recipSess := s.sessionRetriever.RetrieveSession(recip)
+	if recipSess == nil {
+		// check for TLV that indicates that the message should be saved offline.
+		// For AIM 6/7, this is only set if the sender has the recipient on
+		// their buddy list and they've seen them online at least once.
+		if _, saveOffline := inBody.Bytes(wire.ICBMTLVStore); !saveOffline {
+			return newICBMErr(inFrame.RequestID, wire.ErrorCodeNotLoggedOn), nil
+		}
+
+		if canSend, err := s.canSendOfflineMessage(ctx, inBody); err != nil {
+			return nil, err
+		} else if !canSend {
+			return newICBMErr(inFrame.RequestID, wire.ErrorCodeNotLoggedOn), nil
+		}
+
+		msg, err := s.sendOfflineMessage(ctx, instance, inFrame, inBody)
+		if errors.Is(err, state.ErrNoUser) {
+			return newICBMErr(inFrame.RequestID, wire.ErrorCodeNotLoggedOn), nil
+		}
+
+		return msg, err
+	}
+
+	clientIM := wire.SNAC_0x04_0x07_ICBMChannelMsgToClient{
+		Cookie:       inBody.Cookie,
+		ChannelID:    inBody.ChannelID,
+		TLVUserInfo:  instance.Session().TLVUserInfo(),
+		TLVRestBlock: wire.TLVRestBlock{},
+	}
+	for _, tlv := range inBody.TLVRestBlock.TLVList {
+		if tlv.Tag == wire.ICBMTLVRequestHostAck {
+			// exclude this TLV, because its presence breaks chat invitations on macOS client v4.0.9
+			continue
+		}
+
+		var err error
+		if clientIM.ChannelID == wire.ICBMChannelRendezvous && tlv.Tag == wire.ICBMTLVData {
+			if tlv, err = addExternalIP(instance, tlv); err != nil {
+				return nil, errors.New("addExternalIP: " + err.Error())
+			}
+		}
+
+		// strip HTML from ICQ messages if recipient doesn't support XHTML
+		// AIM clients send HTML formatted messages that should be preserved
+		if instance.UIN() > 0 &&
+			(clientIM.ChannelID == wire.ICBMChannelIM || clientIM.ChannelID == wire.ICBMChannelMIME) &&
+			tlv.Tag == wire.ICBMTLVAOLIMData && !recipSess.HasCap(wire.CapXHTMLIM) {
+			if transformedTLV, err := stripHTMLFromICBMTLV(tlv); err == nil {
+				tlv = transformedTLV
+			}
+		}
+
+		clientIM.Append(tlv)
+	}
+
+	if instance.TypingEventsEnabled() && (inBody.ChannelID == wire.ICBMChannelIM || inBody.ChannelID == wire.ICBMChannelMIME) {
+		// tell the receiver that we want to receive their typing events
+		clientIM.Append(wire.NewTLVBE(wire.ICBMTLVWantEvents, []byte{}))
+	}
+
+	if recipSess.Inactive() {
+		s.messageRelayer.RelayToScreenName(ctx, recipSess.IdentScreenName(), wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.ICBM,
+				SubGroup:  wire.ICBMChannelMsgToClient,
+				RequestID: wire.ReqIDFromServer,
+			},
+			Body: clientIM,
+		})
+	} else {
+		s.messageRelayer.RelayToScreenNameActiveOnly(ctx, recipSess.IdentScreenName(), wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.ICBM,
+				SubGroup:  wire.ICBMChannelMsgToClient,
+				RequestID: wire.ReqIDFromServer,
+			},
+			Body: clientIM,
+		})
+	}
+
+	s.convoTracker.trackConvo(time.Now(), instance.IdentScreenName(), recipSess.IdentScreenName())
+	if _, requestedConfirmation := inBody.TLVRestBlock.Bytes(wire.ICBMTLVRequestHostAck); !requestedConfirmation {
+		// don't ack message
+		return nil, nil
+	}
+
+	// ack message back to sender
+	return &wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.ICBM,
+			SubGroup:  wire.ICBMHostAck,
+			RequestID: inFrame.RequestID,
+		},
+		Body: wire.SNAC_0x04_0x0C_ICBMHostAck{
+			Cookie:     inBody.Cookie,
+			ChannelID:  inBody.ChannelID,
+			ScreenName: inBody.ScreenName,
+		},
+	}, nil
+}
+
 func (s ICBMService) sendOfflineMessage(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x04_0x06_ICBMChannelMsgToHost) (*wire.SNACMessage, error) {
 	recip := state.NewIdentScreenName(inBody.ScreenName)
 	offlineMsg := state.OfflineMessage{
@@ -153,6 +266,38 @@ func (s ICBMService) sendOfflineMessage(ctx context.Context, instance *state.Ses
 	}
 
 	return nil, nil
+}
+
+// canSendOfflineMessage returns true if the user can send an offline message.
+//
+//	For ICQ users, always return true.
+//
+//	For AIM users, only return false if the recipient has specifically opted out
+//	of receiving offline messages or they do not have a stored buddy list.
+func (s ICBMService) canSendOfflineMessage(ctx context.Context, inBody wire.SNAC_0x04_0x06_ICBMChannelMsgToHost) (bool, error) {
+	bag, err := s.feedbagManager.Feedbag(ctx, state.NewIdentScreenName(inBody.ScreenName))
+	if err != nil {
+		return false, errors.New("get feedbag failed: " + err.Error())
+	}
+
+	for _, item := range bag {
+		if item.ClassID == wire.FeedbagClassIdBuddyPrefs {
+			if valid, ok := feedbagBuddyPref(wire.FeedbagBuddyPrefsAcceptOfflineIM, item.TLVList); !valid {
+				// user doesn't have an opt-out,
+				// so assume they can accept offline messages,
+				// because AIM 6.0+ clients accept offline messages by default
+				//
+				// this preference did not exist prior to AIM 6,
+				// so retroactively assume it's OK for users who have never used
+				// capable clients to have offline messages stored for them
+				return true, nil
+			} else {
+				return ok, nil // return the explicit preference
+			}
+		}
+	}
+
+	return true, nil
 }
 
 // ringBuffer is a fixed-size circular buffer with 3 slots for storing time values.

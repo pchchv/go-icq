@@ -47,3 +47,58 @@ func newConvoTracker() *convoTracker {
 func (w *convoTracker) key(sender state.IdentScreenName, recip state.IdentScreenName) string {
 	return sender.String() + recip.String()
 }
+
+// trackWarn attempts to record a warning from warner to warnee.
+// It returns true if the warning is allowed
+// (warnee has sent more messages than warnings in the current window),
+// or false if the warning limit has been reached or no conversation exists in the current window.
+func (w *convoTracker) trackWarn(now time.Time, warner, warnee state.IdentScreenName) bool {
+	key := w.key(warnee, warner)
+	convos, found := w.convos.Get(key)
+	if !found {
+		// no convos tracked, can't warn
+		return false
+	}
+
+	// get convo count during window
+	var convoCt int
+	windowStart := now.Add(-w.window)
+	for _, v := range convos.(*ringBuffer).vals {
+		if v.After(windowStart) {
+			convoCt++
+		}
+	}
+
+	warns, found := w.warns.Get(key)
+	if !found {
+		warns = &ringBuffer{}
+		w.warns.Set(key, warns, time.Hour)
+	}
+
+	// get warn count during window
+	var warnCount int
+	for _, v := range warns.(*ringBuffer).vals {
+		if v.After(windowStart) {
+			warnCount++
+		}
+	}
+
+	if convoCt <= warnCount {
+		return false
+	}
+
+	warns.(*ringBuffer).set(now)
+	return true
+}
+
+// trackConvo records a conversation from sender to recipient at the given time.
+func (w *convoTracker) trackConvo(now time.Time, sender, recip state.IdentScreenName) {
+	k := w.key(sender, recip)
+	buf, found := w.convos.Get(k)
+	if !found {
+		buf = &ringBuffer{}
+		w.convos.Set(k, buf, time.Hour)
+	}
+
+	buf.(*ringBuffer).set(now)
+}

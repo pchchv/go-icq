@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/patrickmn/go-cache"
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
+	"golang.org/x/net/html"
 )
 
 const (
@@ -303,4 +306,74 @@ func addExternalIP(instance *state.SessionInstance, tlv wire.TLV) (wire.TLV, err
 	}
 
 	return tlv, nil
+}
+
+// stripHTML extracts plaintext from HTML content.
+func stripHTML(text []byte) []byte {
+	if len(text) == 0 {
+		return text
+	}
+
+	var result strings.Builder
+	tok := html.NewTokenizer(strings.NewReader(string(text)))
+	for {
+		switch tok.Next() {
+		case html.TextToken:
+			result.Write(tok.Text())
+		case html.SelfClosingTagToken, html.StartTagToken:
+			tn, _ := tok.TagName()
+			if string(tn) == "br" {
+				result.WriteByte('\n')
+			}
+		case html.ErrorToken:
+			if tok.Err() == io.EOF {
+				return []byte(result.String())
+			}
+
+			// on error return what we have
+			return []byte(result.String())
+		}
+	}
+}
+
+// stripHTMLFromICBMTLV transforms an ICBMTLVAOLIMData TLV by
+// stripping HTML from the message text for
+// clients that don't support XHTML.
+func stripHTMLFromICBMTLV(tlv wire.TLV) (wire.TLV, error) {
+	var frags []wire.ICBMCh1Fragment
+	if err := wire.UnmarshalBE(&frags, bytes.NewBuffer(tlv.Value)); err != nil {
+		return tlv, errors.New("unmarshal ICBM fragments: " + err.Error())
+	}
+
+	var modified bool
+	for i, frag := range frags {
+		if frag.ID == 1 { // 1 = message text
+			msg := wire.ICBMCh1Message{}
+			if wire.UnmarshalBE(&msg, bytes.NewBuffer(frag.Payload)) == nil {
+				// strip HTML from message text
+				strippedText := stripHTML(msg.Text)
+				if !bytes.Equal(strippedText, msg.Text) {
+					msg.Text = strippedText
+					// remarshal the message
+					msgBuf := bytes.Buffer{}
+					if wire.MarshalBE(msg, &msgBuf) == nil {
+						frags[i].Payload = msgBuf.Bytes()
+						modified = true
+					}
+				}
+			}
+		}
+	}
+
+	if !modified {
+		return tlv, nil
+	}
+
+	// remarshal the fragments
+	newValue, err := wire.MarshalICBMFragmentList(frags)
+	if err != nil {
+		return tlv, err
+	}
+
+	return wire.NewTLVBE(tlv.Tag, newValue), nil
 }

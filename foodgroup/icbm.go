@@ -679,6 +679,27 @@ func stripHTMLFromICBMTLV(tlv wire.TLV) (wire.TLV, error) {
 	return wire.NewTLVBE(tlv.Tag, newValue), nil
 }
 
+func startTicker(s ICBMService, ctx context.Context, interval time.Duration, inProgress *bool) (*time.Ticker, <-chan time.Time) {
+	// create a new ticker and return both the ticker and its channel
+	ticker := time.NewTicker(interval)
+	tickC := ticker.C
+	*inProgress = true
+	s.logger.DebugContext(ctx, "warning decay started")
+	return ticker, tickC
+}
+
+func stopTicker(s ICBMService, ctx context.Context, ticker **time.Ticker, tickC *<-chan time.Time, inProgress *bool) {
+	// caller holds the variables; nil them out when stopping
+	if *ticker != nil {
+		(*ticker).Stop()
+		*ticker = nil
+	}
+
+	*tickC = nil
+	*inProgress = false
+	s.logger.DebugContext(ctx, "warning decay stopped")
+}
+
 func timeTillNextInterval(lastWarned time.Time, now time.Time, interval time.Duration) time.Duration {
 	return interval - (now.Sub(lastWarned) % interval)
 }

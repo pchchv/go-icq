@@ -9,7 +9,10 @@ import (
 	"github.com/pchchv/go-icq/wire"
 )
 
-const rateDecayInterval = 5 * time.Minute
+const (
+	warningDecayPct   = -50
+	rateDecayInterval = 5 * time.Minute
+)
 
 // ICBMService provides functionality for the ICBM food group,
 // which is responsible for sending and receiving instant messages and
@@ -171,4 +174,14 @@ func newICBMErr(requestID uint32, errCode uint16, tlvs ...wire.TLV) *wire.SNACMe
 		},
 		Body: body,
 	}
+}
+
+func calcElapsedWarningLevel(lastWarnUpdate time.Time, now time.Time, interval time.Duration) (warnDelta int16) {
+	// time passed since last signoff
+	since := now.Sub(lastWarnUpdate)
+	// how many times warning decayed since last signoff
+	decayPeriods := int(since / interval)
+	// total amount warning decreased since last signoff
+	warnDelta = int16(decayPeriods * warningDecayPct)
+	return
 }

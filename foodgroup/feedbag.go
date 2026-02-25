@@ -86,6 +86,98 @@ func (s FeedbagService) Query(ctx context.Context, instance *state.SessionInstan
 	}, nil
 }
 
+// QueryIfModified fetches the user's feedbag (aka buddy list).
+// It returns wire.FeedbagReplyNotModified if the feedbag was last modified before inBody.LastUpdate,
+// else return wire.FeedbagReply, which contains feedbag entries.
+func (s FeedbagService) QueryIfModified(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x13_0x05_FeedbagQueryIfModified) (wire.SNACMessage, error) {
+	fb, err := s.feedbagManager.Feedbag(ctx, instance.IdentScreenName())
+	if err != nil {
+		return wire.SNACMessage{}, err
+	}
+
+	lm := time.UnixMilli(0)
+	if len(fb) > 0 {
+		lm, err = s.feedbagManager.FeedbagLastModified(ctx, instance.IdentScreenName())
+		if err != nil {
+			return wire.SNACMessage{}, err
+		} else if lm.Before(time.Unix(int64(inBody.LastUpdate), 0)) {
+			return wire.SNACMessage{
+				Frame: wire.SNACFrame{
+					FoodGroup: wire.Feedbag,
+					SubGroup:  wire.FeedbagReplyNotModified,
+					RequestID: inFrame.RequestID,
+				},
+				Body: wire.SNAC_0x13_0x05_FeedbagQueryIfModified{
+					LastUpdate: uint32(lm.Unix()),
+					Count:      uint8(len(fb)),
+				},
+			}, nil
+		}
+	}
+
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Feedbag,
+			SubGroup:  wire.FeedbagReply,
+			RequestID: inFrame.RequestID,
+		},
+		Body: wire.SNAC_0x13_0x06_FeedbagReply{
+			Version:    0,
+			Items:      fb,
+			LastUpdate: uint32(lm.Unix()),
+		},
+	}, nil
+}
+
+// RightsQuery returns SNAC wire.FeedbagRightsReply,
+// which contains Feedbag food group settings for the current user.
+// The values within the SNAC are not well understood but seem to make the AIM client happy.
+func (s FeedbagService) RightsQuery(_ context.Context, inFrame wire.SNACFrame) wire.SNACMessage {
+	// maxItemsByClass defines per-type item limits
+	// types not listed here are 0 by default
+	// the slice size is equal to the maximum "enum" value+1
+	maxItemsByClass := make([]uint16, 21)
+	maxItemsByClass[wire.FeedbagClassIdBuddy] = 61
+	maxItemsByClass[wire.FeedbagClassIdGroup] = 61
+	maxItemsByClass[wire.FeedbagClassIDPermit] = 100
+	maxItemsByClass[wire.FeedbagClassIDDeny] = 100
+	maxItemsByClass[wire.FeedbagClassIdPdinfo] = 1
+	maxItemsByClass[wire.FeedbagClassIdBuddyPrefs] = 1
+	maxItemsByClass[wire.FeedbagClassIdNonbuddy] = 50
+	maxItemsByClass[wire.FeedbagClassIdClientPrefs] = 3
+	maxItemsByClass[wire.FeedbagClassIdWatchList] = 128
+	maxItemsByClass[wire.FeedbagClassIdIgnoreList] = 255
+	maxItemsByClass[wire.FeedbagClassIdDateTime] = 20
+	maxItemsByClass[wire.FeedbagClassIdExternalUser] = 200
+	maxItemsByClass[wire.FeedbagClassIdRootCreator] = 1
+	maxItemsByClass[wire.FeedbagClassIdImportTimestamp] = 1
+	maxItemsByClass[wire.FeedbagClassIdBart] = 200
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Feedbag,
+			SubGroup:  wire.FeedbagRightsReply,
+			RequestID: inFrame.RequestID,
+		},
+		Body: wire.SNAC_0x13_0x03_FeedbagRightsReply{
+			TLVRestBlock: wire.TLVRestBlock{
+				TLVList: wire.TLVList{
+					wire.NewTLVBE(wire.FeedbagRightsMaxItemAttrs, uint16(200)),
+					wire.NewTLVBE(wire.FeedbagRightsMaxItemsByClass, maxItemsByClass),
+					wire.NewTLVBE(wire.FeedbagRightsMaxClientItems, uint16(200)),
+					wire.NewTLVBE(wire.FeedbagRightsMaxItemNameLen, uint16(200)),
+					wire.NewTLVBE(wire.FeedbagRightsMaxRecentBuddies, uint16(200)),
+					wire.NewTLVBE(wire.FeedbagRightsInteractionBuddies, uint16(200)),
+					wire.NewTLVBE(wire.FeedbagRightsInteractionHalfLife, uint16(200)),
+					wire.NewTLVBE(wire.FeedbagRightsInteractionMaxScore, uint16(200)),
+					wire.NewTLVBE(wire.FeedbagRightsMaxBuddiesPerGroup, uint16(200)),
+					wire.NewTLVBE(wire.FeedbagRightsMaxMegaBots, uint16(200)),
+					wire.NewTLVBE(wire.FeedbagRightsMaxSmartGroups, uint16(100)),
+				},
+			},
+		},
+	}
+}
+
 // FeedbagBuddyPref returns a pref value stored in the user's feedbag.
 //
 // Preferences are binary values stored in a logical bitmask spanning 2 physical bitmasks.

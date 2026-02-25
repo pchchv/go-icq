@@ -7,6 +7,12 @@ import (
 	"github.com/pchchv/go-icq/state"
 )
 
+// ringBuffer is a fixed-size circular buffer with 3 slots for storing time values.
+type ringBuffer struct {
+	cur  int          // Current cursor position (0, 1, or 2).
+	vals [3]time.Time // Fixed-size array to store time values.
+}
+
 // convoTracker keeps track of messages initiated from a sender to a recipient.
 // A user (the warner) can only warn another user (the warnee)
 // only if the warner has received a message from the warnee.

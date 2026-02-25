@@ -226,6 +226,52 @@ func (s ICBMService) ChannelMsgToHost(ctx context.Context, instance *state.Sessi
 	}, nil
 }
 
+// ClientEvent relays SNAC wire.ICBMClientEvent typing events from the
+// sender to the recipient.
+func (s ICBMService) ClientEvent(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x04_0x14_ICBMClientEvent) error {
+	blocked, err := s.relationshipFetcher.Relationship(ctx, instance.IdentScreenName(), state.NewIdentScreenName(inBody.ScreenName))
+	switch {
+	case err != nil:
+		return err
+	case blocked.BlocksYou || blocked.YouBlock:
+		return nil
+	default:
+		recipient := state.NewIdentScreenName(inBody.ScreenName)
+		s.messageRelayer.RelayToScreenNameActiveOnly(ctx, recipient, wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.ICBM,
+				SubGroup:  wire.ICBMClientEvent,
+				RequestID: inFrame.RequestID,
+			},
+			Body: wire.SNAC_0x04_0x14_ICBMClientEvent{
+				Cookie:     inBody.Cookie,
+				ChannelID:  inBody.ChannelID,
+				ScreenName: string(instance.DisplayScreenName()),
+				Event:      inBody.Event,
+			},
+		})
+		return nil
+	}
+}
+
+func (s ICBMService) ClientErr(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x04_0x0B_ICBMClientErr) error {
+	s.messageRelayer.RelayToScreenName(ctx, state.NewIdentScreenName(inBody.ScreenName), wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.ICBM,
+			SubGroup:  wire.ICBMClientErr,
+			RequestID: inFrame.RequestID,
+		},
+		Body: wire.SNAC_0x04_0x0B_ICBMClientErr{
+			Cookie:     inBody.Cookie,
+			ChannelID:  inBody.ChannelID,
+			ScreenName: instance.DisplayScreenName().String(),
+			Code:       inBody.Code,
+			ErrInfo:    inBody.ErrInfo,
+		},
+	})
+	return nil
+}
+
 func (s ICBMService) sendOfflineMessage(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x04_0x06_ICBMChannelMsgToHost) (*wire.SNACMessage, error) {
 	recip := state.NewIdentScreenName(inBody.ScreenName)
 	offlineMsg := state.OfflineMessage{

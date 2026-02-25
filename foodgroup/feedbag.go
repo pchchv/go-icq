@@ -1,8 +1,12 @@
 package foodgroup
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/pchchv/go-icq/state"
@@ -86,7 +90,7 @@ func (s FeedbagService) Query(ctx context.Context, instance *state.SessionInstan
 	}, nil
 }
 
-// QueryIfModified fetches the user's feedbag (aka buddy list).
+// QueryIfModified fetches the user's feedbag (buddy list).
 // It returns wire.FeedbagReplyNotModified if the feedbag was last modified before inBody.LastUpdate,
 // else return wire.FeedbagReply, which contains feedbag entries.
 func (s FeedbagService) QueryIfModified(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, inBody wire.SNAC_0x13_0x05_FeedbagQueryIfModified) (wire.SNACMessage, error) {
@@ -176,6 +180,160 @@ func (s FeedbagService) RightsQuery(_ context.Context, inFrame wire.SNACFrame) w
 			},
 		},
 	}
+}
+
+// UpsertItem updates items in the user's feedbag (buddy list).
+// Sends user buddy arrival notifications for each online & visible buddy added to the feedbag.
+// Sends a buddy departure notification to blocked buddies if current user is visible.
+// It returns wire.FeedbagStatus, which contains insert confirmation.
+// UpdateItem updates items in the user's feedbag (buddy list).
+// Sends user buddy arrival notifications for each online & visible buddy added to the feedbag.
+// It returns wire.FeedbagStatus, which contains update confirmation.
+func (s FeedbagService) UpsertItem(ctx context.Context, instance *state.SessionInstance, inFrame wire.SNACFrame, items []wire.FeedbagItem) (*wire.SNACMessage, error) {
+	for _, item := range items {
+		// don't let users block themselves,
+		// it causes the AIM client to go into a weird state
+		if item.ClassID == wire.FeedbagClassIDDeny && state.NewIdentScreenName(item.Name) == instance.IdentScreenName() {
+			return &wire.SNACMessage{
+				Frame: wire.SNACFrame{
+					FoodGroup: wire.Feedbag,
+					SubGroup:  wire.FeedbagErr,
+					RequestID: inFrame.RequestID,
+				},
+				Body: wire.SNACError{
+					Code: wire.ErrorCodeNotSupportedByHost,
+				},
+			}, nil
+		}
+	}
+
+	if err := s.feedbagManager.FeedbagUpsert(ctx, instance.IdentScreenName(), items); err != nil {
+		return nil, err
+	}
+
+	setSessionBuddyPrefs(items, instance)
+
+	var alertAll bool
+	var filter []state.IdentScreenName
+	for _, item := range items {
+		switch item.ClassID {
+		case wire.FeedbagClassIdBuddy, wire.FeedbagClassIDPermit, wire.FeedbagClassIDDeny:
+			filter = append(filter, state.NewIdentScreenName(item.Name))
+		case wire.FeedbagClassIdBart:
+			if err := s.setBARTItem(ctx, instance, item); err != nil {
+				return nil, err
+			}
+		case wire.FeedbagClassIdPdinfo:
+			alertAll = true
+		}
+	}
+
+	snacPayloadOut := wire.SNAC_0x13_0x0E_FeedbagStatus{}
+	for range items {
+		snacPayloadOut.Results = append(snacPayloadOut.Results, 0x0000)
+	}
+
+	s.messageRelayer.RelayToSelf(ctx, instance, wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Feedbag,
+			SubGroup:  wire.FeedbagStatus,
+			RequestID: inFrame.RequestID,
+		},
+		Body: snacPayloadOut,
+	})
+	s.messageRelayer.RelayToOtherInstances(ctx, instance, wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: inFrame.FoodGroup,
+			SubGroup:  inFrame.SubGroup,
+			RequestID: wire.ReqIDFromServer,
+		},
+		Body: wire.SNAC_0x13_0x09_FeedbagUpdateItem{
+			Items: items,
+		},
+	})
+	if alertAll || len(filter) > 0 {
+		if err := s.buddyBroadcaster.BroadcastVisibility(ctx, instance, filter, true); err != nil {
+			return nil, err
+		}
+	}
+
+	return nil, nil
+}
+
+// setBARTItem informs clients about buddy icon update.
+// If the BART store doesn't have the icon, then tell the client to upload the buddy icon.
+// If the icon already exists, tell the user's buddies about the icon change.
+func (s FeedbagService) setBARTItem(ctx context.Context, instance *state.SessionInstance, item wire.FeedbagItem) error {
+	b, hasBuf := item.Bytes(wire.FeedbagAttributesBartInfo)
+	if !hasBuf {
+		return errors.New("unable to extract icon payload")
+	}
+
+	itemType, err := strconv.ParseUint(item.Name, 0, 16)
+	if err != nil {
+		return fmt.Errorf("invalid BART item type %q: %w", item.Name, err)
+	}
+
+	bartID := wire.BARTID{
+		Type: uint16(itemType),
+	}
+	if err := wire.UnmarshalBE(&bartID.BARTInfo, bytes.NewBuffer(b)); err != nil {
+		return err
+	}
+
+	var itemExists bool
+	if bytes.Equal(bartID.Hash, wire.GetClearIconHash()) {
+		s.logger.DebugContext(ctx, "user is clearing icon", "hash", fmt.Sprintf("%x", bartID.Hash))
+		itemExists = true
+	} else {
+		if existingItem, err := s.bartItemManager.BARTItem(ctx, bartID.Hash); err != nil {
+			return err
+		} else {
+			itemExists = len(existingItem) > 0
+		}
+	}
+
+	if itemExists {
+		if bartID.Type == wire.BARTTypesBuddyIconSmall || bartID.Type == wire.BARTTypesBuddyIcon {
+			instance.Session().SetBuddyIcon(bartID)
+			// tell buddies about the icon update
+			if err := s.buddyBroadcaster.BroadcastBuddyArrived(ctx, instance.IdentScreenName(), instance.Session().TLVUserInfo()); err != nil {
+				return err
+			}
+		}
+
+		s.logger.DebugContext(ctx, "icon already exists in BART store, don't upload the icon file",
+			"hash", fmt.Sprintf("%x", bartID.Hash))
+	} else {
+		// icon doesn't exist, tell the client to upload buddy icon
+		bartID.Flags |= wire.BARTFlagsUnknown
+		if bartID.Type == wire.BARTTypesBuddyIconSmall || bartID.Type == wire.BARTTypesBuddyIcon {
+			instance.Session().SetBuddyIcon(bartID)
+		}
+
+		s.logger.DebugContext(ctx, "icon doesn't exist in BART store, client must upload the icon file", "hash", fmt.Sprintf("%x", bartID.Hash))
+	}
+
+	s.messageRelayer.RelayToSelf(ctx, instance, wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.OService,
+			SubGroup:  wire.OServiceBartReply,
+		},
+		Body: wire.SNAC_0x01_0x21_OServiceBARTReply{
+			BARTID: bartID,
+		},
+	})
+	if bartID.Type == wire.BARTTypesBuddyIconSmall || bartID.Type == wire.BARTTypesBuddyIcon {
+		s.messageRelayer.RelayToScreenName(ctx, instance.IdentScreenName(), wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.OService,
+				SubGroup:  wire.OServiceUserInfoUpdate,
+			},
+			Body: newOServiceUserInfoUpdate(instance),
+		})
+	}
+
+	return nil
 }
 
 // FeedbagBuddyPref returns a pref value stored in the user's feedbag.

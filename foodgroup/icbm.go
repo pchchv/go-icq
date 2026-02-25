@@ -154,3 +154,21 @@ func (w *convoTracker) trackConvo(now time.Time, sender, recip state.IdentScreen
 
 	buf.(*ringBuffer).set(now)
 }
+
+func newICBMErr(requestID uint32, errCode uint16, tlvs ...wire.TLV) *wire.SNACMessage {
+	body := wire.SNACError{
+		Code: errCode,
+	}
+	if len(tlvs) > 0 {
+		body.AppendList(tlvs)
+	}
+
+	return &wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.ICBM,
+			SubGroup:  wire.ICBMErr,
+			RequestID: requestID,
+		},
+		Body: body,
+	}
+}

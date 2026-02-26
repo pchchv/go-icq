@@ -198,6 +198,65 @@ type buddyIconMetadataParams []struct {
 	err        error
 }
 
+// chatAllSessionsParams is the list of parameters passed at
+// the mock ChatMessageRelayer.AllSessions call site.
+type chatAllSessionsParams []struct {
+	cookie   string
+	sessions []*state.Session
+	err      error
+}
+
+// chatMessageRelayerParams is a helper struct that
+// contains mock parameters for ChatMessageRelayer methods.
+type chatMessageRelayerParams struct {
+	chatAllSessionsParams
+	chatRelayToAllExceptParams
+	chatRelayToScreenNameParams
+}
+
+// chatRelayToAllExceptParams is the list of parameters passed at
+// the mock ChatMessageRelayer.RelayToAllExcept call site.
+type chatRelayToAllExceptParams []struct {
+	cookie     string
+	screenName state.IdentScreenName
+	message    wire.SNACMessage
+	err        error
+}
+
+// chatRelayToScreenNameParams is the list of parameters passed at
+// the mock ChatMessageRelayer.RelayToScreenName call site.
+type chatRelayToScreenNameParams []struct {
+	cookie     string
+	screenName state.IdentScreenName
+	message    wire.SNACMessage
+	err        error
+}
+
+// chatRoomByCookieParams is the list of parameters passed at
+// the mock ChatRoomRegistry.ChatRoomByCookie call site.
+type chatRoomByCookieParams []struct {
+	cookie string
+	room   state.ChatRoom
+	err    error
+}
+
+// chatRoomByCookieParams is the list of parameters passed at
+// the mock ChatRoomRegistry.ChatRoomByName call site.
+type chatRoomByNameParams []struct {
+	exchange uint16
+	name     string
+	room     state.ChatRoom
+	err      error
+}
+
+// chatRoomRegistryParams is a helper struct that
+// contains mock parameters for ChatRoomRegistry methods.
+type chatRoomRegistryParams struct {
+	chatRoomByCookieParams
+	chatRoomByNameParams
+	createChatRoomParams
+}
+
 // cookieBakerParams is a helper struct that
 // contains mock parameters for CookieBaker methods.
 type cookieBakerParams struct {
@@ -219,4 +278,11 @@ type cookieIssueParams []struct {
 	dataIn    []byte
 	cookieOut []byte
 	err       error
+}
+
+// createChatRoomParams is the list of parameters passed at
+// the mock ChatRoomRegistry.CreateChatRoom call site.
+type createChatRoomParams []struct {
+	room *state.ChatRoom
+	err  error
 }

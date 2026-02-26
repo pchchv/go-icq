@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -79,7 +78,7 @@ func NewAuthService(
 func (s AuthService) RegisterChatSession(ctx context.Context, serverCookie state.ServerCookie) (*state.SessionInstance, error) {
 	sess, err := s.chatSessionRegistry.AddSession(ctx, serverCookie.ChatCookie, serverCookie.ScreenName)
 	if err != nil {
-		return nil, fmt.Errorf("AddSession: %w", err)
+		return nil, errors.New("AddSession: " + err.Error())
 	}
 
 	sess.Session().SetRateClasses(time.Now(), s.rateLimitClasses)
@@ -90,9 +89,9 @@ func (s AuthService) RegisterChatSession(ctx context.Context, serverCookie state
 func (s AuthService) RegisterBOSSession(ctx context.Context, serverCookie state.ServerCookie) (*state.SessionInstance, error) {
 	u, err := s.userManager.User(ctx, serverCookie.ScreenName.IdentScreenName())
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve user: %w", err)
+		return nil, errors.New("failed to retrieve user: " + err.Error())
 	} else if u == nil {
-		return nil, fmt.Errorf("user not found")
+		return nil, errors.New("user not found")
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
@@ -106,12 +105,12 @@ func (s AuthService) RegisterBOSSession(ctx context.Context, serverCookie state.
 
 	sess, err := s.sessionManager.AddSession(ctx, u.DisplayScreenName, doMultiSess)
 	if err != nil {
-		return nil, fmt.Errorf("AddSession: %w", err)
+		return nil, errors.New("AddSession: " + err.Error())
 	}
 
 	// set the unconfirmed user info flag if this account is unconfirmed
 	if confirmed, err := s.accountManager.ConfirmStatus(ctx, sess.IdentScreenName()); err != nil {
-		return nil, fmt.Errorf("error setting unconfirmed user flag: %w", err)
+		return nil, errors.New("error setting unconfirmed user flag: " + err.Error())
 	} else if !confirmed {
 		sess.SetUserInfoFlag(wire.OServiceUserFlagUnconfirmed)
 	}
@@ -129,7 +128,7 @@ func (s AuthService) RegisterBOSSession(ctx context.Context, serverCookie state.
 	sess.Session().SetOfflineMsgCount(u.OfflineMsgCount)
 	if _, alreadySet := sess.Session().BuddyIcon(); !alreadySet {
 		if bartID, err := s.bartItemManager.BuddyIconMetadata(ctx, sess.IdentScreenName()); err != nil {
-			return nil, fmt.Errorf("BuddyIconMetadata: %w", err)
+			return nil, errors.New("BuddyIconMetadata: " + err.Error())
 		} else if bartID != nil {
 			sess.Session().SetBuddyIcon(*bartID)
 		}
@@ -141,7 +140,7 @@ func (s AuthService) RegisterBOSSession(ctx context.Context, serverCookie state.
 		sess.SetUserInfoFlag(wire.OServiceUserFlagICQ)
 		uin, err := strconv.Atoi(u.IdentScreenName.String())
 		if err != nil {
-			return nil, fmt.Errorf("error converting username to UIN: %w", err)
+			return nil, errors.New("error converting username to UIN: " + err.Error())
 		}
 
 		sess.Session().SetUIN(uint32(uin))
@@ -154,9 +153,9 @@ func (s AuthService) RegisterBOSSession(ctx context.Context, serverCookie state.
 func (s AuthService) RetrieveBOSSession(ctx context.Context, serverCookie state.ServerCookie) (*state.SessionInstance, error) {
 	u, err := s.userManager.User(ctx, serverCookie.ScreenName.IdentScreenName())
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve user: %w", err)
+		return nil, errors.New("failed to retrieve user: " + err.Error())
 	} else if u == nil {
-		return nil, fmt.Errorf("user not found")
+		return nil, errors.New("user not found")
 	}
 
 	sess := s.sessionRetriever.RetrieveSession(u.IdentScreenName)

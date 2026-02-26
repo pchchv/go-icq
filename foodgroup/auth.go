@@ -218,6 +218,97 @@ func (s AuthService) FLAPLogin(ctx context.Context, inFrame wire.FLAPSignonFrame
 	return s.login(ctx, inFrame.TLVList, advertisedHost)
 }
 
+// KerberosLogin handles AIM-style Kerberos authentication for AIM 6.0+.
+// Credit for understanding the SNAC structure and values goes to this mailing list attachment from 2007:
+//
+//	https://web.archive.org/web/20100619063015/http://pidgin.im/pipermail/devel/attachments/20070906/e0069ff5/attachment-0001.txt
+//
+// Several values in the response are poorly understood but necessary for proper processing on the client side.
+func (s AuthService) KerberosLogin(ctx context.Context, inBody wire.SNAC_0x050C_0x0002_KerberosLoginRequest, advertisedHost string) (wire.SNACMessage, error) {
+	b, ok := inBody.TicketRequestMetadata.Bytes(wire.KerberosTLVTicketRequest)
+	if !ok {
+		return wire.SNACMessage{}, errors.New("ticket request metadata bytes is missing")
+	}
+
+	var info wire.KerberosLoginRequestTicket
+	if err := wire.UnmarshalBE(&info, bytes.NewReader(b)); err != nil {
+		return wire.SNACMessage{}, errors.New("ticket request metadata unmarshal: " + err.Error())
+	}
+
+	list := wire.TLVList{
+		wire.NewTLVBE(wire.LoginTLVTagsScreenName, inBody.ClientPrincipal),
+		wire.NewTLVBE(wire.LoginTLVTagsMultiConnFlags, wire.MultiConnFlagsRecentClient),
+	}
+	if info.Version >= 4 {
+		list = append(list, wire.NewTLVBE(wire.LoginTLVTagsRoastedKerberosPassword, info.Password))
+	} else {
+		list = append(list, wire.NewTLVBE(wire.LoginTLVTagsPlaintextPassword, info.Password))
+	}
+
+	result, err := s.login(ctx, list, advertisedHost)
+	if err != nil {
+		return wire.SNACMessage{}, errors.New("login: " + err.Error())
+	}
+
+	cookie, loginOK := result.Bytes(wire.LoginTLVTagsAuthorizationCookie)
+	if !loginOK {
+		return wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.Kerberos,
+				SubGroup:  wire.KerberosKerberosLoginErrResponse,
+			},
+			Body: wire.SNAC_0x050C_0x0004_KerberosLoginErrResponse{
+				KerbRequestID: inBody.RequestID,
+				ScreenName:    inBody.ClientPrincipal,
+				ErrCode:       wire.KerberosErrAuthFailure,
+				Message:       "Auth failure",
+			},
+		}, nil
+	}
+
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.Kerberos,
+			SubGroup:  wire.KerberosLoginSuccessResponse,
+		},
+		Body: wire.SNAC_0x050C_0x0003_KerberosLoginSuccessResponse{
+			RequestID:       inBody.RequestID,
+			Epoch:           uint32(s.timeNow().Unix()),
+			ClientPrincipal: inBody.ClientPrincipal,
+			ClientRealm:     "AOL",
+			Tickets: []wire.KerberosTicket{
+				{
+					PVNO:             5,
+					EncTicket:        []byte{},
+					TicketRealm:      "AOL",
+					ServicePrincipal: "im/boss",
+					ClientRealm:      "AOL",
+					ClientPrincipal:  inBody.ClientPrincipal,
+					AuthTime:         uint32(s.timeNow().Unix()),
+					StartTime:        uint32(s.timeNow().Unix()),
+					EndTime:          uint32(s.timeNow().Add(24 * time.Hour).Unix()),
+					Unknown4:         1610612736,
+					Unknown5:         1073741824,
+					ConnectionMetadata: wire.TLVBlock{
+						TLVList: wire.TLVList{
+							wire.NewTLVBE(wire.KerberosTLVBOSServerInfo, wire.KerberosBOSServerInfo{
+								Unknown: 1,
+								ConnectionInfo: wire.TLVBlock{
+									TLVList: wire.TLVList{
+										wire.NewTLVBE(wire.KerberosTLVHostname, advertisedHost),
+										wire.NewTLVBE(wire.KerberosTLVCookie, cookie),
+										wire.NewTLVBE(wire.KerberosTLVConnSettings, wire.KerberosConnUseSSL),
+									},
+								},
+							}),
+						},
+					},
+				},
+			},
+		},
+	}, nil
+}
+
 func (s AuthService) createUser(ctx context.Context, props loginProperties, advertisedHost string) (wire.TLVRestBlock, error) {
 	err := s.createAccount(ctx, props.screenName, "welcome1")
 	if err != nil {

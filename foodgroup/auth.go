@@ -180,6 +180,21 @@ func (s AuthService) CrackCookie(authCookie []byte) (state.ServerCookie, error) 
 	return c, nil
 }
 
+func (s AuthService) createUser(ctx context.Context, props loginProperties, advertisedHost string) (wire.TLVRestBlock, error) {
+	err := s.createAccount(ctx, props.screenName, "welcome1")
+	if err != nil {
+		switch {
+		case errors.Is(err, state.ErrAIMHandleInvalidFormat) || errors.Is(err, state.ErrAIMHandleLength):
+			return loginFailureResponse(props, wire.LoginErrInvalidUsernameOrPassword), nil
+		case errors.Is(err, state.ErrICQUINInvalidFormat):
+			return loginFailureResponse(props, wire.LoginErrICQUserErr), nil
+		default:
+			return wire.TLVRestBlock{}, err
+		}
+	}
+	return s.loginSuccessResponse(props, advertisedHost)
+}
+
 func (s AuthService) loginSuccessResponse(props loginProperties, advertisedHost string) (wire.TLVRestBlock, error) {
 	loginCookie := state.ServerCookie{
 		Service:       wire.BOS,
@@ -212,6 +227,104 @@ func (s AuthService) loginSuccessResponse(props loginProperties, advertisedHost 
 			wire.NewTLVBE(wire.OServiceTLVTagsSSLState, sslState),
 		},
 	}, nil
+}
+
+// login validates a user's credentials and creates their session.
+// It returns metadata used in both BUCP and FLAP authentication responses.
+func (s AuthService) login(ctx context.Context, tlv wire.TLVList, advertisedHost string) (wire.TLVRestBlock, error) {
+	props := loginProperties{}
+	if err := props.fromTLV(tlv); err != nil {
+		s.logger.Debug("login: failed to parse TLVs", "err", err.Error())
+		return wire.TLVRestBlock{}, err
+	}
+
+	s.logger.Debug("login: parsed login properties",
+		"screen_name", props.screenName,
+		"client_id", props.clientID,
+		"is_bucp", props.isBUCPAuth,
+		"is_flap", props.isFLAPAuth,
+		"is_flap_java", props.isFLAPJavaAuth,
+		"is_toc", props.isTOCAuth,
+		"is_kerberos_plaintext", props.isKerberosPlaintextAuth,
+		"is_kerberos_roasted", props.isKerberosRoastedAuth,
+		"password_hash_len", len(props.passwordHash),
+		"roasted_pass_len", len(props.roastedPass))
+	user, err := s.userManager.User(ctx, props.screenName.IdentScreenName())
+	if err != nil {
+		s.logger.Error("login: user lookup failed", "screen_name", props.screenName, "err", err.Error())
+		return wire.TLVRestBlock{}, err
+	} else if user == nil {
+		s.logger.Debug("login: user not found", "screen_name", props.screenName)
+		// user not found
+		if s.config.DisableAuth {
+			// auth disabled, create the user
+			s.logger.Debug("login: auth disabled, creating user", "screen_name", props.screenName)
+			return s.createUser(ctx, props, advertisedHost)
+		}
+
+		// auth enabled, return separate login errors for ICQ and AIM
+		loginErr := wire.LoginErrInvalidUsernameOrPassword
+		if props.screenName.IsUIN() {
+			loginErr = wire.LoginErrICQUserErr
+		}
+
+		s.logger.Debug("login: returning user not found error", "screen_name", props.screenName, "error_code", loginErr)
+		return loginFailureResponse(props, loginErr), nil
+	}
+
+	s.logger.Debug("login: user found", "screen_name", props.screenName, "is_icq", user.IsICQ)
+	// check if suspended status should prevent login
+	if user.SuspendedStatus > 0x0 {
+		s.logger.Debug("login: user suspended", "screen_name", props.screenName, "suspended_status", user.SuspendedStatus)
+		return loginFailureResponse(props, user.SuspendedStatus), nil
+	}
+
+	if s.config.DisableAuth {
+		// user exists, but don't validate
+		s.logger.Debug("login: auth disabled, skipping password validation", "screen_name", props.screenName)
+		return s.loginSuccessResponse(props, advertisedHost)
+	}
+
+	var loginOK bool
+	var authMethod string
+	switch {
+	case props.isBUCPAuth:
+		authMethod = "BUCP"
+		loginOK = user.ValidateHash(props.passwordHash)
+	case props.isFLAPAuth:
+		authMethod = "FLAP"
+		loginOK = user.ValidateRoastedPass(props.roastedPass)
+	case props.isFLAPJavaAuth:
+		authMethod = "FLAP_Java"
+		loginOK = user.ValidateRoastedJavaPass(props.roastedPass)
+	case props.isTOCAuth:
+		authMethod = "TOC"
+		loginOK = user.ValidateRoastedTOCPass(props.roastedPass)
+	case props.isKerberosPlaintextAuth:
+		authMethod = "Kerberos_Plaintext"
+		loginOK = user.ValidatePlaintextPass(props.plaintextPassword)
+	case props.isKerberosRoastedAuth:
+		authMethod = "Kerberos_Roasted"
+		loginOK = user.ValidateRoastedKerberosPass(props.roastedPass)
+	}
+
+	s.logger.Debug("login: password validation result", "screen_name", props.screenName, "auth_method", authMethod, "login_ok", loginOK)
+	if !loginOK {
+		s.logger.Debug("login: password validation failed", "screen_name", props.screenName, "auth_method", authMethod)
+		return loginFailureResponse(props, wire.LoginErrInvalidPassword), nil
+	}
+
+	// limit concurrent logins per user
+	if props.multiConnFlag == uint8(wire.MultiConnFlagsRecentClient) {
+		sess := s.sessionRetriever.RetrieveSession(props.screenName.IdentScreenName())
+		if sess != nil && sess.InstanceCount() >= s.maxConcurrentLoginsPerUser {
+			s.logger.Debug("login: too many concurrent sessions", "screen_name", props.screenName, "instance_count", sess.InstanceCount())
+			return loginFailureResponse(props, wire.LoginErrRateLimitExceeded), nil
+		}
+	}
+
+	s.logger.Debug("login: login successful", "screen_name", props.screenName)
+	return s.loginSuccessResponse(props, advertisedHost)
 }
 
 // loginProperties represents the properties sent by the client at login.

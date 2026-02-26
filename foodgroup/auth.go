@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pchchv/go-icq/config"
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
@@ -318,6 +319,63 @@ func (s AuthService) SignoutChat(ctx context.Context, instance *state.SessionIns
 // Signout removes this user's session.
 func (s AuthService) Signout(ctx context.Context, instance *state.SessionInstance) {
 	s.sessionManager.RemoveSession(instance)
+}
+
+// BUCPChallenge processes a BUCP authentication challenge request.
+// It retrieves the user's auth key based on the screen name provided in the request.
+// The client uses the auth key to salt the MD5 password hash provided in the subsequent login request.
+// If the account is valid, return SNAC(0x17,0x07), otherwise return SNAC(0x17,0x03).
+func (s AuthService) BUCPChallenge(ctx context.Context, inBody wire.SNAC_0x17_0x06_BUCPChallengeRequest, newUUID func() uuid.UUID) (wire.SNACMessage, error) {
+	screenName, exists := inBody.String(wire.LoginTLVTagsScreenName)
+	if !exists {
+		s.logger.Debug("BUCPChallenge: screen name TLV not found in request")
+		return wire.SNACMessage{}, errors.New("screen name doesn't exist in tlv")
+	}
+
+	var authKey string
+	s.logger.Debug("BUCPChallenge: received challenge request", "screen_name", screenName, "is_uin", state.DisplayScreenName(screenName).IsUIN())
+	user, err := s.userManager.User(ctx, state.NewIdentScreenName(screenName))
+	if err != nil {
+		s.logger.Error("BUCPChallenge: user lookup failed", "screen_name", screenName, "err", err.Error())
+		return wire.SNACMessage{}, err
+	}
+
+	switch {
+	case user != nil:
+		// user lookup succeeded
+		authKey = user.AuthKey
+		s.logger.Debug("BUCPChallenge: user found, returning auth key", "screen_name", screenName, "auth_key_len", len(authKey))
+	case s.config.DisableAuth:
+		// can't find user, generate stub auth key
+		authKey = newUUID().String()
+		s.logger.Debug("BUCPChallenge: user not found, auth disabled, generating stub auth key", "screen_name", screenName)
+	default:
+		// can't find user, return login error
+		s.logger.Debug("BUCPChallenge: user not found, returning error", "screen_name", screenName, "error_code", wire.LoginErrInvalidUsernameOrPassword)
+		return wire.SNACMessage{
+			Frame: wire.SNACFrame{
+				FoodGroup: wire.BUCP,
+				SubGroup:  wire.BUCPLoginResponse,
+			},
+			Body: wire.SNAC_0x17_0x03_BUCPLoginResponse{
+				TLVRestBlock: wire.TLVRestBlock{
+					TLVList: []wire.TLV{
+						wire.NewTLVBE(wire.LoginTLVTagsErrorSubcode, wire.LoginErrInvalidUsernameOrPassword),
+					},
+				},
+			},
+		}, nil
+	}
+
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.BUCP,
+			SubGroup:  wire.BUCPChallengeResponse,
+		},
+		Body: wire.SNAC_0x17_0x07_BUCPChallengeResponse{
+			AuthKey: authKey,
+		},
+	}, nil
 }
 
 func (s AuthService) createUser(ctx context.Context, props loginProperties, advertisedHost string) (wire.TLVRestBlock, error) {

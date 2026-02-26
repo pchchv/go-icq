@@ -107,3 +107,20 @@ type addSessionParams []struct {
 	result      *state.SessionInstance
 	err         error
 }
+
+// adjacentUsersParams is the list of parameters passed at
+// the mock FeedbagManager.AdjacentUsers call site.
+type adjacentUsersParams []struct {
+	screenName state.IdentScreenName
+	users      []state.IdentScreenName
+	err        error
+}
+
+// allRelationshipsParams is the list of parameters passed at
+// the mock RelationshipFetcher.AllRelationships call site.
+type allRelationshipsParams []struct {
+	screenName state.IdentScreenName
+	filter     []state.IdentScreenName
+	result     []state.Relationship
+	err        error
+}

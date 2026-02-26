@@ -180,6 +180,40 @@ func (s AuthService) CrackCookie(authCookie []byte) (state.ServerCookie, error) 
 	return c, nil
 }
 
+func (s AuthService) loginSuccessResponse(props loginProperties, advertisedHost string) (wire.TLVRestBlock, error) {
+	loginCookie := state.ServerCookie{
+		Service:       wire.BOS,
+		ScreenName:    props.screenName,
+		ClientID:      props.clientID,
+		MultiConnFlag: props.multiConnFlag,
+	}
+	if props.isKerberosPlaintextAuth || props.isKerberosRoastedAuth {
+		loginCookie.KerberosAuth = 1
+	}
+
+	buf := &bytes.Buffer{}
+	if err := wire.MarshalBE(loginCookie, buf); err != nil {
+		return wire.TLVRestBlock{}, err
+	}
+
+	cookie, err := s.cookieBaker.Issue(buf.Bytes())
+	if err != nil {
+		return wire.TLVRestBlock{}, errors.New("failed to issue auth cookie: " + err.Error())
+	}
+
+	reconnectHost := advertisedHost
+	sslState := wire.OServiceServiceResponseSSLStateNotUsed
+	s.logger.Debug("loginSuccessResponse: returning login response", "screen_name", props.screenName, "reconnect_host", reconnectHost, "ssl_state", sslState)
+	return wire.TLVRestBlock{
+		TLVList: []wire.TLV{
+			wire.NewTLVBE(wire.LoginTLVTagsScreenName, props.screenName),
+			wire.NewTLVBE(wire.LoginTLVTagsReconnectHere, reconnectHost),
+			wire.NewTLVBE(wire.LoginTLVTagsAuthorizationCookie, cookie),
+			wire.NewTLVBE(wire.OServiceTLVTagsSSLState, sslState),
+		},
+	}, nil
+}
+
 // loginProperties represents the properties sent by the client at login.
 type loginProperties struct {
 	clientID                string

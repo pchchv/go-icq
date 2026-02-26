@@ -286,3 +286,18 @@ type createChatRoomParams []struct {
 	room *state.ChatRoom
 	err  error
 }
+
+// legacyBuddiesParams is the list of parameters passed at
+// the mock ClientSideBuddyListManager.RemoveBuddy call site.
+type deleteBuddyParams []struct {
+	me   state.IdentScreenName
+	them state.IdentScreenName
+	err  error
+}
+
+// deleteMessagesParams is the list of parameters passed at
+// the mock OfflineMessageManager.DeleteMessages call site.
+type deleteMessagesParams []struct {
+	recipIn state.IdentScreenName
+	err     error
+}

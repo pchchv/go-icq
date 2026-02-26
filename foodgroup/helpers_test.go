@@ -197,3 +197,26 @@ type buddyIconMetadataParams []struct {
 	result     *wire.BARTID
 	err        error
 }
+
+// cookieBakerParams is a helper struct that
+// contains mock parameters for CookieBaker methods.
+type cookieBakerParams struct {
+	cookieCrackParams
+	cookieIssueParams
+}
+
+// cookieCrackParams is the list of parameters passed at
+// the mock CookieBaker.Crack call site.
+type cookieCrackParams []struct {
+	cookieIn []byte
+	dataOut  []byte
+	err      error
+}
+
+// cookieIssueParams is the list of parameters passed at
+// the mock CookieBaker.Issue call site.
+type cookieIssueParams []struct {
+	dataIn    []byte
+	cookieOut []byte
+	err       error
+}

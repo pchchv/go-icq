@@ -126,6 +126,31 @@ type allRelationshipsParams []struct {
 	err        error
 }
 
+// bartItemManagerParams is a helper struct that
+// contains mock parameters for BARTItemManager methods.
+type bartItemManagerParams struct {
+	bartItemManagerRetrieveParams
+	bartItemManagerUpsertParams
+	buddyIconMetadataParams
+}
+
+// bartItemManagerRetrieveParams is the list of parameters passed at
+// the mock BARTItemManager.BuddyIcon call site.
+type bartItemManagerRetrieveParams []struct {
+	itemHash []byte
+	result   []byte
+	err      error
+}
+
+// bartItemManagerUpsertParams is the list of parameters passed at
+// the mock BARTItemManager.SetBuddyIcon call site.
+type bartItemManagerUpsertParams []struct {
+	itemHash []byte
+	payload  []byte
+	bartType uint16
+	err      error
+}
+
 // broadcastBuddyArrivedParams is the list of parameters passed at
 // the mock buddyBroadcaster.BroadcastBuddyArrived call site.
 type broadcastBuddyArrivedParams []struct {

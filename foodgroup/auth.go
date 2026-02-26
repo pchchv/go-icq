@@ -178,3 +178,19 @@ func (s AuthService) CrackCookie(authCookie []byte) (state.ServerCookie, error) 
 
 	return c, nil
 }
+
+// loginProperties represents the properties sent by the client at login.
+type loginProperties struct {
+	clientID                string
+	isBUCPAuth              bool
+	isFLAPAuth              bool
+	isFLAPJavaAuth          bool
+	isKerberosPlaintextAuth bool
+	isKerberosRoastedAuth   bool
+	isTOCAuth               bool
+	multiConnFlag           uint8
+	passwordHash            []byte
+	plaintextPassword       []byte
+	roastedPass             []byte
+	screenName              state.DisplayScreenName
+}

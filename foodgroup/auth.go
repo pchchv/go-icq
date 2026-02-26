@@ -1,6 +1,7 @@
 package foodgroup
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -145,4 +146,35 @@ func (s AuthService) RegisterBOSSession(ctx context.Context, serverCookie state.
 	}
 
 	return sess, nil
+}
+
+// RetrieveBOSSession returns a user's existing session instance.
+func (s AuthService) RetrieveBOSSession(ctx context.Context, serverCookie state.ServerCookie) (*state.SessionInstance, error) {
+	u, err := s.userManager.User(ctx, serverCookie.ScreenName.IdentScreenName())
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve user: %w", err)
+	} else if u == nil {
+		return nil, fmt.Errorf("user not found")
+	}
+
+	sess := s.sessionRetriever.RetrieveSession(u.IdentScreenName)
+	if sess == nil {
+		return nil, nil
+	}
+
+	return sess.Instance(serverCookie.SessionNum), nil
+}
+
+func (s AuthService) CrackCookie(authCookie []byte) (state.ServerCookie, error) {
+	c := state.ServerCookie{}
+	buf, err := s.cookieBaker.Crack(authCookie)
+	if err != nil {
+		return c, err
+	}
+
+	if err := wire.UnmarshalBE(&c, bytes.NewBuffer(buf)); err != nil {
+		return c, err
+	}
+
+	return c, nil
 }

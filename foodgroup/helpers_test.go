@@ -149,3 +149,26 @@ type broadcastVisibilityParams []struct {
 	doSendDepartures bool
 	err              error
 }
+
+// buddiesParams is the list of parameters passed at
+// the mock FeedbagManager.Buddies call site.
+type buddiesParams []struct {
+	screenName state.IdentScreenName
+	results    []state.IdentScreenName
+}
+
+// buddyBroadcasterParams is a helper struct that
+// contains mock parameters for buddyBroadcaster methods.
+type buddyBroadcasterParams struct {
+	broadcastBuddyArrivedParams
+	broadcastBuddyDepartedParams
+	broadcastVisibilityParams
+}
+
+// buddyIconMetadataParams is the list of parameters passed at
+// the mock BARTItemManager.BuddyIconMetadata call site.
+type buddyIconMetadataParams []struct {
+	screenName state.IdentScreenName
+	result     *wire.BARTID
+	err        error
+}

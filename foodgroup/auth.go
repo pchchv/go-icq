@@ -309,6 +309,17 @@ func (s AuthService) KerberosLogin(ctx context.Context, inBody wire.SNAC_0x050C_
 	}, nil
 }
 
+// SignoutChat removes user from chat room and notifies remaining participants of their departure.
+func (s AuthService) SignoutChat(ctx context.Context, instance *state.SessionInstance) {
+	alertUserLeft(ctx, instance, s.chatMessageRelayer)
+	s.chatSessionRegistry.RemoveSession(instance)
+}
+
+// Signout removes this user's session.
+func (s AuthService) Signout(ctx context.Context, instance *state.SessionInstance) {
+	s.sessionManager.RemoveSession(instance)
+}
+
 func (s AuthService) createUser(ctx context.Context, props loginProperties, advertisedHost string) (wire.TLVRestBlock, error) {
 	err := s.createAccount(ctx, props.screenName, "welcome1")
 	if err != nil {

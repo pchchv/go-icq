@@ -4,6 +4,7 @@ import (
 	"net/mail"
 
 	"github.com/pchchv/go-icq/state"
+	"github.com/pchchv/go-icq/wire"
 )
 
 // accountManagerConfirmStatusParams is the list of parameters passed at
@@ -123,4 +124,28 @@ type allRelationshipsParams []struct {
 	filter     []state.IdentScreenName
 	result     []state.Relationship
 	err        error
+}
+
+// broadcastBuddyArrivedParams is the list of parameters passed at
+// the mock buddyBroadcaster.BroadcastBuddyArrived call site.
+type broadcastBuddyArrivedParams []struct {
+	screenName  state.DisplayScreenName
+	err         error
+	bodyMatcher func(snac wire.TLVUserInfo) bool
+}
+
+// broadcastBuddyDepartedParams is the list of parameters passed at
+// the mock buddyBroadcaster.BroadcastBuddyDeparted call site.
+type broadcastBuddyDepartedParams []struct {
+	screenName state.IdentScreenName
+	err        error
+}
+
+// broadcastVisibilityParams is the list of parameters passed at
+// the mock buddyBroadcaster.BroadcastVisibility call site.
+type broadcastVisibilityParams []struct {
+	from             state.IdentScreenName
+	filter           []state.IdentScreenName
+	doSendDepartures bool
+	err              error
 }

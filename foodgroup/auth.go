@@ -180,6 +180,44 @@ func (s AuthService) CrackCookie(authCookie []byte) (state.ServerCookie, error) 
 	return c, nil
 }
 
+// BUCPLogin processes a BUCP authentication request for AIM v3.5-v5.9.
+// Upon successful login, a session is created.
+// If login credentials are invalid and app config DisableAuth is true,
+// a stub user is created and login continues as normal.
+// DisableAuth allows you to skip the account creation procedure,
+// which simplifies the login flow during development.
+// If login is successful, the SNAC TLV list contains the BOS server address
+// (wire.LoginTLVTagsReconnectHere) and an authorization cookie (wire.LoginTLVTagsAuthorizationCookie).
+// Else, an error code is set (wire.LoginTLVTagsErrorSubcode).
+func (s AuthService) BUCPLogin(ctx context.Context, inBody wire.SNAC_0x17_0x02_BUCPLoginRequest, advertisedHost string) (wire.SNACMessage, error) {
+	block, err := s.login(ctx, inBody.TLVList, advertisedHost)
+	if err != nil {
+		return wire.SNACMessage{}, err
+	}
+	return wire.SNACMessage{
+		Frame: wire.SNACFrame{
+			FoodGroup: wire.BUCP,
+			SubGroup:  wire.BUCPLoginResponse,
+		},
+		Body: wire.SNAC_0x17_0x03_BUCPLoginResponse{
+			TLVRestBlock: block,
+		},
+	}, nil
+}
+
+// FLAPLogin processes a FLAP authentication request for AIM v1.0-v3.0.
+// Upon successful login, a session is created.
+// If login credentials are invalid and app config DisableAuth is true,
+// a stub user is created and login continues as normal.
+// DisableAuth allows you to skip the account creation procedure,
+// which simplifies the login flow during development.
+// If login is successful, the SNAC TLV list contains the BOS server address
+// (wire.LoginTLVTagsReconnectHere) and an authorization cookie (wire.LoginTLVTagsAuthorizationCookie).
+// Else, an error code is set (wire.LoginTLVTagsErrorSubcode).
+func (s AuthService) FLAPLogin(ctx context.Context, inFrame wire.FLAPSignonFrame, advertisedHost string) (wire.TLVRestBlock, error) {
+	return s.login(ctx, inFrame.TLVList, advertisedHost)
+}
+
 func (s AuthService) createUser(ctx context.Context, props loginProperties, advertisedHost string) (wire.TLVRestBlock, error) {
 	err := s.createAccount(ctx, props.screenName, "welcome1")
 	if err != nil {

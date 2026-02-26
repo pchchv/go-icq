@@ -3,9 +3,11 @@ package foodgroup
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pchchv/go-icq/config"
@@ -193,4 +195,58 @@ type loginProperties struct {
 	plaintextPassword       []byte
 	roastedPass             []byte
 	screenName              state.DisplayScreenName
+}
+
+// fromTLV creates an instance of loginProperties from a TLV list.
+func (l *loginProperties) fromTLV(list wire.TLVList) error {
+	// extract screen name
+	if screenName, found := list.String(wire.LoginTLVTagsScreenName); found {
+		l.screenName = state.DisplayScreenName(screenName)
+	} else {
+		return errors.New("screen name doesn't exist in tlv")
+	}
+
+	// extract client name and version
+	if clientID, found := list.String(wire.LoginTLVTagsClientIdentity); found {
+		l.clientID = clientID
+	}
+
+	// get the password from the appropriate TLV
+	// older clients have a roasted password,
+	// newer clients have a hashed password
+	// ICQ may omit the password TLV when logging in without saved password
+	switch {
+	case list.HasTag(wire.LoginTLVTagsPasswordHash):
+		// extract password hash for BUCP login
+		l.passwordHash, _ = list.Bytes(wire.LoginTLVTagsPasswordHash)
+		l.isBUCPAuth = true
+	case list.HasTag(wire.LoginTLVTagsRoastedPassword):
+		// extract roasted password for FLAP login
+		l.roastedPass, _ = list.Bytes(wire.LoginTLVTagsRoastedPassword)
+		if strings.HasPrefix(l.clientID, "AOL Instant Messenger (TM) version") &&
+			strings.Contains(l.clientID, "for Java") {
+			l.isFLAPJavaAuth = true
+		} else {
+			l.isFLAPAuth = true
+		}
+	case list.HasTag(wire.LoginTLVTagsRoastedTOCPassword):
+		// extract roasted password for TOC FLAP login
+		l.roastedPass, _ = list.Bytes(wire.LoginTLVTagsRoastedTOCPassword)
+		l.isTOCAuth = true
+	case list.HasTag(wire.LoginTLVTagsPlaintextPassword):
+		l.plaintextPassword, _ = list.Bytes(wire.LoginTLVTagsPlaintextPassword)
+		l.isKerberosPlaintextAuth = true
+	case list.HasTag(wire.LoginTLVTagsRoastedKerberosPassword):
+		l.roastedPass, _ = list.Bytes(wire.LoginTLVTagsRoastedKerberosPassword)
+		l.isKerberosRoastedAuth = true
+	default:
+		l.isFLAPAuth = true
+	}
+
+	// does the client support multiple concurrent sessions?
+	if multiConnFlags, found := list.Uint8(wire.LoginTLVTagsMultiConnFlags); found {
+		l.multiConnFlag = multiConnFlags
+	}
+
+	return nil
 }

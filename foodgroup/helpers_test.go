@@ -301,3 +301,11 @@ type deleteMessagesParams []struct {
 	recipIn state.IdentScreenName
 	err     error
 }
+
+// deleteUserParams is the list of parameters passed at
+// the mock ClientSideBuddyListManager.RemoveBuddy call site.
+type denyBuddyParams []struct {
+	me   state.IdentScreenName
+	them state.IdentScreenName
+	err  error
+}

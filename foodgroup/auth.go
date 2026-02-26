@@ -249,3 +249,12 @@ func (l *loginProperties) fromTLV(list wire.TLVList) error {
 
 	return nil
 }
+
+func loginFailureResponse(props loginProperties, errCode uint16) wire.TLVRestBlock {
+	return wire.TLVRestBlock{
+		TLVList: []wire.TLV{
+			wire.NewTLVBE(wire.LoginTLVTagsScreenName, props.screenName),
+			wire.NewTLVBE(wire.LoginTLVTagsErrorSubcode, errCode),
+		},
+	}
+}

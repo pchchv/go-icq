@@ -3,6 +3,7 @@ package foodgroup
 import (
 	"context"
 	"net/mail"
+	"net/netip"
 	"time"
 
 	"github.com/pchchv/go-icq/state"
@@ -785,4 +786,171 @@ func matchSession(mustMatch state.IdentScreenName) interface{} {
 	return mock.MatchedBy(func(s *state.SessionInstance) bool {
 		return mustMatch == s.IdentScreenName()
 	})
+}
+
+// sessClientID sets the client ID.
+func sessClientID(clientID string) func(instance *state.SessionInstance) {
+	return func(instance *state.SessionInstance) {
+		instance.SetClientID(clientID)
+	}
+}
+
+// sessOptAllInactive makes all instances in the session group inactive
+// (away/idle/closed).
+func sessOptAllInactive(instance *state.SessionInstance) {
+	// set away message to make instance inactive
+	instance.SetAwayMessage("away message")
+	// also set idle to ensure it's inactive
+	instance.SetIdle(time.Hour)
+}
+
+// sessOptBot sets the bot flag to true on the session object.
+func sessOptBot(instance *state.SessionInstance) {
+	instance.SetUserInfoFlag(wire.OServiceUserFlagBot)
+}
+
+// sessBuddyIcon sets session buddy icon.
+func sessOptBuddyIcon(icon wire.BARTID) func(instance *state.SessionInstance) {
+	return func(instance *state.SessionInstance) {
+		instance.Session().SetBuddyIcon(icon)
+	}
+}
+
+// sessOptCannedAwayMessage sets a canned away message
+// ("this is my away message!") on the session object.
+func sessOptCannedAwayMessage(instance *state.SessionInstance) {
+	instance.SetAwayMessage("this is my away message!")
+}
+
+// sessOptCannedSignonTime sets a canned
+// sign-on time (1696790127565) on the session object.
+func sessOptCannedSignonTime(instance *state.SessionInstance) {
+	instance.Session().SetSignonTime(time.UnixMilli(1696790127565))
+}
+
+// sessOptChatRoomCookie sets cookie on the session object.
+func sessOptChatRoomCookie(cookie string) func(instance *state.SessionInstance) {
+	return func(instance *state.SessionInstance) {
+		instance.Session().SetChatRoomCookie(cookie)
+	}
+}
+
+// sessOptClosed makes the session instance closed (inactive).
+func sessOptClosed(instance *state.SessionInstance) {
+	instance.CloseInstance()
+}
+
+// sessOptIdle sets the idle flag to dur on the session object.
+func sessOptIdle(dur time.Duration) func(instance *state.SessionInstance) {
+	return func(instance *state.SessionInstance) {
+		instance.SetIdle(dur)
+	}
+}
+
+// sessOptInvisible sets the invisible flag to true on the session object.
+func sessOptInvisible(instance *state.SessionInstance) {
+	instance.SetUserStatusBitmask(wire.OServiceUserStatusInvisible)
+}
+
+// sessOptKerberosAuth indicates the session signed on.
+func sessOptKerberosAuth(instance *state.SessionInstance) {
+	instance.SetKerberosAuth(true)
+}
+
+// sessOptMemberSince sets the member since timestamp on the session object.
+func sessOptMemberSince(t time.Time) func(instance *state.SessionInstance) {
+	return func(instance *state.SessionInstance) {
+		instance.Session().SetMemberSince(t)
+	}
+}
+
+// sessOptMixedStates simulates a multisession scenario with mixed states.
+// This would require multiple instances,
+// but for testing purposes we'll just keep the instance active to
+// simulate having some active sessions.
+func sessOptMixedStates(instance *state.SessionInstance) {
+	// keep instance active to simulate mixed states scenario
+	// in a real multisession scenario,
+	// this would have multiple instances with some active and some inactive
+}
+
+// sessOptOfflineMsgCount sets the offline message count on the session object.
+func sessOptOfflineMsgCount(count int) func(instance *state.SessionInstance) {
+	return func(instance *state.SessionInstance) {
+		instance.Session().SetOfflineMsgCount(count)
+	}
+}
+
+// sessOptProfile sets profile.
+func sessOptProfile(profile state.UserProfile) func(instance *state.SessionInstance) {
+	return func(instance *state.SessionInstance) {
+		instance.SetProfile(profile)
+	}
+}
+
+// sessOptSetFoodGroupVersion sets food group versions.
+func sessOptSetFoodGroupVersion(foodGroup uint16, version uint16) func(instance *state.SessionInstance) {
+	return func(instance *state.SessionInstance) {
+		var versions [wire.MDir + 1]uint16
+		versions[foodGroup] = version
+		instance.SetFoodGroupVersions(versions)
+	}
+}
+
+// sessOptSetRateClasses sets rate limit classes.
+func sessOptSetRateClasses(classes wire.RateLimitClasses) func(instance *state.SessionInstance) {
+	return func(instance *state.SessionInstance) {
+		instance.Session().SetRateClasses(time.Now(), classes)
+	}
+}
+
+// sessOptSignonComplete sets the sign on complete flag to true.
+func sessOptSignonComplete(instance *state.SessionInstance) {
+	instance.SetSignonComplete()
+}
+
+// sessOptSignonTime sets the sign-on time on the session object.
+func sessOptSignonTime(t time.Time) func(instance *state.SessionInstance) {
+	return func(instance *state.SessionInstance) {
+		instance.Session().SetSignonTime(t)
+	}
+}
+
+// sessOptSomeActive ensures some instances are active (not all inactive).
+func sessOptSomeActive(instance *state.SessionInstance) {
+	// don't set away message or idle - keep instance active
+	// this simulates a multisession scenario where at least one instance is active
+}
+
+// sessOptCaps sets caps.
+func sessOptUIN(UIN uint32) func(instance *state.SessionInstance) {
+	return func(instance *state.SessionInstance) {
+		instance.Session().SetUIN(UIN)
+	}
+}
+
+// sessOptUserInfoFlag sets a user info flag on the session object.
+func sessOptUserInfoFlag(flag uint16) func(instance *state.SessionInstance) {
+	return func(instance *state.SessionInstance) {
+		instance.SetUserInfoFlag(flag)
+	}
+}
+
+// sessOptCaps sets caps.
+func sessOptWantTypingEvents(instance *state.SessionInstance) {
+	instance.Session().SetTypingEventsEnabled(true)
+}
+
+// sessOptWarning sets a warning level on the session object.
+func sessOptWarning(level int16) func(instance *state.SessionInstance) {
+	return func(instance *state.SessionInstance) {
+		instance.Session().SetWarning(uint16(level))
+	}
+}
+
+// sessRemoteAddr sets the client's ip address/port.
+func sessRemoteAddr(remoteAddr netip.AddrPort) func(instance *state.SessionInstance) {
+	return func(instance *state.SessionInstance) {
+		instance.SetRemoteAddr(&remoteAddr)
+	}
 }

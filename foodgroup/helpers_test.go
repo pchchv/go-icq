@@ -478,6 +478,29 @@ type messageRelayerParams struct {
 	relayToSelfParams
 }
 
+// offlineMessageManagerParams is a helper struct that
+// contains mock parameters for OfflineMessageManager methods.
+type offlineMessageManagerParams struct {
+	deleteMessagesParams
+	retrieveMessagesParams
+	saveMessageParams
+	setOfflineMsgCountParams
+}
+
+// profileManagerParams is a helper struct that
+// contains mock parameters for ProfileManager methods.
+type profileManagerParams struct {
+	findByAIMEmailParams
+	findByAIMKeywordParams
+	findByAIMNameAndAddrParams
+	getUserParams
+	interestListParams
+	retrieveProfileParams
+	setDirectoryInfoParams
+	setKeywordsParams
+	setProfileParams
+}
+
 // permitBuddyParams is the list of parameters passed at
 // the mock ClientSideBuddyListManager.PermitBuddy call site.
 type permitBuddyParams []struct {

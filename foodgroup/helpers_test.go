@@ -432,6 +432,16 @@ type interestListParams []struct {
 	err    error
 }
 
+// messageRelayerParams is a helper struct that
+// contains mock parameters for MessageRelayer methods.
+type messageRelayerParams struct {
+	relayToScreenNamesParams
+	relayToScreenNameParams
+	relayToOtherInstancesParams
+	relayToScreenNameActiveOnlyParams
+	relayToSelfParams
+}
+
 // permitBuddyParams is the list of parameters passed at
 // the mock ClientSideBuddyListManager.PermitBuddy call site.
 type permitBuddyParams []struct {

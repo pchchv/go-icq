@@ -490,3 +490,25 @@ type relayToSelfParams []struct {
 	screenName state.IdentScreenName
 	message    wire.SNACMessage
 }
+
+// removeDenyBuddyParams is the list of parameters passed at
+// the mock ClientSideBuddyListManager.RemoveDenyBuddy call site.
+type removeDenyBuddyParams []struct {
+	me   state.IdentScreenName
+	them state.IdentScreenName
+	err  error
+}
+
+// // removePermitBuddyParams is the list of parameters passed at
+// the mock ClientSideBuddyListManager.RemovePermitBuddy call site.
+type removePermitBuddyParams []struct {
+	me   state.IdentScreenName
+	them state.IdentScreenName
+	err  error
+}
+
+// removeSessionParams is the list of parameters passed at
+// the mock SessionRegistry.RemoveSession call site.
+type removeSessionParams []struct {
+	screenName state.IdentScreenName
+}

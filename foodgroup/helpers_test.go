@@ -439,3 +439,19 @@ type permitBuddyParams []struct {
 	them state.IdentScreenName
 	err  error
 }
+
+// relationshipFetcherParams is a helper struct that
+// contains mock parameters for RelationshipFetcher methods.
+type relationshipFetcherParams struct {
+	allRelationshipsParams
+	relationshipParams
+}
+
+// relationshipParams is the list of parameters passed at
+// the mock RelationshipFetcher.Relationship call site.
+type relationshipParams []struct {
+	me     state.IdentScreenName
+	them   state.IdentScreenName
+	result state.Relationship
+	err    error
+}

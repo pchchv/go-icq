@@ -755,3 +755,17 @@ type useParams []struct {
 type userManagerParams struct {
 	getUserParams
 }
+
+// newTestInstance creates a session object with 0 or more functional options applied.
+func newTestInstance(screenName state.DisplayScreenName, options ...func(instance *state.SessionInstance)) *state.SessionInstance {
+	session := state.NewSession()
+	session.SetIdentScreenName(screenName.IdentScreenName())
+	session.SetDisplayScreenName(screenName)
+	session.SetRateClasses(time.Now(), wire.DefaultRateLimitClasses())
+	instance := session.AddInstance()
+	for _, op := range options {
+		op(instance)
+	}
+
+	return instance
+}

@@ -406,3 +406,11 @@ type feedbagUpsertParams []struct {
 	screenName state.IdentScreenName
 	items      []wire.FeedbagItem
 }
+
+// getUserParams is the list of parameters passed at
+// the mock UserManager.User call site.
+type getUserParams []struct {
+	screenName state.IdentScreenName
+	result     *state.User
+	err        error
+}

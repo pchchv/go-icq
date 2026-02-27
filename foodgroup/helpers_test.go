@@ -545,3 +545,15 @@ type retrieveSessionParams []struct {
 	screenName state.IdentScreenName
 	result     *state.Session
 }
+
+// useParams is the list of parameters passed at
+// the mock FeedbagManager.Use call site.
+type useParams []struct {
+	screenName state.IdentScreenName
+}
+
+// userManagerParams is a helper struct that
+// contains mock parameters for UserManager methods.
+type userManagerParams struct {
+	getUserParams
+}

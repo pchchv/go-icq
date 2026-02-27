@@ -392,6 +392,18 @@ type feedbagLastModifiedParams []struct {
 	result     time.Time
 }
 
+// feedbagManagerParams is a helper struct that
+// contains mock parameters for FeedbagManager methods.
+type feedbagManagerParams struct {
+	adjacentUsersParams
+	feedbagUpsertParams
+	buddiesParams
+	feedbagParams
+	feedbagLastModifiedParams
+	feedbagDeleteParams
+	useParams
+}
+
 // feedbagParams is the list of parameters passed at
 // the mock FeedbagManager.Feedbag call site.
 type feedbagParams []struct {

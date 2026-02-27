@@ -455,3 +455,38 @@ type relationshipParams []struct {
 	result state.Relationship
 	err    error
 }
+
+// relayToOtherInstancesParams is the list of parameters passed at
+// the mock MessageRelayer.RelayToOtherInstances call site.
+type relayToOtherInstancesParams []struct {
+	screenName state.IdentScreenName
+	message    wire.SNACMessage
+}
+
+// relayToScreenNameActiveOnlyParams is the list of parameters passed at
+// the mock MessageRelayer.RelayToScreenNameActiveOnly call site.
+type relayToScreenNameActiveOnlyParams []struct {
+	screenName state.IdentScreenName
+	message    wire.SNACMessage
+}
+
+// relayToScreenNameParams is the list of parameters passed at
+// the mock MessageRelayer.RelayToScreenName call site.
+type relayToScreenNameParams []struct {
+	screenName state.IdentScreenName
+	message    wire.SNACMessage
+}
+
+// relayToScreenNamesParams is the list of parameters passed at
+// the mock MessageRelayer.RelayToScreenNames call site.
+type relayToScreenNamesParams []struct {
+	screenNames []state.IdentScreenName
+	message     wire.SNACMessage
+}
+
+// relayToSelfParams is the list of parameters passed at
+// the mock MessageRelayer.RelayToSelf call site.
+type relayToSelfParams []struct {
+	screenName state.IdentScreenName
+	message    wire.SNACMessage
+}

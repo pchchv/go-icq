@@ -1,11 +1,13 @@
 package foodgroup
 
 import (
+	"context"
 	"net/mail"
 	"time"
 
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
+	"github.com/stretchr/testify/mock"
 )
 
 // accountManagerConfirmStatusParams is the list of parameters passed at
@@ -768,4 +770,19 @@ func newTestInstance(screenName state.DisplayScreenName, options ...func(instanc
 	}
 
 	return instance
+}
+
+// matchContext matches any instance of Context interface.
+func matchContext() interface{} {
+	return mock.MatchedBy(func(ctx any) bool {
+		_, ok := ctx.(context.Context)
+		return ok
+	})
+}
+
+// matchSession matches a mock call based session ident screen name.
+func matchSession(mustMatch state.IdentScreenName) interface{} {
+	return mock.MatchedBy(func(s *state.SessionInstance) bool {
+		return mustMatch == s.IdentScreenName()
+	})
 }

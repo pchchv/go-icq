@@ -566,6 +566,19 @@ type saveMessageParams []struct {
 	err              error
 }
 
+// sessionRegistryParams is a helper struct that
+// contains mock parameters for SessionRegistry methods.
+type sessionRegistryParams struct {
+	addSessionParams
+	removeSessionParams
+}
+
+// sessionRetrieverParams is a helper struct that
+// contains mock parameters for SessionRetriever methods.
+type sessionRetrieverParams struct {
+	retrieveSessionParams
+}
+
 // useParams is the list of parameters passed at
 // the mock FeedbagManager.Use call site.
 type useParams []struct {

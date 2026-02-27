@@ -414,3 +414,20 @@ type getUserParams []struct {
 	result     *state.User
 	err        error
 }
+
+// icqUserFinderParams is a helper struct that
+// contains mock parameters for ICQUserFinder methods.
+type icqUserFinderParams struct {
+	findByDetailsParams
+	findByEmailParams
+	findByInterestsParams
+	findByKeywordParams
+	findByUINParams
+}
+
+// interestListParams is the list of parameters passed at
+// the mock ProfileManager.InterestList call site.
+type interestListParams []struct {
+	result []wire.ODirKeywordListItem
+	err    error
+}

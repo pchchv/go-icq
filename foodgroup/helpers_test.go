@@ -558,6 +558,14 @@ type retrieveSessionParams []struct {
 	result     *state.Session
 }
 
+// saveMessageParams is the list of parameters passed at
+// the mock OfflineMessageManager.SaveMessage call site.
+type saveMessageParams []struct {
+	offlineMessageIn state.OfflineMessage
+	countOut         int
+	err              error
+}
+
 // useParams is the list of parameters passed at
 // the mock FeedbagManager.Use call site.
 type useParams []struct {

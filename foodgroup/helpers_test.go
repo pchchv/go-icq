@@ -478,6 +478,29 @@ type messageRelayerParams struct {
 	relayToSelfParams
 }
 
+// mockParams is a helper struct that
+// centralizes mock function call parameters in
+// one place for a table test.
+type mockParams struct {
+	accountManagerParams
+	bartItemManagerParams
+	buddyBroadcasterParams
+	relationshipFetcherParams
+	chatMessageRelayerParams
+	chatRoomRegistryParams
+	cookieBakerParams
+	feedbagManagerParams
+	icqUserFinderParams
+	icqUserUpdaterParams
+	clientSideBuddyListManagerParams
+	messageRelayerParams
+	offlineMessageManagerParams
+	profileManagerParams
+	sessionRegistryParams
+	sessionRetrieverParams
+	userManagerParams
+}
+
 // offlineMessageManagerParams is a helper struct that
 // contains mock parameters for OfflineMessageManager methods.
 type offlineMessageManagerParams struct {

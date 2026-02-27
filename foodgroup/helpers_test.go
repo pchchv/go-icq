@@ -2,6 +2,7 @@ package foodgroup
 
 import (
 	"net/mail"
+	"time"
 
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
@@ -375,4 +376,33 @@ type findByUINParams []struct {
 	UIN    uint32
 	result state.User
 	err    error
+}
+
+// feedbagDeleteParams is the list of parameters passed at
+// the mock FeedbagManager.FeedbagDelete call site.
+type feedbagDeleteParams []struct {
+	screenName state.IdentScreenName
+	items      []wire.FeedbagItem
+}
+
+// feedbagLastModifiedParams is the list of parameters passed at
+// the mock FeedbagManager.FeedbagLastModified call site.
+type feedbagLastModifiedParams []struct {
+	screenName state.IdentScreenName
+	result     time.Time
+}
+
+// feedbagParams is the list of parameters passed at
+// the mock FeedbagManager.Feedbag call site.
+type feedbagParams []struct {
+	screenName state.IdentScreenName
+	results    []wire.FeedbagItem
+	err        error
+}
+
+// feedbagUpsertParams is the list of parameters passed at
+// the mock FeedbagManager.FeedbagUpsert call site.
+type feedbagUpsertParams []struct {
+	screenName state.IdentScreenName
+	items      []wire.FeedbagItem
 }

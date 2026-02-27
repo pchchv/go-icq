@@ -512,3 +512,26 @@ type removePermitBuddyParams []struct {
 type removeSessionParams []struct {
 	screenName state.IdentScreenName
 }
+
+// deleteMessagesParams is the list of parameters passed at
+// the mock OfflineMessageManager.RetrieveMessages call site.
+type retrieveMessagesParams []struct {
+	recipIn     state.IdentScreenName
+	messagesOut []state.OfflineMessage
+	err         error
+}
+
+// retrieveProfileParams is the list of parameters passed at
+// the mock ProfileManager.Profile call site.
+type retrieveProfileParams []struct {
+	screenName state.IdentScreenName
+	result     state.UserProfile
+	err        error
+}
+
+// retrieveSessionParams is the list of parameters passed at
+// the mock SessionRetriever.RetrieveSession call site.
+type retrieveSessionParams []struct {
+	screenName state.IdentScreenName
+	result     *state.Session
+}

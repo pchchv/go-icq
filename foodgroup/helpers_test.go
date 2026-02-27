@@ -309,3 +309,70 @@ type denyBuddyParams []struct {
 	them state.IdentScreenName
 	err  error
 }
+
+// findByAIMEmailParams is the list of parameters passed at
+// the mock ProfileManager.FindByAIMEmail call site.
+type findByAIMEmailParams []struct {
+	email  string
+	result state.User
+	err    error
+}
+
+// findByAIMKeywordParams is the list of parameters passed at
+// the mock ProfileManager.FindByAIMKeyword call site.
+type findByAIMKeywordParams []struct {
+	keyword string
+	result  []state.User
+	err     error
+}
+
+// findByAIMNameAndAddrParams is the list of parameters passed at
+// the mock ProfileManager.FindByAIMNameAndAddr call site.
+type findByAIMNameAndAddrParams []struct {
+	info   state.AIMNameAndAddr
+	result []state.User
+	err    error
+}
+
+// setBasicInfoParams is the list of parameters passed at
+// the mock ICQUserFinder.FindByDetails call site.
+type findByDetailsParams []struct {
+	firstName string
+	lastName  string
+	nickName  string
+	result    []state.User
+	err       error
+}
+
+// findByEmailParams is the list of parameters passed at
+// the mock ICQUserFinder.FindByEmail call site.
+type findByEmailParams []struct {
+	email  string
+	result state.User
+	err    error
+}
+
+// setBasicInfoParams is the list of parameters passed at
+// the mock ICQUserFinder.FindByInterests call site.
+type findByInterestsParams []struct {
+	code     uint16
+	keywords []string
+	result   []state.User
+	err      error
+}
+
+// findByKeywordParams is the list of parameters passed at
+// the mock ICQUserFinder.FindByKeyword call site.
+type findByKeywordParams []struct {
+	keyword string
+	result  []state.User
+	err     error
+}
+
+// findByUINParams is the list of parameters passed at
+// the mock ICQUserFinder.FindByUIN call site.
+type findByUINParams []struct {
+	UIN    uint32
+	result state.User
+	err    error
+}

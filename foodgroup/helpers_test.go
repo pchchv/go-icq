@@ -431,3 +431,11 @@ type interestListParams []struct {
 	result []wire.ODirKeywordListItem
 	err    error
 }
+
+// permitBuddyParams is the list of parameters passed at
+// the mock ClientSideBuddyListManager.PermitBuddy call site.
+type permitBuddyParams []struct {
+	me   state.IdentScreenName
+	them state.IdentScreenName
+	err  error
+}

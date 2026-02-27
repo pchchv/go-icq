@@ -579,6 +579,101 @@ type sessionRetrieverParams struct {
 	retrieveSessionParams
 }
 
+// setAffiliationsParams is the list of parameters passed at
+// the mock ICQUserUpdater.SetAffiliations call site.
+type setAffiliationsParams []struct {
+	name state.IdentScreenName
+	data state.ICQAffiliations
+	err  error
+}
+
+// setBasicInfoParams is the list of parameters passed at
+// the mock ICQUserUpdater.SetBasicInfo call site.
+type setBasicInfoParams []struct {
+	name state.IdentScreenName
+	data state.ICQBasicInfo
+	err  error
+}
+
+// setDirectoryInfoParams is the list of parameters passed at
+// the mock ProfileManager.SetDirectoryInfo call site.
+type setDirectoryInfoParams []struct {
+	screenName state.IdentScreenName
+	info       state.AIMNameAndAddr
+	err        error
+}
+
+// setInterestsParams is the list of parameters passed at
+// the mock ICQUserUpdater.SetInterests call site.
+type setInterestsParams []struct {
+	name state.IdentScreenName
+	data state.ICQInterests
+	err  error
+}
+
+// setKeywordsParams is the list of parameters passed at
+// the mock ProfileManager.SetKeywords call site.
+type setKeywordsParams []struct {
+	screenName state.IdentScreenName
+	keywords   [5]string
+	err        error
+}
+
+// setMoreInfoParams is the list of parameters passed at
+// the mock ICQUserUpdater.SetMoreInfo call site.
+type setMoreInfoParams []struct {
+	name state.IdentScreenName
+	data state.ICQMoreInfo
+	err  error
+}
+
+// setOfflineMsgCountParams is the list of parameters passed at
+// the mock OfflineMessageManager.SetOfflineMsgCount call site.
+type setOfflineMsgCountParams []struct {
+	screenName state.IdentScreenName
+	count      int
+	err        error
+}
+
+// setPermissionsParams is the list of parameters passed at
+// the mock ICQUserUpdater.SetPermissions call site.
+type setPermissionsParams []struct {
+	name state.IdentScreenName
+	data state.ICQPermissions
+	err  error
+}
+
+// setPDModeParams is the list of parameters passed at
+// the mock ClientSideBuddyListManager.SetPDMode call site.
+type setPDModeParams []struct {
+	userScreenName state.IdentScreenName
+	pdMode         wire.FeedbagPDMode
+	err            error
+}
+
+// setProfileParams is the list of parameters passed at
+// the mock ProfileManager.SetProfile call site.
+type setProfileParams []struct {
+	screenName state.IdentScreenName
+	body       state.UserProfile
+}
+
+// setUserNotesParams is the list of parameters passed at
+// the mock ICQUserUpdater.SetUserNotes call site.
+type setUserNotesParams []struct {
+	name state.IdentScreenName
+	data state.ICQUserNotes
+	err  error
+}
+
+// setWorkInfoParams is the list of parameters passed at
+// the mock ICQUserUpdater.SetWorkInfo call site.
+type setWorkInfoParams []struct {
+	name state.IdentScreenName
+	data state.ICQWorkInfo
+	err  error
+}
+
 // useParams is the list of parameters passed at
 // the mock FeedbagManager.Use call site.
 type useParams []struct {

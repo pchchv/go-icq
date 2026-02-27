@@ -258,6 +258,18 @@ type chatRoomRegistryParams struct {
 	createChatRoomParams
 }
 
+// clientSideBuddyListManagerParams is a helper struct that contains mock
+// parameters for ClientSideBuddyListManager methods.
+type clientSideBuddyListManagerParams struct {
+	addBuddyParams
+	deleteBuddyParams
+	denyBuddyParams
+	permitBuddyParams
+	removeDenyBuddyParams
+	removePermitBuddyParams
+	setPDModeParams
+}
+
 // cookieBakerParams is a helper struct that
 // contains mock parameters for CookieBaker methods.
 type cookieBakerParams struct {
@@ -435,6 +447,18 @@ type icqUserFinderParams struct {
 	findByInterestsParams
 	findByKeywordParams
 	findByUINParams
+}
+
+// icqUserUpdaterParams is a helper struct that
+// contains mock parameters for ICQUserUpdater methods.
+type icqUserUpdaterParams struct {
+	setAffiliationsParams
+	setBasicInfoParams
+	setInterestsParams
+	setMoreInfoParams
+	setPermissionsParams
+	setUserNotesParams
+	setWorkInfoParams
 }
 
 // interestListParams is the list of parameters passed at

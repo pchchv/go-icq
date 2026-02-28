@@ -954,3 +954,9 @@ func sessRemoteAddr(remoteAddr netip.AddrPort) func(instance *state.SessionInsta
 		instance.SetRemoteAddr(&remoteAddr)
 	}
 }
+
+func userInfoWithBARTIcon(instance *state.SessionInstance, bid wire.BARTID) wire.TLVUserInfo {
+	info := instance.Session().TLVUserInfo()
+	info.Append(wire.NewTLVBE(wire.OServiceUserInfoBARTInfo, bid))
+	return info
+}

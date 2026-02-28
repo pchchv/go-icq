@@ -2598,7 +2598,7 @@ func TestICBMService_EvilRequest(t *testing.T) {
 func TestICBMService_ParameterQuery(t *testing.T) {
 	svc := NewICBMService(nil, nil, nil, nil, nil, nil, nil, wire.DefaultSNACRateLimits(), slog.Default())
 
-	have := svc.ParameterQuery(nil, wire.SNACFrame{RequestID: 1234})
+	have := svc.ParameterQuery(context.TODO(), wire.SNACFrame{RequestID: 1234})
 	want := wire.SNACMessage{
 		Frame: wire.SNACFrame{
 			FoodGroup: wire.ICBM,

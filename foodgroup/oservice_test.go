@@ -1073,7 +1073,7 @@ func TestOServiceService_SetUserInfoFields(t *testing.T) {
 				logger:           slog.Default(),
 				buddyBroadcaster: buddyUpdateBroadcaster,
 			}
-			outputSNAC, err := svc.SetUserInfoFields(nil, tc.instance, tc.inputSNAC.Frame,
+			outputSNAC, err := svc.SetUserInfoFields(context.TODO(), tc.instance, tc.inputSNAC.Frame,
 				tc.inputSNAC.Body.(wire.SNAC_0x01_0x1E_OServiceSetUserInfoFields))
 			assert.ErrorIs(t, err, tc.expectErr)
 			if tc.expectErr != nil {
@@ -2095,7 +2095,7 @@ func TestOServiceService_IdleNotification(t *testing.T) {
 				logger:           slog.Default(),
 				buddyBroadcaster: buddyUpdateBroadcaster,
 			}
-			haveErr := svc.IdleNotification(nil, tt.instance, tt.bodyIn)
+			haveErr := svc.IdleNotification(context.TODO(), tt.instance, tt.bodyIn)
 			assert.ErrorIs(t, tt.wantErr, haveErr)
 		})
 	}

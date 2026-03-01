@@ -64,6 +64,9 @@ func main() {
 	api := MgmtAPI(deps)
 	g.Go(api.ListenAndServe)
 
+	oscar := OSCAR(deps)
+	g.Go(oscar.ListenAndServe)
+
 	var webAPI *webapi.Server
 	if os.Getenv("ENABLE_WEBAPI") == "1" {
 		webAPI = WebAPI(deps)
@@ -75,8 +78,9 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_ = kerb.Shutdown(shutdownCtx)
 	_ = api.Shutdown(shutdownCtx)
+	_ = kerb.Shutdown(shutdownCtx)
+	_ = oscar.Shutdown(shutdownCtx)
 	if os.Getenv("ENABLE_WEBAPI") == "1" {
 		_ = webAPI.Shutdown(shutdownCtx)
 	}

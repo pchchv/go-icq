@@ -13,6 +13,8 @@ import (
 	"github.com/pchchv/go-icq/server/http"
 	"github.com/pchchv/go-icq/server/kerberos"
 	oscarmiddleware "github.com/pchchv/go-icq/server/oscar/middleware"
+	"github.com/pchchv/go-icq/server/webapi"
+	"github.com/pchchv/go-icq/server/webapi/handlers"
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 )
@@ -138,6 +140,124 @@ func MgmtAPI(deps Container) *http.Server {
 		state.NewAccountCreator(deps.sqLiteUserStore.InsertUser),
 		logger,
 	)
+}
+
+// WebAPI creates an HTTP server for the webapi protocol.
+func WebAPI(deps Container) *webapi.Server {
+	logger := deps.logger.With("svc", "webapi")
+	// create feedbag adapter for WebAPI
+	feedbagAdapter := &webapi.FeedbagAdapter{
+		Store: deps.sqLiteUserStore,
+	}
+	// create WebAPI buddy list manager (local to WebAPI)
+	buddyListManager := handlers.NewBuddyListManager(
+		feedbagAdapter,
+		deps.inMemorySessionManager,
+		logger,
+	)
+	// create the OSCAR buddy broadcaster for WebAPI to use
+	oscarBuddyBroadcaster := foodgroup.NewBuddyService(
+		deps.inMemorySessionManager,
+		deps.sqLiteUserStore,
+		deps.sqLiteUserStore,
+		deps.inMemorySessionManager,
+		deps.sqLiteUserStore,
+	)
+	handler := webapi.Handler{
+		AdminService: foodgroup.NewAdminService(
+			deps.sqLiteUserStore,
+			deps.sqLiteUserStore,
+			deps.sqLiteUserStore,
+			deps.inMemorySessionManager,
+			deps.inMemorySessionManager,
+			deps.logger,
+		),
+		AuthService: foodgroup.NewAuthService(
+			deps.cfg,
+			deps.inMemorySessionManager,
+			deps.inMemorySessionManager,
+			deps.chatSessionManager,
+			deps.sqLiteUserStore,
+			deps.hmacCookieBaker,
+			deps.chatSessionManager,
+			deps.sqLiteUserStore,
+			deps.sqLiteUserStore,
+			deps.rateLimitClasses,
+			state.NewAccountCreator(deps.sqLiteUserStore.InsertUser),
+			logger,
+		),
+		BuddyListRegistry: deps.sqLiteUserStore,
+		BuddyService: foodgroup.NewBuddyService(
+			deps.inMemorySessionManager,
+			deps.sqLiteUserStore,
+			deps.sqLiteUserStore,
+			deps.inMemorySessionManager,
+			deps.sqLiteUserStore,
+		),
+		CookieBaker:      deps.hmacCookieBaker,
+		DirSearchService: foodgroup.NewODirService(logger, deps.sqLiteUserStore),
+		ICBMService:      deps.icbmSvc,
+		LocateService: foodgroup.NewLocateService(
+			deps.sqLiteUserStore,
+			deps.inMemorySessionManager,
+			deps.sqLiteUserStore,
+			deps.sqLiteUserStore,
+			deps.inMemorySessionManager,
+			deps.sqLiteUserStore,
+		),
+		Logger: logger,
+		OServiceService: foodgroup.NewOServiceService(
+			deps.cfg,
+			deps.inMemorySessionManager,
+			logger,
+			deps.hmacCookieBaker,
+			deps.sqLiteUserStore,
+			deps.sqLiteUserStore,
+			deps.inMemorySessionManager,
+			deps.sqLiteUserStore,
+			deps.snacRateLimits,
+			deps.chatSessionManager,
+			deps.sqLiteUserStore,
+			deps.sqLiteUserStore,
+		),
+		PermitDenyService: foodgroup.NewPermitDenyService(
+			deps.sqLiteUserStore,
+			deps.sqLiteUserStore,
+			deps.sqLiteUserStore,
+			deps.inMemorySessionManager,
+			deps.inMemorySessionManager,
+		),
+		TOCConfigStore: deps.sqLiteUserStore,
+		ChatService:    foodgroup.NewChatService(deps.chatSessionManager),
+		ChatNavService: foodgroup.NewChatNavService(logger, deps.sqLiteUserStore),
+		SNACRateLimits: deps.snacRateLimits,
+		// new fields for WebAPI handlers
+		SessionRetriever: deps.inMemorySessionManager,
+		FeedbagRetriever: feedbagAdapter,
+		FeedbagManager:   feedbagAdapter,
+		// phase 2 additions
+		MessageRelayer:        deps.inMemorySessionManager,
+		OfflineMessageManager: deps.sqLiteUserStore,
+		BuddyBroadcaster:      oscarBuddyBroadcaster,
+		ProfileManager:        deps.sqLiteUserStore,
+		RelationshipFetcher:   deps.sqLiteUserStore,
+		// authentication support
+		UserManager: deps.sqLiteUserStore,
+		TokenStore:  deps.sqLiteUserStore.NewWebAPITokenStore(),
+		// phase 3 additions
+		PreferenceManager: deps.sqLiteUserStore.NewWebPreferenceManager(),
+		PermitDenyManager: deps.sqLiteUserStore.NewWebPermitDenyManager(),
+		// phase 4 additions for OSCAR Bridge
+		OSCARBridgeStore: deps.sqLiteUserStore.NewOSCARBridgeStore(),
+		OSCARConfig:      webapi.NewOSCARConfigAdapter(deps.cfg),
+		// phase 5 additions for buddy list and messaging
+		BuddyListManager: buddyListManager,
+		// phase 5 additions for chat rooms
+		ChatManager: deps.sqLiteUserStore.NewWebAPIChatManager(logger, deps.webAPISessionManager),
+	}
+
+	// pass SQLiteUserStore as the API key validator (it implements middleware.APIKeyValidator)
+	return webapi.NewServer([]string{"0.0.0.0:9000"}, logger, handler, deps.sqLiteUserStore, deps.webAPISessionManager)
 }
 
 // Helper function to check if a slice contains a string.

@@ -16,12 +16,38 @@ import (
 	"github.com/pchchv/go-icq/server/kerberos"
 	"github.com/pchchv/go-icq/server/oscar"
 	oscarmiddleware "github.com/pchchv/go-icq/server/oscar/middleware"
+	"github.com/pchchv/go-icq/server/toc"
 	"github.com/pchchv/go-icq/server/webapi"
 	"github.com/pchchv/go-icq/server/webapi/handlers"
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 	"golang.org/x/time/rate"
 )
+
+// import (
+// 	"context"
+// 	"errors"
+// 	"fmt"
+// 	"log/slog"
+// 	"os"
+// 	"strings"
+// 	"time"
+
+// 	"github.com/kelseyhightower/envconfig"
+// 	"golang.org/x/time/rate"
+
+// 	"github.com/mk6i/open-oscar-server/config"
+// 	"github.com/mk6i/open-oscar-server/foodgroup"
+// 	"github.com/mk6i/open-oscar-server/server/http"
+// 	"github.com/mk6i/open-oscar-server/server/kerberos"
+// 	"github.com/mk6i/open-oscar-server/server/oscar"
+// 	oscarmiddleware "github.com/mk6i/open-oscar-server/server/oscar/middleware"
+// 	"github.com/mk6i/open-oscar-server/server/toc"
+// 	"github.com/mk6i/open-oscar-server/server/webapi"
+// 	"github.com/mk6i/open-oscar-server/server/webapi/handlers"
+// 	"github.com/mk6i/open-oscar-server/state"
+// 	"github.com/mk6i/open-oscar-server/wire"
+// )
 
 // Container groups together common dependencies.
 type Container struct {
@@ -379,6 +405,89 @@ func OSCAR(deps Container) *oscar.Server {
 		deps.snacRateLimits,
 		oscar.NewIPRateLimiter(rate.Every(1*time.Minute), 10, 1*time.Minute),
 		deps.Listeners,
+		deps.icbmSvc.RestoreWarningLevel,
+		deps.icbmSvc.UpdateWarnLevel,
+	)
+}
+
+// TOC creates a TOC server.
+func TOC(deps Container) *toc.Server {
+	logger := deps.logger.With("svc", "TOC")
+	return toc.NewServer(
+		deps.cfg.TOCListeners,
+		logger,
+		toc.OSCARProxy{
+			AdminService: foodgroup.NewAdminService(
+				deps.sqLiteUserStore,
+				deps.sqLiteUserStore,
+				deps.sqLiteUserStore,
+				deps.inMemorySessionManager,
+				deps.inMemorySessionManager,
+				deps.logger,
+			),
+			AuthService: foodgroup.NewAuthService(
+				deps.cfg,
+				deps.inMemorySessionManager,
+				deps.inMemorySessionManager,
+				deps.chatSessionManager,
+				deps.sqLiteUserStore,
+				deps.hmacCookieBaker,
+				deps.chatSessionManager,
+				deps.sqLiteUserStore,
+				deps.sqLiteUserStore,
+				deps.rateLimitClasses,
+				state.NewAccountCreator(deps.sqLiteUserStore.InsertUser),
+				logger,
+			),
+			BuddyListRegistry: deps.sqLiteUserStore,
+			BuddyService: foodgroup.NewBuddyService(
+				deps.inMemorySessionManager,
+				deps.sqLiteUserStore,
+				deps.sqLiteUserStore,
+				deps.inMemorySessionManager,
+				deps.sqLiteUserStore,
+			),
+			CookieBaker:      deps.hmacCookieBaker,
+			DirSearchService: foodgroup.NewODirService(logger, deps.sqLiteUserStore),
+			ICBMService:      deps.icbmSvc,
+			LocateService: foodgroup.NewLocateService(
+				deps.sqLiteUserStore,
+				deps.inMemorySessionManager,
+				deps.sqLiteUserStore,
+				deps.sqLiteUserStore,
+				deps.inMemorySessionManager,
+				deps.sqLiteUserStore,
+			),
+			Logger: logger,
+			OServiceService: foodgroup.NewOServiceService(
+				deps.cfg,
+				deps.inMemorySessionManager,
+				logger,
+				deps.hmacCookieBaker,
+				deps.sqLiteUserStore,
+				deps.sqLiteUserStore,
+				deps.inMemorySessionManager,
+				deps.sqLiteUserStore,
+				deps.snacRateLimits,
+				deps.chatSessionManager,
+				deps.sqLiteUserStore,
+				deps.sqLiteUserStore,
+			),
+			PermitDenyService: foodgroup.NewPermitDenyService(
+				deps.sqLiteUserStore,
+				deps.sqLiteUserStore,
+				deps.sqLiteUserStore,
+				deps.inMemorySessionManager,
+				deps.inMemorySessionManager,
+			),
+			TOCConfigStore:    deps.sqLiteUserStore,
+			ChatService:       foodgroup.NewChatService(deps.chatSessionManager),
+			ChatNavService:    foodgroup.NewChatNavService(logger, deps.sqLiteUserStore),
+			SNACRateLimits:    deps.snacRateLimits,
+			HTTPIPRateLimiter: toc.NewIPRateLimiter(rate.Every(1*time.Minute), 10, 1*time.Minute),
+			SessionRetriever:  deps.inMemorySessionManager,
+		},
+		toc.NewIPRateLimiter(rate.Every(1*time.Minute), 10, 1*time.Minute),
 		deps.icbmSvc.RestoreWarningLevel,
 		deps.icbmSvc.UpdateWarnLevel,
 	)

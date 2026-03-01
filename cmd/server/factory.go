@@ -7,8 +7,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/kelseyhightower/envconfig"
 	"github.com/pchchv/go-icq/config"
 	"github.com/pchchv/go-icq/foodgroup"
+	oscarmiddleware "github.com/pchchv/go-icq/server/oscar/middleware"
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
 )
@@ -26,6 +28,56 @@ type Container struct {
 	sqLiteUserStore        *state.SQLiteUserStore
 	webAPISessionManager   *state.WebAPISessionManager
 	Listeners              []config.Listener
+}
+
+// MakeCommonDeps creates common dependencies used by the food group services.
+func MakeCommonDeps() (c Container, err error) {
+	if err = validateConfigMigration(); err != nil {
+		return c, errors.New("unable to validate config migration: " + err.Error())
+	}
+
+	if err = envconfig.Process("", &c.cfg); err != nil {
+		return c, errors.New("unable to process app config: " + err.Error())
+	}
+
+	if err = c.cfg.Validate(); err != nil {
+		return c, errors.New("configuration validation failed: " + err.Error())
+	}
+
+	c.Listeners, err = c.cfg.ParseListenersCfg()
+	if err != nil {
+		return c, errors.New("unable to parse listener config: " + err.Error())
+	}
+
+	c.sqLiteUserStore, err = state.NewSQLiteUserStore(c.cfg.DBPath)
+	if err != nil {
+		return c, errors.New("unable to create feedbag store: " + err.Error())
+	}
+
+	c.hmacCookieBaker, err = state.NewHMACCookieBaker()
+	if err != nil {
+		return c, errors.New("unable to create HMAC cookie baker: " + err.Error())
+	}
+
+	c.logger = oscarmiddleware.NewLogger(c.cfg)
+	c.inMemorySessionManager = state.NewInMemorySessionManager(c.logger)
+	c.chatSessionManager = state.NewInMemoryChatSessionManager(c.logger)
+	c.webAPISessionManager = state.NewWebAPISessionManager()
+	c.rateLimitClasses = wire.DefaultRateLimitClasses()
+	c.snacRateLimits = wire.DefaultSNACRateLimits()
+	// ICBM svc is a common dep because OSCAR and TOC need to share convo history state
+	c.icbmSvc = foodgroup.NewICBMService(
+		c.sqLiteUserStore,
+		c.inMemorySessionManager,
+		c.sqLiteUserStore,
+		c.sqLiteUserStore,
+		c.inMemorySessionManager,
+		c.sqLiteUserStore,
+		c.sqLiteUserStore,
+		c.snacRateLimits,
+		c.logger,
+	)
+	return c, nil
 }
 
 // Helper function to check if a slice contains a string.

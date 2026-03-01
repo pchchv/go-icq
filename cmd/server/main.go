@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
+	"github.com/pchchv/env"
 )
 
 // default build fields populated by GoReleaser
@@ -14,6 +16,7 @@ var (
 )
 
 func init() {
+	cfgFile := flag.String("config", "settings.env", "Path to config file")
 	showHelp := flag.Bool("help", false, "Display help")
 	showVersion := flag.Bool("version", false, "Display build information")
 
@@ -28,6 +31,13 @@ func init() {
 	case *showHelp:
 		flag.PrintDefaults()
 		os.Exit(0)
+	}
+
+	// optionally populate environment variables with config file
+	if err := env.Load(*cfgFile); err != nil {
+		fmt.Printf("Config file (%s) not found, defaulting to env vars for app config...\n", *cfgFile)
+	} else {
+		fmt.Printf("Successfully loaded config file (%s)\n", *cfgFile)
 	}
 }
 

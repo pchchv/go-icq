@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pchchv/env"
+	"github.com/pchchv/go-icq/server/webapi"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -63,6 +64,12 @@ func main() {
 	api := MgmtAPI(deps)
 	g.Go(api.ListenAndServe)
 
+	var webAPI *webapi.Server
+	if os.Getenv("ENABLE_WEBAPI") == "1" {
+		webAPI = WebAPI(deps)
+		g.Go(webAPI.ListenAndServe)
+	}
+
 	<-ctx.Done()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -70,6 +77,9 @@ func main() {
 
 	_ = kerb.Shutdown(shutdownCtx)
 	_ = api.Shutdown(shutdownCtx)
+	if os.Getenv("ENABLE_WEBAPI") == "1" {
+		_ = webAPI.Shutdown(shutdownCtx)
+	}
 
 	if err = g.Wait(); err != nil {
 		deps.logger.Error("server initialization failed", "err", err.Error())

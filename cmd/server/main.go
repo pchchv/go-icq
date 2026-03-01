@@ -1,11 +1,16 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/pchchv/env"
+	"golang.org/x/sync/errgroup"
 )
 
 // default build fields populated by GoReleaser
@@ -41,4 +46,28 @@ func init() {
 	}
 }
 
-func main() {}
+func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	deps, err := MakeCommonDeps()
+	if err != nil {
+		fmt.Printf("startup failed: %s\n", err)
+		os.Exit(1)
+	}
+
+	g, ctx := errgroup.WithContext(ctx)
+	kerb := KerberosAPI(deps)
+	g.Go(kerb.ListenAndServe)
+
+	api := MgmtAPI(deps)
+	g.Go(api.ListenAndServe)
+
+	<-ctx.Done()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_ = kerb.Shutdown(shutdownCtx)
+	_ = api.Shutdown(shutdownCtx)
+}

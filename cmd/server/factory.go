@@ -24,31 +24,6 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// import (
-// 	"context"
-// 	"errors"
-// 	"fmt"
-// 	"log/slog"
-// 	"os"
-// 	"strings"
-// 	"time"
-
-// 	"github.com/kelseyhightower/envconfig"
-// 	"golang.org/x/time/rate"
-
-// 	"github.com/mk6i/open-oscar-server/config"
-// 	"github.com/mk6i/open-oscar-server/foodgroup"
-// 	"github.com/mk6i/open-oscar-server/server/http"
-// 	"github.com/mk6i/open-oscar-server/server/kerberos"
-// 	"github.com/mk6i/open-oscar-server/server/oscar"
-// 	oscarmiddleware "github.com/mk6i/open-oscar-server/server/oscar/middleware"
-// 	"github.com/mk6i/open-oscar-server/server/toc"
-// 	"github.com/mk6i/open-oscar-server/server/webapi"
-// 	"github.com/mk6i/open-oscar-server/server/webapi/handlers"
-// 	"github.com/mk6i/open-oscar-server/state"
-// 	"github.com/mk6i/open-oscar-server/wire"
-// )
-
 // Container groups together common dependencies.
 type Container struct {
 	cfg                    config.Config

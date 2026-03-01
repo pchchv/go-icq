@@ -1,22 +1,26 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pchchv/go-icq/config"
 	"github.com/pchchv/go-icq/foodgroup"
 	"github.com/pchchv/go-icq/server/http"
 	"github.com/pchchv/go-icq/server/kerberos"
+	"github.com/pchchv/go-icq/server/oscar"
 	oscarmiddleware "github.com/pchchv/go-icq/server/oscar/middleware"
 	"github.com/pchchv/go-icq/server/webapi"
 	"github.com/pchchv/go-icq/server/webapi/handlers"
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
+	"golang.org/x/time/rate"
 )
 
 // Container groups together common dependencies.
@@ -258,6 +262,126 @@ func WebAPI(deps Container) *webapi.Server {
 
 	// pass SQLiteUserStore as the API key validator (it implements middleware.APIKeyValidator)
 	return webapi.NewServer([]string{"0.0.0.0:9000"}, logger, handler, deps.sqLiteUserStore, deps.webAPISessionManager)
+}
+
+// OSCAR creates an OSCAR server for the OSCAR food group.
+func OSCAR(deps Container) *oscar.Server {
+	logger := deps.logger.With("svc", "OSCAR")
+	adminService := foodgroup.NewAdminService(
+		deps.sqLiteUserStore,
+		deps.sqLiteUserStore,
+		deps.sqLiteUserStore,
+		deps.inMemorySessionManager,
+		deps.inMemorySessionManager,
+		deps.logger,
+	)
+	authService := foodgroup.NewAuthService(
+		deps.cfg,
+		deps.inMemorySessionManager,
+		deps.inMemorySessionManager,
+		deps.chatSessionManager,
+		deps.sqLiteUserStore,
+		deps.hmacCookieBaker,
+		deps.chatSessionManager,
+		deps.sqLiteUserStore,
+		deps.sqLiteUserStore,
+		deps.rateLimitClasses,
+		state.NewAccountCreator(deps.sqLiteUserStore.InsertUser),
+		logger,
+	)
+	bartService := foodgroup.NewBARTService(
+		logger,
+		deps.sqLiteUserStore,
+		deps.inMemorySessionManager,
+		deps.sqLiteUserStore,
+		deps.inMemorySessionManager,
+	)
+	buddyService := foodgroup.NewBuddyService(
+		deps.inMemorySessionManager,
+		deps.sqLiteUserStore,
+		deps.sqLiteUserStore,
+		deps.inMemorySessionManager,
+		deps.sqLiteUserStore,
+	)
+	chatService := foodgroup.NewChatService(deps.chatSessionManager)
+	chatNavService := foodgroup.NewChatNavService(logger, deps.sqLiteUserStore)
+	feedbagService := foodgroup.NewFeedbagService(
+		logger,
+		deps.inMemorySessionManager,
+		deps.sqLiteUserStore,
+		deps.sqLiteUserStore,
+		deps.sqLiteUserStore,
+		deps.inMemorySessionManager,
+	)
+	permitDenyService := foodgroup.NewPermitDenyService(
+		deps.sqLiteUserStore,
+		deps.sqLiteUserStore,
+		deps.sqLiteUserStore,
+		deps.inMemorySessionManager,
+		deps.inMemorySessionManager,
+	)
+	locateService := foodgroup.NewLocateService(
+		deps.sqLiteUserStore,
+		deps.inMemorySessionManager,
+		deps.sqLiteUserStore,
+		deps.sqLiteUserStore,
+		deps.inMemorySessionManager,
+		deps.sqLiteUserStore,
+	)
+	oServiceService := foodgroup.NewOServiceService(
+		deps.cfg,
+		deps.inMemorySessionManager,
+		logger,
+		deps.hmacCookieBaker,
+		deps.sqLiteUserStore,
+		deps.sqLiteUserStore,
+		deps.inMemorySessionManager,
+		deps.sqLiteUserStore,
+		deps.snacRateLimits,
+		deps.chatSessionManager,
+		deps.sqLiteUserStore,
+		deps.sqLiteUserStore,
+	)
+	userLookupService := foodgroup.NewUserLookupService(deps.sqLiteUserStore)
+	statsService := foodgroup.NewStatsService()
+	oDirService := foodgroup.NewODirService(logger, deps.sqLiteUserStore)
+
+	if err := deps.sqLiteUserStore.ClearBuddyListRegistry(context.Background()); err != nil {
+		panic(err)
+	}
+
+	return oscar.NewServer(
+		authService,
+		deps.sqLiteUserStore,
+		deps.chatSessionManager,
+		buddyService,
+		logger,
+		oServiceService,
+		oscar.Handler{
+			AdminService:      adminService,
+			BARTService:       bartService,
+			BuddyService:      buddyService,
+			ChatNavService:    chatNavService,
+			ChatService:       chatService,
+			FeedbagService:    feedbagService,
+			ICBMService:       deps.icbmSvc,
+			LocateService:     locateService,
+			ODirService:       oDirService,
+			OServiceService:   oServiceService,
+			PermitDenyService: permitDenyService,
+			StatsService:      statsService,
+			UserLookupService: userLookupService,
+			RouteLogger: oscarmiddleware.RouteLogger{
+				Logger: logger,
+			},
+		}.Handle,
+		oServiceService,
+		deps.snacRateLimits,
+		oscar.NewIPRateLimiter(rate.Every(1*time.Minute), 10, 1*time.Minute),
+		deps.Listeners,
+		deps.icbmSvc.RestoreWarningLevel,
+		deps.icbmSvc.UpdateWarnLevel,
+	)
 }
 
 // Helper function to check if a slice contains a string.

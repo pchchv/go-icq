@@ -70,4 +70,9 @@ func main() {
 
 	_ = kerb.Shutdown(shutdownCtx)
 	_ = api.Shutdown(shutdownCtx)
+
+	if err = g.Wait(); err != nil {
+		deps.logger.Error("server initialization failed", "err", err.Error())
+		os.Exit(1)
+	}
 }

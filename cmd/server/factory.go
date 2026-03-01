@@ -10,6 +10,8 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/pchchv/go-icq/config"
 	"github.com/pchchv/go-icq/foodgroup"
+	"github.com/pchchv/go-icq/server/http"
+	"github.com/pchchv/go-icq/server/kerberos"
 	oscarmiddleware "github.com/pchchv/go-icq/server/oscar/middleware"
 	"github.com/pchchv/go-icq/state"
 	"github.com/pchchv/go-icq/wire"
@@ -78,6 +80,64 @@ func MakeCommonDeps() (c Container, err error) {
 		c.logger,
 	)
 	return c, nil
+}
+
+// KerberosAPI creates an HTTP server for the Kerberos server.
+func KerberosAPI(deps Container) *kerberos.Server {
+	logger := deps.logger.With("svc", "Kerberos")
+	authService := foodgroup.NewAuthService(
+		deps.cfg,
+		deps.inMemorySessionManager,
+		deps.inMemorySessionManager,
+		deps.chatSessionManager,
+		deps.sqLiteUserStore,
+		deps.hmacCookieBaker,
+		deps.chatSessionManager,
+		deps.sqLiteUserStore,
+		deps.sqLiteUserStore,
+		deps.rateLimitClasses,
+		state.NewAccountCreator(deps.sqLiteUserStore.InsertUser),
+		logger,
+	)
+	return kerberos.NewKerberosServer(deps.Listeners, logger, authService)
+}
+
+// MgmtAPI creates an HTTP server for the management API.
+func MgmtAPI(deps Container) *http.Server {
+	bld := config.Build{
+		Version: version,
+		Commit:  commit,
+		Date:    date,
+	}
+	logger := deps.logger.With("svc", "API")
+	buddyService := foodgroup.NewBuddyService(
+		deps.inMemorySessionManager,
+		deps.sqLiteUserStore,
+		deps.sqLiteUserStore,
+		deps.inMemorySessionManager,
+		deps.sqLiteUserStore,
+	)
+	return http.NewManagementAPI(
+		bld,
+		deps.cfg.APIListener,
+		deps.sqLiteUserStore,        // userManager
+		deps.inMemorySessionManager, // sessionRetriever
+		buddyService,
+		deps.sqLiteUserStore,        // chatRoomRetriever
+		deps.sqLiteUserStore,        // chatRoomCreator
+		deps.sqLiteUserStore,        // chatRoomDeleter
+		deps.chatSessionManager,     // chatSessionRetriever
+		deps.sqLiteUserStore,        // directoryManager
+		deps.inMemorySessionManager, // messageRelayer
+		deps.sqLiteUserStore,        // bartAssetManager
+		deps.sqLiteUserStore,        // feedbagRetriever
+		deps.sqLiteUserStore,        // feedbagManager
+		deps.sqLiteUserStore,        // accountManager
+		deps.sqLiteUserStore,        // profileRetriever
+		deps.sqLiteUserStore,        // webAPIKeyManager
+		state.NewAccountCreator(deps.sqLiteUserStore.InsertUser),
+		logger,
+	)
 }
 
 // Helper function to check if a slice contains a string.

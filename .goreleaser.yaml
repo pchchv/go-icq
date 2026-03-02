@@ -1,0 +1,85 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: linux
+    binary: go_icq
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm
+    goarm:
+      - "7"
+    main: ./cmd/server
+    env:
+      - CGO_ENABLED=0
+  - id: macos
+    binary: go_icq
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    main: ./cmd/server
+    env:
+      - CGO_ENABLED=0
+  - id: windows
+    binary: go_icq
+    goos:
+      - windows
+    goarch:
+      - amd64
+    main: ./cmd/server
+    env:
+      - CGO_ENABLED=0
+
+archives:
+  - id: linux
+    ids:
+      - linux
+    formats:
+      - tar.gz
+    wrap_in_directory: true
+    files:
+      - LICENSE
+      - src: config/settings.env
+        strip_parent: true
+      - src: config/ras.service
+        strip_parent: true
+    name_template: >-
+      {{ .Binary }}.{{ .Version }}.{{ .Os }}.
+      {{- if eq .Arch "amd64" }}x86_64{{ else }}arm64_arm7_raspberry_pi{{ end }}
+  - id: macos
+    ids:
+      - macos
+    formats:
+      - zip
+    wrap_in_directory: true
+    files:
+      - LICENSE
+      - src: config/settings.env
+        strip_parent: true
+    name_template: >-
+      {{ .Binary }}.{{ .Version }}.macos.
+      {{- if eq .Arch "amd64" }}intel_x86_64{{ else }}apple_silicon{{ end }}
+  - id: windows
+    ids:
+      - windows
+    formats:
+      - zip
+    wrap_in_directory: true
+    files:
+      - LICENSE
+      - src: config/settings.env
+        strip_parent: true
+    name_template: >-
+      {{ .Binary }}.{{ .Version }}.{{ .Os }}.
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
+
+release:
+    draft: true
